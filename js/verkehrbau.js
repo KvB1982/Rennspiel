@@ -3,13 +3,16 @@
 // Jede Fahrzeugart (Kleinwagen, Limousine, Geländewagen, Transporter, Lastwagen, Bus) ist eine Form aus wenigen Kisten.
 // Alle Autos einer Art werden auf einmal gemalt ("Instanzen") – das geht viel schneller als jedes Auto einzeln.
 // Die Lackfarbe kommt pro Auto dazu, Scheiben und Reifen bleiben dunkel, die Lichter leuchten.
-// Autos in der Nähe der Kamera (bis NAH Meter) zeigen ein fertiges Modell (Kenney Car Kit, CC0, siehe js/modelle.js),
-// weiter weg reichen die Kisten – das spart viele Dreiecke (ein Modell hat etwa 2000, eine Kisten-Form etwa 100).
+// Autos in der Nähe der Kamera (bis NAH Meter) zeigen ein fertiges Modell, weiter weg reichen die Kisten –
+// das spart viele Dreiecke (ein Modell hat etwa 5000, eine Kisten-Form etwa 100).
+// Die fertigen Modelle kommen aus 3D AI Studio (modelle/verkehr/, siehe js/automodelle.js): echt aussehende Autos mit Farbbild,
+// der Lack wird je Auto umgefärbt. Fehlen sie, nimmt das Spiel die bunten Autos von Kenney (CC0, js/modelle.js).
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ARTEN } from './verkehr.js';
 import { modell, passend, eckMaterial } from './modelle.js';
+import { echtesAuto, lackMaterial } from './automodelle.js';
 
 const NAH = 220;   // so nah (m) muss ein Auto sein, damit es als Modell gezeigt wird
 const MODELL = { kompakt: 'auto_kompakt', limousine: 'auto_limousine', gelaende: 'auto_gelaende', transporter: 'auto_transporter', lkw: 'auto_lkw' };
@@ -26,6 +29,16 @@ function radTeil(x, z, r, b) {
   const g = new THREE.CylinderGeometry(r, r, b, 10); g.rotateZ(Math.PI / 2); g.translate(x, r, z);
   const cols = []; for (let k = 0; k < g.getAttribute('position').count; k++) cols.push(0.06, 0.06, 0.06);
   g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  return g;
+}
+
+// Ein fertiges Modell auf die Maße der Fahrzeugart bringen (Mitte bei x = z = 0, Reifen auf y = 0)
+function aufMass(form, A) {
+  const g = form.clone(); g.computeBoundingBox();
+  const k = g.boundingBox, gr = k.getSize(new THREE.Vector3());
+  g.translate(-(k.min.x + k.max.x) / 2, -k.min.y, -(k.min.z + k.max.z) / 2);
+  g.scale(A.breit / gr.x, A.hoch / gr.y, A.lang / gr.z);
+  g.computeVertexNormals();
   return g;
 }
 
@@ -93,8 +106,15 @@ export class VerkehrBild {
       szene.add(k, l);
       // fertiges Modell für die nahen Autos (auf die Maße der Fahrzeugart gezogen)
       let nah = null;
-      const m = MODELL[typ] && modell(MODELL[typ]);
-      if (m) {
+      const echt = echtesAuto('verkehr_' + typ);
+      const m = !echt && MODELL[typ] && modell(MODELL[typ]);
+      if (echt) {
+        // echt aussehendes Modell: ein Stück, der Lack bekommt die Farbe des einzelnen Autos
+        const lack = new THREE.InstancedMesh(aufMass(echt.koerper, ARTEN[typ]), lackMaterial(echt.bild, 0xffffff, { proAuto: true }), liste.length);
+        lack.setColorAt(0, c.setHex(0xffffff));
+        lack.castShadow = lack.receiveShadow = true; lack.frustumCulled = false; lack.count = 0; szene.add(lack);
+        nah = { lack, rest: null };
+      } else if (m) {
         const A = ARTEN[typ], t = passend(m, { breit: A.breit, hoch: A.hoch, lang: A.lang });
         const lack = new THREE.InstancedMesh(t.lack, lackMat, liste.length), rest = new THREE.InstancedMesh(t.rest, restMat, liste.length);
         for (const o of [lack, rest]) { o.castShadow = o.receiveShadow = true; o.frustumCulled = false; o.count = 0; szene.add(o); }
@@ -102,6 +122,7 @@ export class VerkehrBild {
       }
       this.gruppen.push({ liste, k, l, nah });
     }
+    this.nichts = new THREE.Matrix4().makeScale(0, 0, 0);
     this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.p = new THREE.Vector3(); this.e = new THREE.Vector3(1, 1, 1); this.eu = new THREE.Euler(0, 0, 0, 'YXZ');
     this.farbe = new THREE.Color();
   }
@@ -113,18 +134,21 @@ export class VerkehrBild {
       liste.forEach((t, i) => {
         // weggeschleuderte Autos kippen und nicken ein wenig (kipp, nick)
         eu.set(t.nick || 0, t.h, t.kipp || 0); q.setFromEuler(eu); p.set(t.x, t.y, t.z);
-        m4.compose(p, q, e); l.setMatrixAt(i, m4);
+        m4.compose(p, q, e);
+        const nahDran = nah && kp && (t.x - kp.x) ** 2 + (t.z - kp.z) ** 2 < NAH * NAH;
+        // Lampen als kleine Kisten: nur bei den einfachen Autos (die echten Modelle haben ihre Lampen im Farbbild)
+        l.setMatrixAt(i, nahDran && !nah.rest ? this.nichts : m4);
         // nah: als Modell, weit weg: als Kisten-Form (die Listen werden jedes Bild neu gefüllt)
-        if (nah && kp && (t.x - kp.x) ** 2 + (t.z - kp.z) ** 2 < NAH * NAH) {
-          nah.lack.setMatrixAt(n, m4); nah.rest.setMatrixAt(n, m4); nah.lack.setColorAt(n, this.farbe.setHex(t.farbe)); n++;
+        if (nahDran) {
+          nah.lack.setMatrixAt(n, m4); if (nah.rest) nah.rest.setMatrixAt(n, m4); nah.lack.setColorAt(n, this.farbe.setHex(t.farbe)); n++;
         } else { k.setMatrixAt(fern, m4); k.setColorAt(fern, this.farbe.setHex(t.farbe)); fern++; }
       });
       k.count = fern;
       k.instanceMatrix.needsUpdate = true; l.instanceMatrix.needsUpdate = true;
       if (k.instanceColor) k.instanceColor.needsUpdate = true;
       if (nah) {
-        nah.lack.count = nah.rest.count = n;
-        nah.lack.instanceMatrix.needsUpdate = nah.rest.instanceMatrix.needsUpdate = true;
+        nah.lack.count = n; nah.lack.instanceMatrix.needsUpdate = true;
+        if (nah.rest) { nah.rest.count = n; nah.rest.instanceMatrix.needsUpdate = true; }
         if (nah.lack.instanceColor) nah.lack.instanceColor.needsUpdate = true;
       }
     }

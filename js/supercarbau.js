@@ -14,55 +14,11 @@
 
 import * as THREE from 'three';
 import { rumpf, rad, stange } from './autobau.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { ladeSupercars as laden, echtesAuto, lackMaterial } from './automodelle.js';
 import { supercar, SUPERCARS } from './supercars.js';
 
-// ---------------------------------------------------------------- fertige Modelle
-const echt = new Map();   // id → { koerper: Form, raeder: [{ form, ort }], bild }
-let echtLaeuft = null;
-// Alle Supercar-Modelle laden. Wartet höchstens `bis` Millisekunden. Mit ?ohnemodelle bleiben die selbst gebauten Autos.
-export function ladeSupercars({ bis = 8000 } = {}) {
-  if (typeof location !== 'undefined' && /ohnemodelle|ohnesupercars/.test(location.search)) return Promise.resolve();
-  if (!echtLaeuft) {
-    const lader = new GLTFLoader();
-    echtLaeuft = Promise.all(SUPERCARS.map(S => lader.loadAsync(`modelle/supercars/${S.id}.glb`).then(g => {
-      const e = { koerper: null, raeder: [], bild: null };
-      g.scene.traverse(o => {
-        if (!o.isMesh) return;
-        o.geometry.computeVertexNormals();
-        e.bild = o.material.map;
-        if (o.name === 'koerper') e.koerper = o.geometry;
-        else if (o.name.startsWith('rad_')) e.raeder.push({ name: o.name, form: o.geometry, ort: o.position.clone() });
-      });
-      e.raeder.sort((a, b) => 'rad_vl rad_vr rad_hl rad_hr'.indexOf(a.name) - 'rad_vl rad_vr rad_hl rad_hr'.indexOf(b.name));
-      if (e.koerper && e.raeder.length === 4) echt.set(S.id, e);
-    }).catch(() => { /* fehlt: dann das selbst gebaute Auto */ })));
-  }
-  return Promise.race([echtLaeuft, new Promise(ok => setTimeout(ok, bis))]);
-}
-
-// Material für die Karosserie: Im Farbbild ist der Lack blau gespeichert. Hier wird das Blau gegen die
-// gewünschte Lackfarbe getauscht (in einem kleinen Zusatz zum Malprogramm der Grafikkarte) und der Lack glänzt.
-function lackMaterial(bild, farbe) {
-  const mat = new THREE.MeshStandardMaterial({ map: bild, roughness: 0.6, metalness: 0 });
-  const u = { uLack: { value: new THREE.Color(farbe) } };
-  mat.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, u);
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 uLack;\nfloat lackK = 0.0;')
-      .replace('#include <map_fragment>', `#include <map_fragment>
-        {
-          float grau = min(diffuseColor.r, diffuseColor.g);       // Glanzlicht und Schatten
-          float blau = diffuseColor.b - grau;                      // so viel Lack ist an dieser Stelle
-          lackK = smoothstep(0.03, 0.12, blau);
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(grau) + uLack * min(blau * 3.4, 1.25), lackK);
-        }`)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.2, lackK);')
-      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.4, lackK);');
-  };
-  mat.userData.lack = u.uLack.value;
-  return mat;
-}
+// Alle Supercar-Modelle laden (siehe js/automodelle.js)
+export const ladeSupercars = opt => laden(SUPERCARS.map(S => S.id), opt);
 
 const VORN = 1.25, HINTEN = -1.45;   // Achsen (wie in supercars.js: a = 1,25 m, b = 1,45 m)
 const RAD = 0.35;                    // Radhalbmesser
@@ -292,7 +248,7 @@ export function baueSupercar(id, { farbe = null } = {}) {
   const mark = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.03, 0.03), new THREE.MeshStandardMaterial({ color: 0xf2c21a })); mark.position.y = 0.17; lenkrad.add(mark);
 
   // Gibt es das fertige Modell? Dann kommt alles bisher Gebaute in eine Gruppe "alt" (nur im Cockpit zu sehen)
-  const E = echt.get(S.id);
+  const E = echtesAuto(S.id);
   const raeder = [], lenkVorn = [];
   let sicht = null;
   if (E) {

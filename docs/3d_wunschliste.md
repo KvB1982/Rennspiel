@@ -38,3 +38,9 @@ Nur freie Modelle mit Lizenz **CC0** (oder CC-BY mit Namen im Spiel). Keine Mark
 - Eingebaut: sechs Supercars aus 3D AI Studio (Räder drehen und lenken, Lackfarbe wählbar), Gras- und Asphalt-Foto von Poly Haven, Bäume als flache Bilder der Powershot-Baum-Modelle.
 - In den anderen Spielen gefunden: Powershot hat Bäume, Häuser je Land, Laternen, Bodenbilder und fünf Alltagsautos (die Autos sind unscharf und tragen eine marken-typische Front, deshalb nicht übernommen). Frontline hat nur Militär-Modelle. Reitturnier hat Pferd und Hindernisse.
 - Offen: Verkehrsautos im selben Stil wie die Supercars (jetzt noch Kenney), Formel-Rennwagen als Modell, Häuser aus Powershot für Dörfer und Stadt, Bremslichter an den neuen Supercars, Cockpit passend zum neuen Modell.
+
+## Nachtrag 21.11.2026 (2): Verkehr, Formel-Rennwagen, Menü-Bilder
+
+- Eingebaut: sechs Verkehrsautos (auch ein Bus) und der Formel-Rennwagen aus 3D AI Studio, Bilder im Menü (Fahrzeuge, Supercars in der gewählten Lackfarbe, Strecken).
+- Gesucht, aber nicht gefunden: frei herunterladbare, echt aussehende Autos ohne Marke. Sketchfab braucht eine Anmeldung und ist gesperrt, Poly Pizza lässt Programme nicht durch, Poly Haven hat keine Autos, und die freien Pakete (Kenney, Quaternius, KayKit) sind alle im Spielzeug-Stil.
+- Offen: Häuser aus Powershot für Dörfer und Stadt, Bremslichter an den neuen Supercars, Cockpit passend zu den neuen Modellen, Startnummer und zweite Teamfarbe auf dem neuen Formel-Rennwagen, Scheiben für den Bus.

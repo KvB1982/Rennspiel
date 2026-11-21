@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- Rennspiel – malt die Auto-Modelle als kleine Bilder (für die Karten im Menü und zum Anschauen).
+     Aufruf über tools/server.py:  http://localhost:8765/tools/autobilder.html?d=supercars/falkner,formel/formel&farbe=0000ff
+       d      = Modelle aus modelle/ (ohne .glb), mit Komma getrennt
+       farbe  = Lackfarbe (ohne Angabe: reines Blau – das Menü tauscht das Blau später gegen die gewählte Farbe)
+       b, h   = Bildgröße (ohne Angabe 600 × 240)
+       blick  = seite | vorn | oben (ohne Angabe: schräg von vorn)
+       nah    = Abstand der Kamera (1 = normal, kleiner = näher)
+     Danach steht in window.bilder zu jedem Namen ein PNG mit durchsichtigem Hintergrund (als Daten-Adresse). -->
+<html><body style="margin:0;background:#223">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { lackMaterial } from '../js/automodelle.js';
+const q = new URLSearchParams(location.search);
+const dateien = (q.get('d') || 'supercars/falkner').split(','), farbe = parseInt(q.get('farbe') || '0000ff', 16);
+const B = +(q.get('b') || 600), H = +(q.get('h') || 240), blick = q.get('blick') || 'schraeg';
+const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+r.setSize(B, H); r.setClearColor(0, 0); r.outputColorSpace = THREE.SRGBColorSpace;
+const umgebung = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture;
+const lader = new GLTFLoader();
+window.bilder = {};
+for (const d of dateien) {
+  const s = new THREE.Scene(); s.environment = umgebung;
+  const licht = new THREE.DirectionalLight(0xffffff, 2.2); licht.position.set(3, 6, 5); s.add(licht);
+  const g = (await lader.loadAsync(`../modelle/${d}.glb`)).scene;
+  g.traverse(o => { if (o.isMesh) { o.geometry.computeVertexNormals(); o.material = lackMaterial(o.material.map, o.name.startsWith('rad_') ? 0x26272b : farbe); } });
+  s.add(g);
+  const kiste = new THREE.Box3().setFromObject(g), m = kiste.getCenter(new THREE.Vector3()), gr = kiste.getSize(new THREE.Vector3());
+  const k = new THREE.PerspectiveCamera(22, B / H, 0.1, 200);
+  const weit = Math.max(gr.z * 1.75, gr.x * 3) * (blick === 'schraeg' ? 1.12 : 1.25) * +(q.get('nah') || 1);
+  const von = blick === 'seite' ? [1, 0.12, 0] : blick === 'vorn' ? [0.15, 0.25, 1] : blick === 'oben' ? [0.01, 1, 0.3] : [0.86, 0.3, 0.62];
+  k.position.copy(m).add(new THREE.Vector3(...von).normalize().multiplyScalar(weit)); k.lookAt(m);
+  r.render(s, k);
+  const name = d.split('/').pop();
+  window.bilder[name] = r.domElement.toDataURL('image/png');
+  const bild = new Image(); bild.src = window.bilder[name]; bild.title = name; document.body.appendChild(bild);
+}
+window.fertig = true;
+</script></body></html>
