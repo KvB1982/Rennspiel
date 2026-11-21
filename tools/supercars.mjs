@@ -4,6 +4,7 @@
 //   PAKETE=~/modell-werkzeug node tools/supercars.mjs falkner    nur eins
 //   PAKETE=~/modell-werkzeug node tools/supercars.mjs formel     der Formel-Rennwagen (Vorlage: quellen_modelle/formel/formel.glb)
 //   PAKETE=~/modell-werkzeug node tools/supercars.mjs verkehr    die sechs Autos für den Verkehr (Vorlagen: quellen_modelle/verkehr/)
+//   PAKETE=~/modell-werkzeug node tools/supercars.mjs rallye     die drei Rallyeautos (Vorlagen: quellen_modelle/rallye/)
 //
 // Die Vorlagen (je etwa 45 MB und 1,4 Millionen Dreiecke) liegen in quellen_modelle/supercars/<id>.glb
 // (kommt nicht ins Repository). Heraus kommt modelle/supercars/<id>.glb mit etwa 20.000 Dreiecken.
@@ -37,6 +38,10 @@ export const AUTOS = {
   vento: { lang: 4.55, mitte: 0.025, vornIst: '+x', dreiecke: 16000 },
   // Der Formel-Rennwagen (Vorlage in quellen_modelle/formel/): Räder werden auch herausgeschnitten
   formel: { art: 'formel', lang: 5.47, mitte: -0.035, vornIst: '+x', dreiecke: 12000, radDreiecke: 1000, rad: [0.31, 0.37], tief: 0.42 },
+  // Die Rallyeautos (Vorlagen in quellen_modelle/rallye/): wie die Supercars, Räder etwas kleiner
+  sturmfalke: { art: 'rallye', lang: 4.1, mitte: 0, vornIst: '+x', dreiecke: 16000, rad: [0.3, 0.37] },
+  quadra: { art: 'rallye', lang: 4.2, mitte: 0, vornIst: '+x', dreiecke: 16000, rad: [0.3, 0.37] },
+  kaiten: { art: 'rallye', lang: 4.35, mitte: 0, vornIst: '+x', dreiecke: 16000, rad: [0.3, 0.37] },
   // Die Autos im Verkehr (Vorlagen in quellen_modelle/verkehr/): ein Stück ohne einzelne Räder, kleines Farbbild.
   // Die Längen sind die aus ARTEN in js/verkehr.js.
   kompakt: { art: 'verkehr', lang: 4.0, vornIst: '+x', dreiecke: 5000, bild: 512 },

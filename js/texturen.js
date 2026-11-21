@@ -253,3 +253,72 @@ export function nummer(n, farbe = '#fff', grund = null) {
   x.fillText(String(n), 64, 70);
   return textur(c, false);
 }
+
+// ---------------------------------------------------------------- Rallye
+// Schotterweg: Das Bild geht über die ganze Breite des Weges (links → rechts) und 12 m in Fahrtrichtung.
+// Wo die Räder fahren, ist der Schotter festgefahren und dunkler (zwei Fahrspuren), in der Mitte und am Rand
+// liegt loser, heller Schotter mit größeren Steinen. hell = Grundfarbe (heller Kalkschotter oder dunkle Walderde)
+export const schotterWeg = (art = 'hell') => merk('schotterWeg' + art, () => {
+  const W = 512, H = 512, [c, x] = leinwand(W, H), [hc, hx] = leinwand(W, H), r = zufall(art.length * 71 + 5);
+  const n = rauschen(art === 'hell' ? 41 : 43);
+  const F = art === 'hell'
+    ? { grund: [176, 160, 132], spur: [128, 116, 96], stein: ['#d9ccb2', '#b8a888', '#9a8a70', '#e8dfcc', '#7d705c'] }
+    : { grund: [122, 102, 78], spur: [84, 70, 54], stein: ['#a08a6c', '#857058', '#6a5844', '#b8a688', '#5a4a3a'] };
+  // Wie stark ist eine Stelle festgefahren? (0 = lose, 1 = Fahrspur). u = 0 … 1 quer über den Weg
+  const fest = u => Math.max(Math.exp(-(((u - 0.3) / 0.075) ** 2)), Math.exp(-(((u - 0.7) / 0.075) ** 2)));
+  const img = x.createImageData(W, H), himg = hx.createImageData(W, H);
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const u = i / W, a = j / H * Math.PI * 2;
+    // nahtlos in Fahrtrichtung: Rauschen auf einem Ring
+    const v = n(u * 6, Math.cos(a) * 1.6 + 7, 4) * 0.5 + n(u * 22 + 3, Math.sin(a) * 4 + Math.cos(a) * 2, 2) * 0.35;
+    const f = fest(u) * (0.85 + 0.15 * Math.sin(a * 3 + u * 9));
+    const k = (j * W + i) * 4;
+    for (let m = 0; m < 3; m++) img.data[k + m] = Math.max(0, Math.min(255, F.grund[m] + (F.spur[m] - F.grund[m]) * f + v * 26));
+    img.data[k + 3] = 255;
+    const h = 128 + v * 40 * (1 - f * 0.7);
+    himg.data[k] = himg.data[k + 1] = himg.data[k + 2] = h; himg.data[k + 3] = 255;
+  }
+  x.putImageData(img, 0, 0); hx.putImageData(himg, 0, 0);
+  // lose Steine: viele in der Mitte und an den Rändern, wenige in den Fahrspuren
+  for (let k = 0; k < 26000; k++) {
+    const u = r(), px = u * W, py = r() * H;
+    if (r() < fest(u) * 0.85) continue;
+    const s = (0.7 + r() * 1.8) * (r() < 0.05 ? 2.4 : 1);
+    x.fillStyle = F.stein[Math.floor(r() * F.stein.length)]; x.globalAlpha = 0.55 + r() * 0.45;
+    x.fillRect(px, py, s, s * (0.7 + r() * 0.6));
+    const g = 150 + Math.floor(r() * 105); hx.fillStyle = `rgb(${g},${g},${g})`; hx.fillRect(px, py, s, s);
+  }
+  // Rillen in den Fahrspuren (vom Reifenprofil), ganz fein
+  x.globalAlpha = 0.12; x.fillStyle = '#000';
+  for (const m of [0.3, 0.7]) for (let k = 0; k < 9; k++) x.fillRect((m - 0.06 + k * 0.014) * W, 0, 1, H);
+  x.globalAlpha = 1;
+  return { map: textur(c), normalMap: normalAus(hx, W, H, 3) };
+});
+
+// Waldboden neben dem Weg: Erde, Nadeln, Moos, ein paar Steine
+export const waldboden = (art = 'kiefer') => merk('waldboden' + art, () => {
+  const w = 256, [c, x] = leinwand(w), r = zufall(art.length * 13 + 3);
+  const grund = art === 'laub' ? '#5b5a2e' : art === 'berg' ? '#6e7656' : '#5d5a34';
+  x.fillStyle = grund; x.fillRect(0, 0, w, w);
+  const farben = art === 'laub' ? ['#7a5a2a', '#8c6a32', '#4f6a2a', '#a07836', '#3e4a22'] : ['#6c7a34', '#4c5e28', '#8a7444', '#5a4a30', '#7d8a44'];
+  for (let i = 0; i < 9000; i++) {
+    x.fillStyle = farben[Math.floor(r() * farben.length)]; x.globalAlpha = 0.45 + r() * 0.4;
+    const a = r() * 6.28, l = 1.5 + r() * 4;
+    x.save(); x.translate(r() * w, r() * w); x.rotate(a); x.fillRect(0, 0, l, 1 + r()); x.restore();
+  }
+  x.globalAlpha = 1;
+  return { map: textur(c) };
+});
+
+// Schild mit Schrift (Start, Ziel, Stopp, Zwischenzeit, Kilometer …). zeilen = [[Text, Größe in Bildpunkten], …]
+export function schild(zeilen, { grund = '#ffffff', schrift = '#111111', rand = null, w = 512, h = 256, karo = false } = {}) {
+  const [c, x] = leinwand(w, h);
+  x.fillStyle = grund; x.fillRect(0, 0, w, h);
+  if (karo) { const q = h / 4; for (let j = 0; j < 4; j++) for (let i = 0; i < w / q; i++) if ((i + j) % 2) { x.fillStyle = '#111'; x.fillRect(i * q, j * q, q, q); } }
+  if (rand) { x.strokeStyle = rand; x.lineWidth = h * 0.06; x.strokeRect(h * 0.05, h * 0.05, w - h * 0.1, h - h * 0.1); }
+  x.fillStyle = schrift; x.textAlign = 'center'; x.textBaseline = 'middle';
+  const sum = zeilen.reduce((s, z) => s + z[1] * 1.15, 0);
+  let y = h / 2 - sum / 2;
+  for (const [t, g] of zeilen) { x.font = `bold ${g}px Arial, sans-serif`; y += g * 0.575; x.fillText(t, w / 2, y); y += g * 0.575; }
+  return textur(c, false);
+}

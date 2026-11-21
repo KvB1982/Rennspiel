@@ -220,7 +220,9 @@ export function baueAuto({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massstab
 export function autoStellen(m, a, uhr = 0) {
   const g = m.gruppe;
   g.position.set(a.x, a.y, a.z);
-  g.rotation.set(0, a.h, 0);
+  // Bergauf hebt sich die Nase (a.nick = Steigung, nur bei Strecken mit Sprüngen ausgerechnet)
+  g.rotation.order = 'YXZ';
+  g.rotation.set(-Math.atan(a.nick || 0), a.h, 0);
   m.koerper.rotation.x = a.neigung; m.koerper.rotation.z = a.kippen;
   for (const v of m.lenkVorn) v.rotation.y = a.lenk;
   const dreh = a.radDreh;

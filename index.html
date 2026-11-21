@@ -34,6 +34,7 @@
     <div id="hAmpel"><i></i><i></i><i></i><i></i><i></i></div>
     <div id="hMeldung"></div>
     <div id="hKurve"></div>
+    <div id="hAnsage"></div>
     <div id="hTacho"><div id="hDz"><i></i></div><div id="hKmh">0</div><div id="hEinheit">km/h</div><div id="hGang">N</div></div>
     <canvas id="hKarte" width="240" height="240"></canvas>
     <div id="hKnoepfe">
@@ -47,7 +48,7 @@
 
   <!-- Hauptmenü -->
   <div id="menue">
-    <header><h1>🏁 Rennspiel</h1><p>Formel-Rennen, Supercars und Modellautos – mit dem Handy als Lenkrad</p></header>
+    <header><h1>🏁 Rennspiel</h1><p>Formel-Rennen, Rallye, Supercars und Modellautos – mit dem Handy als Lenkrad</p></header>
     <div id="mSpalten">
       <section id="mLinks">
         <h2>1 · Fahrzeug</h2>
@@ -56,10 +57,11 @@
           <button data-wert="modell"><img class="bild" src="bilder/menue/fahrzeug_modell.webp" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'gross', textContent: '🚗' }))"><b>Ferngesteuertes Auto</b><small>Strecke im Wohnzimmer – du stehst daneben und lenkst aus der Ferne</small></button>
           <button data-wert="slot"><img class="bild" src="bilder/menue/fahrzeug_slot.webp" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'gross', textContent: '🎛️' }))"><b>Slotcar-Bahn</b><small>Zwei Spuren mit Weichen – du gibst nur Gas. Zu schnell in die Kurve: Abflug!</small></button>
           <button data-wert="drift"><img class="bild" src="bilder/menue/fahrzeug_drift.webp" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'gross', textContent: '🌀' }))"><b>Drift-Rallye</b><small>Kleine Rallyeautos 1:43 auf breiten Matten – quer durch die Kurven, Drift-Punkte sammeln</small></button>
+          <button data-wert="rallye"><img class="bild" src="bilder/menue/fahrzeug_rallye.webp" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'gross', textContent: '🌲' }))"><b>Rallye</b><small>Wertungsprüfungen durch den Wald – Schotter, Sprünge, Matsch und Wasser, dein Beifahrer sagt die Kurven an</small></button>
           <button data-wert="super"><img class="bild" src="bilder/menue/fahrzeug_super.webp" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'gross', textContent: '🚘' }))"><b>Supercar</b><small>Sportwagen durch Großstädte, über Landstraßen und von Stadt zu Stadt – mit Verkehr</small></button>
         </div>
         <div id="mSuper" hidden>
-          <h2>Dein Supercar</h2>
+          <h2 id="mAutoTitel">Dein Supercar</h2>
           <div class="karten autos" id="mAutos"></div>
         </div>
         <h2>2 · Rennart</h2>
@@ -111,7 +113,7 @@
 
   <!-- Ergebnis -->
   <div id="ergebnis" class="fenster" hidden><div><h2 id="eTitel"></h2><table id="eTabelle"></table>
-    <button data-a="neu">Nochmal</button><button data-a="menue">Zum Menü</button></div></div>
+    <button data-a="weiter" id="eWeiter" hidden>Nächste Prüfung ▶</button><button data-a="neu">Nochmal</button><button data-a="menue">Zum Menü</button></div></div>
 
   <div id="laden" class="fenster" hidden><div><h2>Strecke wird gebaut …</h2></div></div>
 

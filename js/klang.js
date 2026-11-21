@@ -61,6 +61,25 @@ export class Klang {
     this.rumpel = c.createGain(); this.rumpel.gain.value = 0;
     const kf = c.createBiquadFilter(); kf.type = 'lowpass'; kf.frequency.value = 140;
     rausch().connect(kf); kf.connect(this.rumpel); this.rumpel.connect(this.haupt);
+    // Rallye: Schotter knirscht. Selbst erzeugt: viele kleine "Klicks" (Steinchen) in zufälligen Abständen,
+    // jeder klingt kurz aus. Je schneller das Auto, desto schneller wird die Schleife abgespielt (mehr Steinchen).
+    {
+      const n = c.sampleRate * 1.5, kb = c.createBuffer(1, n, c.sampleRate), kd = kb.getChannelData(0);
+      let t = 0;
+      while (t < n) {
+        const laut = 0.2 + Math.random() * 0.8, lang = 40 + Math.random() * 260;
+        for (let k = 0; k < lang && t + k < n; k++) kd[t + k] += (Math.random() * 2 - 1) * laut * Math.exp(-k / (lang * 0.25));
+        t += Math.floor(30 + Math.random() * 380);
+      }
+      const ks = c.createBufferSource(); ks.buffer = kb; ks.loop = true; ks.start();
+      const hp = c.createBiquadFilter(); hp.type = 'bandpass'; hp.frequency.value = 2200; hp.Q.value = 0.6;
+      this.knirsch = c.createGain(); this.knirsch.gain.value = 0; this.knirschQuelle = ks;
+      ks.connect(hp); hp.connect(this.knirsch); this.knirsch.connect(this.haupt);
+      // Wasser rauscht (tiefes, breites Rauschen)
+      const wf2 = c.createBiquadFilter(); wf2.type = 'bandpass'; wf2.frequency.value = 700; wf2.Q.value = 0.5;
+      this.platscher = c.createGain(); this.platscher.gain.value = 0;
+      rausch().connect(wf2); wf2.connect(this.platscher); this.platscher.connect(this.haupt);
+    }
     this.ladeProben();
   }
 
@@ -195,6 +214,17 @@ export class Klang {
     const v = Math.abs(a.u) / a.p.vMax;
     this.wind.gain.setTargetAtTime(modell ? 0 : v * v * 0.25, t, 0.1);
     this.rumpel.gain.setTargetAtTime(laeuft && (a.grund === 1 || a.grund >= 2) ? Math.min(1, v * 3) * (a.grund === 1 ? 0.5 : 0.3) * (modell ? 0.2 : 1) : 0, t, 0.04);
+    // Rallye: Schotter knirscht, Matsch schmatzt dumpfer, Wasser rauscht. In der Luft: Stille unter dem Auto
+    if (this.knirsch) {
+      const boden = laeuft && !a.luft && a.p.rallye;
+      const kies = boden && (a.grund === 5 || a.grund === 3) ? 1 : boden && a.grund === 6 ? 0.55 : boden && a.grund === 2 ? 0.35 : 0;
+      const rutschen = Math.max(a.rutschVorn || 0, a.rutschHinten || 0);
+      this.knirsch.gain.setTargetAtTime(kies * Math.min(1, v * 2.5) * (0.28 + rutschen * 0.4), t, 0.05);
+      this.knirschQuelle.playbackRate.setTargetAtTime(0.6 + Math.min(1.6, Math.abs(a.u) / 25), t, 0.1);
+      this.platscher.gain.setTargetAtTime(boden && a.grund === 7 ? Math.min(0.9, v * 2) : 0, t, 0.03);
+      // Landung nach einem Sprung
+      if (a.landung > 3) this.rumms(Math.min(1, a.landung / 14), false);
+    }
   }
 
   // Eine Aufnahme einmal abspielen. Gibt false zurück, wenn sie (noch) nicht da ist.
