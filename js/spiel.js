@@ -28,7 +28,7 @@ const STANDARD = {
   rallyeauto: 'sturmfalke', lack_rallye: 0, beifahrer: 'beides', kamera_rallye: 'hinten',
   supercar: 'falkner', lack: 0, verkehr: 'normal', runden_super: 1, gegner_super: 5,
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
-  bremshilfe: true, lenkhilfe: false, traktion: true, autogas: false, grafik: 'hoch', linie: true, boxen: true,
+  bremshilfe: true, lenkhilfe: false, traktion: true, arcade: true, autogas: false, grafik: 'hoch', linie: true, boxen: true,
   neigStufe: 3,    // wie weit man das Gerät dafür neigen muss (2 = weit … 5 = ganz wenig; Grad stehen in VOLL in neigung.js)
   neigen: false,   // dieses Gerät selbst neigen (Gas und Bremse auf dem Bildschirm), wenn kein Handy-Lenkrad verbunden ist
 };
@@ -142,6 +142,8 @@ export function starteSpiel() {
     zeile('Ideallinie und Bremszonen', 'linie', [[true, 'an'], [false, 'aus']], !modell && !rallye);
     zeile('Bremshilfe', 'bremshilfe', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Lenkhilfe', 'lenkhilfe', [[true, 'an'], [false, 'aus']], !slot);
+    // Arcade-Hilfe (Rennwagen und Supercars): direkte Lenkung, und der Computer hilft unsichtbar, auf der Straße zu bleiben
+    zeile('Fahrgefühl', 'arcade', [[true, 'Arcade'], [false, 'echter']], !modell && !rallye);
     zeile('Traktionskontrolle', 'traktion', [[true, 'an'], [false, 'aus']], !slot && !drift);
     // Drift-Hilfe: dreht das Auto zurück, bevor es sich ganz quer stellt (gleiche Einstellung wie die Traktionskontrolle)
     zeile('Drift-Hilfe', 'traktion', [[true, 'an'], [false, 'aus']], drift);
@@ -253,7 +255,7 @@ export function starteSpiel() {
         auto: E.supercar, lack: sup && LACKE[E.lack] ? LACKE[E.lack].farbe : null, verkehr: sup ? VERKEHR[E.verkehr] ?? 1 : 0 });
       kurven = rennen.L && !modell && !rallye ? kurvenFinden(T, rennen.L, rennen.ich.a.p) : null;
       rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
-      if (rennen.ich) rennen.ich.a.tc = E.traktion ? true : false;
+      if (rennen.ich) { rennen.ich.a.tc = E.traktion ? true : false; rennen.ich.a.arcade = E.arcade !== false; }
       eingabe.autoGas = E.autogas && !slot;
       eingabe.sanft = E.fahrzeug === 'modell' ? 0.5 : 1;
       eingabe.handbremseDa = drift || rallye;

@@ -27,11 +27,12 @@ export const AUTOS = {
     abtrieb: 5.2, abtriebVorn: 0.44,  // Flügel: Abtrieb (Fläche mal Beiwert), Anteil vorn
     widerstand: 1.35,                 // Luftwiderstand (Fläche mal Beiwert)
     rollen: 0.015,
-    leistung: 780000, schubMax: 15000, // Watt, größte Zugkraft (kräftiger als echt: soll nach vorn reißen)
-    zugGriff: 1.9,                    // beim Beschleunigen halten die Reifen längs mehr aus (Spiel-Wert: kräftiger Antritt)
+    leistung: 950000, schubMax: 18500, // Watt, größte Zugkraft (viel kräftiger als echt: soll nach vorn reißen)
+    zugGriff: 2.3,                    // beim Beschleunigen halten die Reifen längs mehr aus (Spiel-Wert: kräftiger Antritt)
     bremse: 1.1, bremseVorn: 0.6,     // Bremse (Anteil der Haftung), Anteil vorn
     bremsGriff: 1.25,                 // beim Bremsen halten die Reifen längs mehr aus als zur Seite (Spiel-Wert: kräftigere Bremse)
     esp: { beta: 0.1, dreh: 6, quer: 0.4 },   // Schleuderschutz (siehe unten)
+    arcade: { lenk: 1.3, folgen: 24, griff: 1.12, ein: 10, fang: 5, frei: 0.06, halt: 1.8, rand: 3.5 },   // Arcade-Hilfe (siehe ARCADE unten)
     lenkMax: 0.42, lenkTempo: 32,     // größter Lenkeinschlag (rad); ab diesem Tempo (m/s) lenkt man weniger
     gaenge: 8, drehzahlMax: 12500, vMax: 96, rueck: 14,
     schritte: 8, unten: 3,
@@ -123,6 +124,7 @@ export function neuesAuto(art = 'f1', tempo = 0) {
     grund: BELAG.asphalt, d: 0, idx: -1, s: 0,
     radDreh: 0, stoss: 0,          // wie weit die Räder gedreht sind; wie hart der letzte Aufprall war
     neigung: 0, kippen: 0,         // Nicken und Rollen der Karosserie (nur fürs Bild)
+    arcade: true,                  // Arcade-Hilfe (gilt nur für Autos, die Werte dafür haben: Rennwagen und Supercars)
   };
 }
 
@@ -149,12 +151,15 @@ export function schritt(a, T, dt) {
   const gr = a.luft ? IN_DER_LUFT : GRUND[a.grund] || GRUND[BELAG.asphalt];
 
   // Lenkrad dreht nicht sofort: die Vorderräder folgen dem Wunsch schnell, aber weich
-  let lenkGr = lenkGrenze(p, a.u);
+  // Arcade-Hilfe: Bei Tempo darf man weiter einlenken als sonst (lenk) und die Räder folgen schneller (folgen)
+  const A = a.arcade && p.arcade && !a.luft ? p.arcade : null;
+  a.helfer = 0;                  // wie stark der Strecken-Helfer gerade hilft (0 … 2, nur zum Anzeigen und Prüfen)
+  let lenkGr = A ? p.lenkMax / (1 + (Math.abs(a.u) / (p.lenkTempo * A.lenk)) ** 2) : lenkGrenze(p, a.u);
   // Rallye: Bei Tempo darf man normal nur wenig einlenken (sonst wäre das Auto zu zappelig). Rutscht das Heck aber weg,
   // darf man zum Gegenlenken bis zum vollen Einschlag drehen – so wie ein echter Rallyefahrer, der den Drift fängt.
   if (p.rallye && a.u > 3 && Math.sign(a.lenkWunsch) === Math.sign(a.v)) lenkGr += (p.lenkMax - lenkGr) * Math.min(1, Math.abs(Math.atan2(a.v, a.u)) / 0.35);
   const ziel = a.lenkWunsch * lenkGr;
-  a.lenk += (ziel - a.lenk) * Math.min(1, dt * 14);
+  a.lenk += (ziel - a.lenk) * Math.min(1, dt * (A ? A.folgen : 14));
 
   let maxRutschV = 0, maxRutschH = 0;
   for (let k = 0; k < n; k++) {
@@ -268,6 +273,24 @@ export function schritt(a, T, dt) {
       dr += korr;
       du -= Math.abs(korr) * E.quer;                                      // ESP bremst dabei einzelne Räder
     }
+    if (A && au > 3) {
+      // ARCADE-HILFE (nur für dich, nur Rennwagen und Supercars; so machen es viele Arcade-Rennspiele):
+      // 1. Lenk-Helfer: Das Auto soll sich so schnell drehen, wie die Räder zeigen – höchstens so schnell, wie es die
+      //    Haftung (mal "griff") hergibt. Dreht es langsamer (es schiebt geradeaus = Untersteuern), hilft ein Dreh-Moment
+      //    mit (ein). Dreht es zu schnell (Heck kommt) oder gegen die Lenkung, fängt es sanft ab (fang).
+      //    Die Lenkung wird dabei nie schwächer gemacht: Es gibt nur Hilfe dazu.
+      const rRad = u * Math.tan(a.lenk) / L;
+      const rMax = (muF + muR) / p.masse / au * A.griff;
+      const rZiel = Math.max(-rMax, Math.min(rMax, rRad));
+      const fehlt = rZiel - r;
+      dr += fehlt * (r * rZiel >= 0 && Math.abs(rZiel) > Math.abs(r) ? A.ein : A.fang);
+      // 2. Reifen-Helfer: Rutscht das Auto mehr als "frei" (Winkel) zur Seite, zieht die Hilfe das Rutschen zurück,
+      //    ohne Tempo zu kosten (das Tempo wird nur in Fahrtrichtung gedreht). Ein kleiner Drift bleibt erlaubt.
+      const freiV = au * Math.tan(A.frei);
+      const zuviel = Math.sign(v) * Math.max(0, Math.abs(v) - freiV);
+      const dvH = -zuviel * A.halt;
+      dv += dvH; du -= v * dvH / au;
+    }
     a.ax = du - v * r;
 
     a.u += du * h; a.v += dv * h; a.r += dr * h;
@@ -289,6 +312,11 @@ export function schritt(a, T, dt) {
   }
   a.rutschVorn = Math.min(1, Math.max(0, maxRutschV - 0.75) * 2.5);
   a.rutschHinten = Math.min(1, Math.max(0, maxRutschH - 0.75) * 2.5);
+
+  // 3. Strecken-Helfer (Arcade-Hilfe): Fährt das Auto auf den Rand der Fahrbahn zu, lenkt die Straße es unsichtbar
+  //    etwas zurück: Fahrtrichtung und Auto drehen sich gemeinsam ein Stück in Richtung der Straße. Je näher am Rand
+  //    und je schneller, desto mehr. Mitten auf der Straße merkt man nichts davon.
+  if (A && A.rand && Math.abs(a.u) > 5) streckenHelfer(a, T, f, A, dt);
 
   // Begrenzung (Leitplanke, Reifenstapel, Mauer): abprallen
   a.stoss = 0;
@@ -355,6 +383,25 @@ export function schritt(a, T, dt) {
   const [jeG, hoechstens] = p.super ? [0.045, 0.07] : [0.014, 0.038];
   a.kippen += (Math.max(-hoechstens, Math.min(hoechstens, querG * jeG)) - a.kippen) * Math.min(1, dt * 6);
   a.neigung += (((a.brems > 0 && a.u > 1 ? 1 : 0) * 0.012 - a.gas * 0.006) - a.neigung) * Math.min(1, dt * 5);
+}
+
+function streckenHelfer(a, T, f, A, dt) {
+  const i = f.i, tx = T.tx[i], tz = T.tz[i];
+  const sh = Math.sin(a.h), ch = Math.cos(a.h);
+  const wx = sh * a.u + ch * a.v, wz = ch * a.u - sh * a.v;   // Tempo in der Welt
+  const tempo = Math.hypot(wx, wz);
+  const seite = f.d >= 0 ? 1 : -1;
+  const raus = (wx * tz - wz * tx) * seite;                     // wie schnell es zum nächsten Rand hin geht
+  if (raus <= 0) return;
+  const abstand = T.hb[i] - 1.0 - Math.abs(f.d);                // so viel Platz ist noch bis zum Rand (Auto ist 2 m breit)
+  const zone = 3 + 0.3 * tempo;                                 // ab hier hilft die Straße (bei 200 km/h ab gut 19 m vor dem Rand)
+  if (abstand > zone) return;
+  let k = Math.min(1.4, 1 - abstand / zone); k *= k;
+  // Winkel zwischen Fahrtrichtung und Straße, ein Stück davon zurückdrehen
+  const winkel = Math.asin(Math.min(1, raus / tempo));
+  const dreh = winkel * Math.min(0.6, A.rand * k * dt) * seite;
+  a.h -= dreh;                                                  // dreht Auto und Fahrtrichtung gleich: kein Rutschen dazu
+  a.helfer = Math.max(a.helfer || 0, k);
 }
 
 // Auf und ab (Rallye): Das Auto folgt der Straße, bis eine Kuppe so rund ist, dass die Straße schneller

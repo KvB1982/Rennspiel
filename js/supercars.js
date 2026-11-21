@@ -22,10 +22,14 @@ const BASIS = {
   widerstand: 0.75,                 // Luftwiderstand (Fläche mal Beiwert, m²)
   rollen: 0.013,
   bremse: 1.0, bremseVorn: 0.68,
-  zugGriff: 1.7, schub: 1.35,       // kräftiger Antritt: Reifen halten längs mehr aus, Motor zieht 1,35-mal so stark (Spiel-Werte)
+  zugGriff: 2.4, schub: 1.9,        // sehr kräftiger Antritt: Reifen halten längs mehr aus, Motor zieht 1,9-mal so stark (Spiel-Werte, mit Absicht viel stärker als echt)
   bremsGriff: 1.9,                 // kräftige Spiel-Bremse: längs halten die Reifen mehr aus als zur Seite
   esp: { beta: 0.4, dreh: 5, quer: 0.3 },   // Schleuderschutz: bis gut 20° Driften ist erlaubt, erst dann fängt er das Auto (Kristian will driften können)
   lenkMax: 0.5, lenkTempo: 22,
+  // Arcade-Hilfe (nur für dich, siehe physik.js): lenk = bei Tempo so viel mehr Lenkeinschlag, folgen = so schnell folgen die Räder,
+  // griff = so viel Drehen lässt der Lenk-Helfer zu, ein/fang = wie stark er beim Einlenken hilft / das Heck fängt,
+  // frei = so viel Driften (Winkel) bleibt ohne Reifen-Helfer, halt = wie stark er das Rutschen zurückholt, rand = Strecken-Helfer
+  arcade: { lenk: 1.6, folgen: 24, griff: 1.3, ein: 9, fang: 4, frei: 0.14, halt: 1.6, rand: 3.5 },
   gaenge: 7, drehzahlMax: 8500, rueck: 8, abregeln: true,
   schritte: 8, unten: 3,
   tcRest: 0.82,                     // Traktionskontrolle lässt mehr Haftung für die Kurve übrig als beim Rennwagen
