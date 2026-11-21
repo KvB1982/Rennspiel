@@ -50,7 +50,7 @@ function glaetten(cx, cz, nx, nz, unten, oben, o, g, runden) {
 
 // seitliche Verschiebung der Linie an jedem Messpunkt ausrechnen. gewicht(i) = wie wichtig ist ein kleiner Knick dort
 function linieSuchen(T, rechts, gewicht) {
-  const n = T.n, sc = T.def.modell ? MASSSTAB : 1;
+  const n = T.n, sc = T.sc;
   const rand = T.def.modell ? 0.06 : 2.5;
   let off = new Float32Array(n);
   for (const [abstand, runden] of STUFEN) {
@@ -86,7 +86,7 @@ function linieSuchen(T, rechts, gewicht) {
 
 // Punkte und Krümmung einer Linie aus der seitlichen Verschiebung
 function linieAus(T, off) {
-  const n = T.n, sc = T.def.modell ? MASSSTAB : 1;
+  const n = T.n, sc = T.sc;
   const lx = new Float32Array(n), lz = new Float32Array(n), kr = new Float32Array(n);
   for (let i = 0; i < n; i++) { lx[i] = T.x[i] + T.tz[i] * off[i]; lz[i] = T.z[i] - T.tx[i] * off[i]; }
   const w = Math.max(1, Math.round(8 * sc / T.ds));
@@ -101,7 +101,7 @@ function linieAus(T, off) {
 
 // rechts = true: auf Straßen mit Gegenverkehr bleibt die Linie auf der rechten Straßenhälfte
 export function ideallinie(T, p, { rechts = false } = {}) {
-  const n = T.n, sc = T.def.modell ? MASSSTAB : 1;
+  const n = T.n, sc = T.sc;
   // 1. Durchgang: überall gleich wichtig = gleichmäßiger, möglichst weiter Bogen
   let L = linieAus(T, linieSuchen(T, rechts, null));
   if (SPAET > 0 && p && p.leistung) {
@@ -160,7 +160,7 @@ export function neuerFahrer(staerke = 0.95, mut = 0.5) {
 const NACHLENK = 3;   // so viel mehr lenken die Computerfahrer bei Höchsttempo (ausprobiert mit tools/sim.mjs)
 // Lenkung zu einer Stelle auf der Ideallinie (auch für die Lenkhilfe des Spielers)
 export function lenkZurLinie(a, T, L, extra = 0, vorausMal = 1) {
-  const p = a.p, sc = T.def.modell ? MASSSTAB : 1;
+  const p = a.p, sc = T.sc;
   // kleine Autos fahren (für ihre Größe) viel engere Kurven: sie schauen weniger weit voraus
   const voraus = Math.max(7 * sc, ((T.def.modell ? 0.2 : 0.45) * Math.abs(a.u) + 4 * sc) * vorausMal);
   const i = T.index(a.s + voraus);
@@ -178,7 +178,7 @@ export function lenkZurLinie(a, T, L, extra = 0, vorausMal = 1) {
 
 // Fahrer entscheidet: lenken, Gas, Bremse. andere = alle Autos im Rennen (für Überholen)
 export function fahren(f, a, T, L, andere, dt) {
-  const p = a.p, sc = T.def.modell ? MASSSTAB : 1;
+  const p = a.p, sc = T.sc;
   const hbRand = T.hb[Math.max(0, a.idx)] - (T.def.modell ? 0.06 : 2);
   // Überholen und Ausweichen: Ist vorn jemand langsamer auf meiner Linie (ein Rennauto, ein Auto im Verkehr,
   // Gegenverkehr)? Dann auf der Seite vorbei, auf der Platz ist – und nur bremsen, wenn es nicht anders geht.

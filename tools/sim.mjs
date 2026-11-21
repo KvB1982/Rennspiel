@@ -11,7 +11,7 @@ let fehler = 0;
 for (const def of STRECKEN) {
   if (nur && def.id !== nur) continue;
   const T = baueStrecke(def);
-  const art = def.slot ? 'slot' : def.modell ? 'modell' : def.strasse ? 'super' : 'f1';
+  const art = def.slot ? 'slot' : def.drift ? 'drift' : def.modell ? 'modell' : def.strasse ? 'super' : 'f1';
   const R = new Rennen(T, { modus: 'rennen', runden: def.strasse && !nur ? 1 : +runden, gegner: def.modell ? Math.min(3, +gegner) : +gegner, staerke, art, mitSpieler: false, boxen: true, verkehr: +verkehr });
   const dt = 1 / 60;
   let wand = 0, neben = 0, maxV = 0, schritte = 0, verkehrStoss = 0;

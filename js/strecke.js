@@ -139,6 +139,9 @@ import { boxAnlegen } from './box.js';
 
 // Maßstab der kleinen Autos (ferngesteuertes Auto und Slotcar): 1:30. Ein 5,6 m langer Rennwagen ist dann knapp 19 cm lang.
 export const MASSSTAB = 1 / 30;
+// Die Drift-Rallyeautos sind kleiner: Maßstab 1:43 (wie die kleinen Drift-Autos zum Steuern mit dem Handy).
+// Eine Strecke kann ihren Maßstab selbst angeben (massstab), sonst gilt für die kleinen Autos 1:30.
+export const massstabVon = def => def.massstab || (def.modell ? MASSSTAB : 1);
 
 export function baueStrecke(def) {
   const ek = def.ecken ? eckenZuTeilen(def.ecken, def.start ?? 0.4) : null;
@@ -168,6 +171,7 @@ export function baueStrecke(def) {
     artL: new Uint8Array(n), artR: new Uint8Array(n),      // was im Auslauf liegt (BELAG)
     kerbL: new Uint8Array(n), kerbR: new Uint8Array(n),    // liegt hier ein rot-weißer Randstein?
     laenge: 0, freiL,
+    sc: massstabVon(def),                                  // Maßstab (1 = echte Größe, 1/30 oder 1/43 = kleine Autos)
   };
   let s = 0;
   for (let i = 0; i < n; i++) {
@@ -296,7 +300,7 @@ export function baueStrecke(def) {
   // Wert an einer Stelle s (Meter seit dem Start) – für weiche Übergänge
   T.index = s => { s = ((s % T.laenge) + T.laenge) % T.laenge; return Math.min(n - 1, Math.floor(s / T.laenge * n)); };
   // kleine Autos: Boxengasse neben der Start-Ziel-Geraden
-  if (def.modell) boxAnlegen(T);
+  if (def.modell && !def.drift) boxAnlegen(T);   // die Drift-Matten haben keine Boxengasse
   return T;
 }
 

@@ -5,6 +5,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { baueWelt, gummiAuftragen, linieZeigen, stimmung } from './streckebau.js';
 import { baueAuto, autoStellen } from './autobau.js';
+import { baueRallye } from './rallyebau.js';
 import { MASSSTAB } from './strecke.js';
 import { baueSupercar } from './supercarbau.js';
 import { AUTOS } from './physik.js';
@@ -132,7 +133,8 @@ export class Buehne {
     // Autos
     this.autos = autos.map(c => {
       const sup = AUTOS[c.a.art] && AUTOS[c.a.art].super;
-      const m = sup ? baueSupercar(c.a.art, { farbe: c.farbe }) : baueAuto({ farbe: c.farbe, zweit: c.zweit, num: c.nummer, massstab: modell ? MASSSTAB : 1 });
+      const m = sup ? baueSupercar(c.a.art, { farbe: c.farbe }) : c.a.art === 'drift' ? baueRallye({ farbe: c.farbe, zweit: c.zweit, num: c.nummer, massstab: T.sc })
+        : baueAuto({ farbe: c.farbe, zweit: c.zweit, num: c.nummer, massstab: T.sc });
       if (m.auge) c.a.auge = m.auge;   // für die Cockpit-Kamera
       if (m.scheinwerfer) m.scheinwerfer.emissiveIntensity = def.welt.zeit === 'abend' ? 3 : 1.2;
       s.add(m.gruppe);
@@ -141,10 +143,22 @@ export class Buehne {
     // Geist (durchsichtiges Auto der Bestrunde)
     const ichC = autos.find(c => c.ich);
     const g = this.geist = ichC && AUTOS[ichC.a.art] && AUTOS[ichC.a.art].super ? baueSupercar(ichC.a.art, { farbe: 0x9fe8ff })
-      : baueAuto({ farbe: 0x9fe8ff, zweit: 0xffffff, num: 0, massstab: modell ? MASSSTAB : 1 });
+      : ichC && ichC.a.art === 'drift' ? baueRallye({ farbe: 0x9fe8ff, zweit: 0xffffff, num: 0, massstab: T.sc })
+      : baueAuto({ farbe: 0x9fe8ff, zweit: 0xffffff, num: 0, massstab: T.sc });
     g.gruppe.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.32; o.material.depthWrite = false; o.castShadow = false; } });
     g.gruppe.visible = false;
     s.add(g.gruppe);
+    // Drift-Matte: Reifenspuren. Rutscht ein Auto quer, bleiben hinter den Hinterrädern dunkle Striche liegen
+    // (bis zu SPUREN Stück, dann werden die ältesten wiederverwendet).
+    this.spuren = null;
+    if (def.drift) {
+      const SPUREN = 3000;
+      const geo = new THREE.PlaneGeometry(0.008, 0.012); geo.rotateX(-Math.PI / 2);
+      const mat = new THREE.MeshBasicMaterial({ color: 0x0c0c0e, transparent: true, opacity: 0.35, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
+      const im = new THREE.InstancedMesh(geo, mat, SPUREN);
+      im.count = 0; im.frustumCulled = false; s.add(im);
+      this.spuren = { im, n: 0, max: SPUREN, m4: new THREE.Matrix4(), q: new THREE.Quaternion(), achse: new THREE.Vector3(0, 1, 0), v: new THREE.Vector3(), eins: new THREE.Vector3(1, 1, 1) };
+    }
     this.uhr = 0;
   }
 
@@ -160,6 +174,7 @@ export class Buehne {
       if (m.sicht) m.sicht(imAuto);                    // fertiges Modell von außen, selbst gebautes Auto im Cockpit           // Supercar: Armaturenbrett und Lenkrad nur von innen
     }
     if (this.verkehrBild) this.verkehrBild.update();
+    if (this.spuren) for (const { c } of this.autos) this.spurSetzen(c.a);
     // Himmel wandert mit der Kamera mit (die Straßen-Strecken sind größer als der Himmel)
     if (this.himmel && this.T.strasse) this.himmel.position.copy(this.kamera.position);
     // Geist
@@ -178,6 +193,26 @@ export class Buehne {
       l.position.set(ziel.x + d.x * 250, ziel.y + d.y * 250, ziel.z + d.z * 250);
     }
     this.renderer.render(this.szene, this.kamera);
+  }
+
+  // Reifenspur eines Drift-Autos: zwei Striche hinter den Hinterrädern, wenn es schräg genug rutscht
+  spurSetzen(a) {
+    const S = this.spuren, au = Math.abs(a.u);
+    if (au < 0.15 || Math.abs(Math.atan2(a.v, au)) < 0.2 && !a.handbremse) return;
+    const sc = this.T.sc, sh = Math.sin(a.h), ch = Math.cos(a.h);
+    // nur alle paar Millimeter einen Strich (sonst sind die Spuren nach ein paar Runden "voll")
+    const weg = Math.hypot(a.x - (a.spurX ?? 1e9), a.z - (a.spurZ ?? 1e9));
+    if (weg < 0.009) return;
+    a.spurX = a.x; a.spurZ = a.z;
+    const bewegung = Math.atan2(sh * a.u + ch * a.v, ch * a.u - sh * a.v);   // Richtung, in die das Auto wirklich rutscht
+    S.q.setFromAxisAngle(S.achse, bewegung);
+    for (const seite of [-1, 1]) {
+      const vor = -1.33 * sc, link = seite * 0.78 * sc;
+      S.v.set(a.x + sh * vor + ch * link, a.y + 0.0006, a.z + ch * vor - sh * link);
+      S.m4.compose(S.v, S.q, S.eins);
+      S.im.setMatrixAt(S.n % S.max, S.m4); S.n++;
+    }
+    S.im.count = Math.min(S.n, S.max); S.im.instanceMatrix.needsUpdate = true;
   }
 
   aufraeumen() {

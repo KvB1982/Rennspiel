@@ -127,3 +127,4 @@ body.verbunden #hlStatus { color: var(--gruen); }
 #lbNah { display: none; }
 html.app #lbNah { display: block; }
 #lbNah button { font-size: 16px; padding: 10px 16px; border-radius: 12px; border: none; background: var(--blau); color: #fff; margin: 4px 0 6px; }
+#hKurve .drift { font-weight: bold; font-size: 22px; color: #7fe3ff; }

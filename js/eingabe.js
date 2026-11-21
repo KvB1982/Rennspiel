@@ -11,7 +11,8 @@ export class Eingabe {
   constructor(empfang) {
     this.empfang = empfang;
     this.tasten = new Set();
-    this.lenk = 0; this.gas = 0; this.brems = 0;
+    this.lenk = 0; this.gas = 0; this.brems = 0; this.hand = 0;   // hand = Handbremse (nur Drift-Rallye)
+    this.handbremseDa = false;    // Drift-Rallye: Leertaste ist dann die Handbremse statt der Bremse
     this.quelle = 'tastatur';
     this.handy = { l: 0, g: 0, b: 0 }; this.handyNr = 0;
     this.befehle = [];            // Knöpfe: kamera, pause, zurueck
@@ -47,6 +48,7 @@ export class Eingabe {
 
   update(dt) {
     // 1. Handy
+    this.hand = 0;
     if (this.empfang && this.empfang.verbunden) {
       this.quelle = 'handy';
       this.lenk = this.handy.l;
@@ -67,6 +69,7 @@ export class Eingabe {
         const x = Math.abs(ax) < 0.08 ? 0 : ax;
         this.lenk = -Math.sign(x) * Math.pow(Math.abs(x), 1.4);
         this.gas = Math.max(rt, a ? 1 : 0); this.brems = Math.max(lt, b ? 1 : 0);
+        this.hand = (p.buttons[5] && p.buttons[5].pressed) || (p.buttons[4] && p.buttons[4].pressed) ? 1 : 0;   // Schultertasten = Handbremse
         return;
       }
     }
@@ -84,7 +87,8 @@ export class Eingabe {
     if (links || rechts || T.has('ArrowUp') || T.has('ArrowDown') || T.has('KeyW') || T.has('KeyS') || T.has('Space')) this.quelle = 'tastatur';
     const tempo = ziel === 0 ? 6 : (Math.sign(ziel) !== Math.sign(this.lenk) ? 7 : 3.2 * this.sanft);
     this.lenk += clamp(ziel - this.lenk, -tempo * dt, tempo * dt);
-    const gasT = T.has('ArrowUp') || T.has('KeyW'), bremsT = T.has('ArrowDown') || T.has('KeyS') || T.has('Space');
+    const gasT = T.has('ArrowUp') || T.has('KeyW'), bremsT = T.has('ArrowDown') || T.has('KeyS') || (T.has('Space') && !this.handbremseDa);
+    this.hand = this.handbremseDa && T.has('Space') ? 1 : 0;
     this.gas = this.autoGas ? (bremsT ? 0 : 1) : (gasT ? 1 : this.pedal.gas);
     this.brems = bremsT ? 1 : this.pedal.brems;
   }

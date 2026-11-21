@@ -51,6 +51,31 @@ export const AUTOS = {
     prall: 0.55,                        // so stark springt es von der Bande zurück (0 = gar nicht, 1 = wie ein Flummi)
     schritte: 16, unten: 0.35,
   },
+  // Drift-Rallyeauto im Maßstab 1:43 (wie die kleinen Drift-Autos, die man mit dem Handy steuert: etwa 10,7 cm lang).
+  // Vorbild ist ein Rallyeauto mit Allrad, das meiste der Kraft geht nach hinten. Die Hinterreifen haften etwas schlechter
+  // als die vorderen: Gibt man in der Kurve Gas, bricht das Heck aus und das Auto driftet. Mit der Handbremse geht es noch leichter.
+  // Langsam genug zum Kontrollieren: 1,2 m/s sieht bei 1:43 aus wie gut 180 km/h.
+  // Maßstabsgetreu heißt auch: Die Kräfte sind mit verkleinert. Ein echtes Auto schafft in einer Kehre mit 20 m Halbmesser
+  // etwa 50 km/h – im Maßstab 1:43 sind das 0,47 m Halbmesser und gut 0,3 m/s. Deshalb haften die Reifen hier viel weniger
+  // als bei einem normalen Spielzeugauto (haft 0,075 statt etwa 1): Das Auto rutscht so, wie ein großes Auto rutschen würde.
+  drift: {
+    name: 'Drift-Rallyeauto 1:43',
+    masse: 0.065, traeg: 0.00004,
+    a: 0.028, b: 0.031, hoehe: 0.012,
+    haft: 0.075, hinten: 0.92, B: 6.5, C: 1.5,    // weiche Reifenkurve: das Rutschen kommt sanft, nicht plötzlich
+    abtrieb: 0, abtriebVorn: 0.45, widerstand: 0.0002,
+    rollen: 0.004, motorBremse: 0.12,
+    leistung: 0.07, schubMax: 0.07, allrad: 0.3,  // mehr Kraft, als die Reifen halten: Vollgas in der Kurve = Heck kommt
+    durchdrehen: 0.8,                             // keine Traktionskontrolle: Die Räder dürfen durchdrehen (sonst kein Drift), bis 80 % der Haftung
+    bremse: 0.6, bremseVorn: 0.6,
+    lenkMax: 0.6, lenkTempo: 1.8,                 // viel Lenkeinschlag, damit man gut gegenlenken kann
+    // Drift-Hilfe (an, solange im Menü „Drift-Hilfe“ an ist): Wird der Drift-Winkel größer als beta (knapp 30 Grad),
+    // dreht das Auto sanft zurück. So dreht man sich nicht so leicht um die eigene Achse.
+    esp: { beta: 0.5, dreh: 5, quer: 0.02, ab: 0.25, nurWinkel: true },
+    gaenge: 1, drehzahlMax: 30000, vMax: 1.2, abregeln: true, rueck: 0.4,
+    prall: 0.5,
+    schritte: 24, unten: 0.15,
+  },
   // Slotcar: fährt im Schlitz der Bahn, gerechnet in slot.js. Hier stehen nur die Werte.
   slot: {
     name: 'Slotcar',
@@ -137,10 +162,18 @@ export function schritt(a, T, dt) {
     let Fx = 0, Fbf = 0, Fbr = 0;
     if (a.gas > 0 && u > -0.5) {
       Fx = a.gas * Math.min(p.schubMax, p.leistung / Math.max(au, 1)) * (p.schub || 1);
+      // Drift-Hilfe: Steht das Auto schon zu quer, nimmt sie etwas Gas weg (dann greifen die Hinterräder wieder)
+      if (p.esp && p.esp.nurWinkel && a.tc !== false && au > p.esp.ab) {
+        const zuquer = Math.abs(Math.atan2(v, au)) - p.esp.beta;
+        if (zuquer > 0) Fx *= Math.max(0.25, 1 - zuquer * 3);
+      }
       // kleine Autos: Der Motor dreht nicht höher, kurz vor dem Höchsttempo lässt der Schub nach
       if (p.abregeln) Fx *= Math.max(0, Math.min(1, (p.vMax * 1.03 - u) / (p.vMax * 0.12)));
     }
     const muF = mu * Fzf, muR = muH * Fzr;
+    // Handbremse: Die Hinterräder blockieren, der Antrieb ist ausgekuppelt. Blockierte Räder halten zur Seite kaum noch: Das Heck rutscht weg.
+    const hand = a.handbremse && u > 0.05;
+    if (hand) Fx = 0;
     // Beim Bremsen halten die Reifen längs mehr aus (bremsGriff). Das macht die Bremse kräftiger,
     // ohne dass die Reifen in der Kurve mehr halten.
     const bg = p.bremsGriff || 1;
@@ -154,6 +187,7 @@ export function schritt(a, T, dt) {
         Fx = -a.brems * p.schubMax * 0.7 * Math.max(0, Math.min(1, (p.rueck + u) / (p.rueck * 0.25)));
       }
     }
+    if (hand) Fbr = Math.max(Fbr, muR * 0.92 * bg);
     if (u < -0.3 && a.gas > 0) { Fbf = Math.min(a.gas * muF * 0.5, muF); Fbr = Math.min(a.gas * muR * 0.5, muR); }
     // Hinterrad kann nicht mehr ziehen, als es Haftung hat. Die Traktionskontrolle (tc) lässt dazu noch Haftung
     // für die Kurve übrig: 0,7 = sicher, 0,95 = fast alles fürs Beschleunigen (dann bricht das Heck leicht aus)
@@ -164,10 +198,12 @@ export function schritt(a, T, dt) {
     let Fxf = Fx * vz; Fx *= 1 - vz;
     // zugGriff: Beim Beschleunigen halten die Reifen längs mehr aus als zur Seite (Spiel-Wert wie bremsGriff: kräftigerer Antritt)
     const zg = p.zugGriff || 1;
-    const zugGrenze = (a.tc === false ? muR * 0.97 : Math.sqrt(Math.max(0, (muR * rest) ** 2 - (a.Fyr || 0) ** 2))) * zg;
+    // Computerfahrer (a.tc nicht gesetzt) fahren immer mit Traktionskontrolle; beim Drift-Auto dreht sie für dich nie ab (durchdrehen)
+    const tcAn = a.tc === undefined || (a.tc !== false && !p.durchdrehen);
+    const zugGrenze = (!tcAn ? muR * (p.durchdrehen || 0.97) : Math.sqrt(Math.max(0, (muR * rest) ** 2 - (a.Fyr || 0) ** 2))) * zg;
     if (Math.abs(Fx) > zugGrenze) Fx = Math.sign(Fx) * zugGrenze;
     if (vz) {
-      const zugVorn = (a.tc === false ? muF * 0.97 : Math.sqrt(Math.max(0, (muF * rest) ** 2 - (a.Fyf || 0) ** 2))) * zg;
+      const zugVorn = (!tcAn ? muF * 0.97 : Math.sqrt(Math.max(0, (muF * rest) ** 2 - (a.Fyf || 0) ** 2))) * zg;
       if (Math.abs(Fxf) > zugVorn) Fxf = Math.sign(Fxf) * zugVorn;
     }
 
@@ -199,7 +235,7 @@ export function schritt(a, T, dt) {
     // Schleuderschutz (wie ESP im echten Auto): Dreht sich das Auto schneller, als die Räder lenken,
     // oder rutscht das Heck zu weit zur Seite, dreht ein Gegen-Moment es zurück und es bremst ein wenig.
     // Ein bisschen Driften (bis "beta") bleibt erlaubt. Ausgeschaltet zusammen mit der Traktionskontrolle.
-    if (p.esp && a.tc !== false && au > 4) {
+    if (p.esp && a.tc !== false && au > (p.esp.ab ?? 4)) {
       const E = p.esp;
       const rLenk = u * Math.tan(a.lenk) / L;                            // so schnell wollen die Räder drehen
       const rGrip = (muF + muR) / p.masse / au * 1.08;                    // so schnell geht es höchstens mit der Haftung
@@ -207,12 +243,14 @@ export function schritt(a, T, dt) {
       const beta = Math.atan2(v, au);                                     // wie schräg das Auto rutscht (plus = Heck nach rechts)
       let korr = 0;
       // dreht zu schnell in dieselbe Richtung (Heck kommt)
-      if (r * rZiel >= 0 && Math.abs(r) > Math.abs(rZiel)) korr -= (r - rZiel) * E.dreh;
+      // (Drift-Hilfe "nurWinkel": Das Drehen bleibt frei, sonst könnte man gar nicht driften – nur der Winkel wird begrenzt.)
+      if (E.nurWinkel) { /* nichts */ }
+      else if (r * rZiel >= 0 && Math.abs(r) > Math.abs(rZiel)) korr -= (r - rZiel) * E.dreh;
       else if (r * rZiel < 0) korr -= r * E.dreh;                         // dreht gegen die Lenkung
       // rutscht zu schräg: Nase in Fahrtrichtung drehen
       const zuviel = Math.abs(beta) - E.beta;
       if (zuviel > 0) korr += Math.sign(beta) * zuviel * E.dreh * 6;
-      const grenze = E.dreh * 1.2;
+      const grenze = E.dreh * (E.nurWinkel ? 4 : 1.2);
       korr = Math.max(-grenze, Math.min(grenze, korr));
       dr += korr;
       du -= Math.abs(korr) * E.quer;                                      // ESP bremst dabei einzelne Räder
@@ -243,7 +281,7 @@ export function schritt(a, T, dt) {
   a.stoss = 0;
   const f2 = T.finde(a.x, a.z, f.i, 6);
   const rand = f2.d > 0 ? hb + T.ausL[f2.i] : -(hb + T.ausR[f2.i]);
-  const breiteAuto = T.def.modell ? 0.04 : 1.0;
+  const breiteAuto = T.def.modell ? 1.2 * T.sc : 1.0;   // halbe Breite des Autos (etwas mehr, damit die Räder nicht in der Wand stecken)
   const grenze = Math.abs(rand) - breiteAuto;
   if (Math.abs(f2.d) > grenze) {
     const seite = Math.sign(f2.d);
@@ -266,7 +304,7 @@ export function schritt(a, T, dt) {
         // Die Nase dreht sich dabei in die Richtung, in die das Auto jetzt weiterrollt (an der Bande entlang)
         if (Math.abs(dh) > Math.PI / 2) dh -= Math.sign(dh) * Math.PI;     // rückwärts zur Strecke: andere Richtung ist näher
         const weit = Math.min(1, 0.35 + gegen * 0.5);
-        a.h += dh * weit + seite * 0.12 * weit * (Math.abs(dh) < 1.2 ? 1 : 0);   // und noch ein wenig von der Wand weg
+        a.h += dh * weit - seite * 0.12 * weit * (Math.abs(dh) < 1.2 ? 1 : 0);   // und noch ein wenig von der Wand weg (links von der Strecke = nach rechts drehen)
         a.u = Math.sin(a.h) * wx + Math.cos(a.h) * wz; a.v = (Math.cos(a.h) * wx - Math.sin(a.h) * wz) * 0.4;
         a.r = 0;
       } else {
@@ -294,7 +332,7 @@ export function schritt(a, T, dt) {
   } else {
     a.gang = 1; a.drehzahl = 2000 + (p.drehzahlMax - 2000) * Math.min(1, au / p.vMax);
   }
-  a.radDreh += a.u * dt / (T.def.modell ? 0.012 : 0.33);
+  a.radDreh += a.u * dt / (T.def.modell ? 0.36 * T.sc : 0.33);
   // Karosserie nickt beim Bremsen und neigt sich in der Kurve (nur Bild)
   const quer = a.u * a.r;
   // In der Kurve drückt die Fliehkraft das Auto nach außen: Es neigt sich sichtbar von der Kurve weg.
