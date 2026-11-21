@@ -9,7 +9,8 @@ zu Schleifen geschnitten (Ende weich in den Anfang überblendet). Sie liegen im 
 
 | Datei | Wofür | Aufnahme | Urheber | Lizenz |
 | --- | --- | --- | --- | --- |
-| `f1_leerlauf.wav`, `f1_hoch.wav` | Rennwagen im Stand und bei hoher Drehzahl (Sekunde 0–1,4 und 10,6–11,6) | [Formel-Rennwagen bei einer Start-Vorführung](https://freesound.org/s/181187/) | Ears68 | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
+| `f1_leerlauf.wav` | Rennwagen, niedrige Drehzahl (ganze Aufnahme, tiefes Brummen weggefiltert, schneller abgespielt) | [SFX_Car_Engine_Outside_RPMLow.wav](https://freesound.org/s/401556/) | GiocoSound | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
+| `f1_hoch.wav` | Rennwagen, hohe Drehzahl (ganze Aufnahme, tiefes Brummen weggefiltert, schneller abgespielt) | [SFX_Car_Engine_Outside_RPMHigh.wav](https://freesound.org/s/401551/) | GiocoSound | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
 | `elektromotor.wav` | Modellauto und Slotcar (Sekunde 15,5–17,2) | [ElectricMotor.wav](https://freesound.org/s/824119/) | derjuli | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
 | `reifen_quietschen.wav` | rutschende Reifen (Sekunde 27,7–29,1) | [screeching tyres / tires](https://freesound.org/s/614627/) | johnnydekk | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
 | `aufprall_gross.wav` | harter Einschlag des Rennwagens | [Car Crash](https://freesound.org/s/237375/) | squareal | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
