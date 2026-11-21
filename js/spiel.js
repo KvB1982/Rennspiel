@@ -6,6 +6,7 @@ import { Rennen, TEAMS, zeitText } from './rennen.js';
 import { aufStrecke, kmh } from './physik.js';
 import { Buehne } from './szene.js';
 import { ladeModelle } from './modelle.js';
+import { ladeBilder } from './texturen.js';
 import { Kamera, SICHTEN } from './kamera.js';
 import { Eingabe } from './eingabe.js';
 import { LenkradEmpfang } from './verbindung.js';
@@ -182,7 +183,7 @@ export function starteSpiel() {
   function starten() {
     zeige('laden', true);
     setTimeout(async () => {
-      await ladeModelle();   // fertige 3D-Modelle (nur beim ersten Start; ohne Internet geht es nach ein paar Sekunden mit Kisten weiter)
+      await Promise.all([ladeModelle(), ladeBilder()]);   // fertige 3D-Modelle (nur beim ersten Start; ohne Internet geht es nach ein paar Sekunden mit Kisten weiter)
       const modell = istKlein(), slot = E.fahrzeug === 'slot', sup = E.fahrzeug === 'super';
       const id = E[streckenFeld()];
       T = holeStrecke(id);

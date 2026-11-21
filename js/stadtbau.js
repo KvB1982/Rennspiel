@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as TX from './texturen.js';
 import { band, abschnitte, mesh, naeheGitter } from './streckebau.js';
-import { baumModell, modell, passend, eckMaterial } from './modelle.js';
+import { baumModell, baumBild, modell, passend, eckMaterial } from './modelle.js';
 
 const STADT = 0, DORF = 1, LAND = 2, AUTOBAHN = 3;
 const DOERFER = ['Lindenau', 'Kirchberg', 'Weidenfeld', 'Hasenmoor', 'Eichtal', 'Sonnwies'];
@@ -520,11 +520,14 @@ function baeume(T, gruppe, nah, land, staedte, r, viel) {
   const stammMat = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 1 });
   // fertige Baum-Modelle (Kenney Nature Kit, CC0), wenn geladen
   const MODELL = { nadel: ['baum_tanne', 11.5], laub: ['baum_laub', 8.5] };
+  const BILD = { nadel: ['fichte', 12], laub: ['laub', 9.5] };
   for (const [name, farbe, anteil, groesse, stammH] of arten) {
     const zahl = Math.round(anzahl * anteil);
-    const bm = baumModell(...MODELL[name]);
+    // am liebsten flache Bilder echter Bäume (4 Dreiecke je Baum), sonst Kenney-Modell, sonst selbst gebaut
+    const bb = baumBild(...BILD[name]);
+    const bm = bb || baumModell(...MODELL[name]);
     const krone = new THREE.InstancedMesh(bm ? bm.krone : formen[name](), bm ? bm.kroneMat : kroneMat, zahl);
-    const st = new THREE.InstancedMesh(bm ? bm.stamm : stamm, bm ? bm.stammMat : stammMat, zahl);
+    const st = bb ? null : new THREE.InstancedMesh(bm ? bm.stamm : stamm, bm ? bm.stammMat : stammMat, zahl);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), Y = new THREE.Vector3(0, 1, 0);
     let k = 0, versuche = 0;
     while (k < zahl && versuche < zahl * 25) {
@@ -548,13 +551,15 @@ function baeume(T, gruppe, nah, land, staedte, r, viel) {
       q.setFromAxisAngle(Y, r() * 6.28);
       m4.compose(new THREE.Vector3(x, hh.h - 0.2, z), q, new THREE.Vector3(s, s, s)); krone.setMatrixAt(k, m4);
       if (!bm) m4.compose(new THREE.Vector3(x, hh.h - 0.2, z), q, new THREE.Vector3(s, s * stammH, s));
-      st.setMatrixAt(k, m4);
-      c.setHex(farbe).offsetHSL((r() - 0.5) * 0.04, (r() - 0.5) * 0.1, (r() - 0.5) * 0.08); krone.setColorAt(k, c);
+      if (st) st.setMatrixAt(k, m4);
+      if (bb) { const v = 0.78 + r() * 0.3; c.setRGB(v, v, v * 0.94); }       // Bild behält seine Farben, nur etwas heller oder dunkler
+      else c.setHex(farbe).offsetHSL((r() - 0.5) * 0.04, (r() - 0.5) * 0.1, (r() - 0.5) * 0.08);
+      krone.setColorAt(k, c);
       k++;
     }
-    krone.count = st.count = k;
-    krone.castShadow = st.castShadow = true; krone.receiveShadow = true;
-    gruppe.add(krone, st);
+    krone.count = k; krone.castShadow = true; krone.receiveShadow = !bb;
+    gruppe.add(krone);
+    if (st) { st.count = k; st.castShadow = true; gruppe.add(st); }
   }
 }
 

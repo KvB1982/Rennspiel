@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- Rennspiel – macht aus Baum-Modellen flache Bilder (zwei Ansichten nebeneinander, Hintergrund durchsichtig).
+     Die Modelle (baum_fichte.glb, baum_laub.glb, baum_pinie.glb, baum_zypresse.glb – aus Powershot, assets/gelaende/)
+     in den Ordner quellen_modelle/baeume/ legen, dann http://localhost:8765/tools/baumbilder.html öffnen.
+     Jedes Bild mit Rechtsklick speichern und als bilder/baum_<name>.webp ablegen. -->
+<meta charset="utf-8"><title>Baum-Bilder</title>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<body style="background:#89a">
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+// Name → Breite einer Ansicht in Bildpunkten (Höhe immer 512)
+const BAEUME = { fichte: 288, laub: 512, pinie: 512, zypresse: 128 };
+window.bilder = {};
+for (const [name, breit] of Object.entries(BAEUME)) {
+  const g = await new GLTFLoader().loadAsync(`../quellen_modelle/baeume/baum_${name}.glb`);
+  const c = document.createElement('canvas'); c.width = breit * 2; c.height = 512; document.body.append(c);
+  const r = new THREE.WebGLRenderer({ canvas: c, alpha: true, antialias: true, preserveDrawingBuffer: true, premultipliedAlpha: false });
+  r.setClearColor(0x000000, 0); r.setScissorTest(true);
+  const s = new THREE.Scene();
+  s.add(new THREE.HemisphereLight(0xffffff, 0x8a9a70, 2.6));
+  const sonne = new THREE.DirectionalLight(0xfff2dd, 1.2); sonne.position.set(1, 3, 2); s.add(sonne);
+  const k = new THREE.Box3().setFromObject(g.scene), gr = k.getSize(new THREE.Vector3()), mi = k.getCenter(new THREE.Vector3());
+  g.scene.position.set(-mi.x, -k.min.y, -mi.z);
+  const dreh = new THREE.Group(); dreh.add(g.scene); s.add(dreh);
+  const halb = gr.y * breit / 512 / 2;      // so breit ist eine Ansicht in Metern
+  const kam = new THREE.OrthographicCamera(-halb, halb, gr.y, 0, 0.1, 100); kam.position.set(0, 0, 20); kam.lookAt(0, 0, 0);
+  kam.position.y = 0; kam.top = gr.y; kam.bottom = 0; kam.updateProjectionMatrix();
+  for (const v of [0, 1]) {
+    dreh.rotation.y = v * Math.PI / 2;
+    r.setViewport(v * breit, 0, breit, 512); r.setScissor(v * breit, 0, breit, 512); r.render(s, kam);
+  }
+  window.bilder[name] = c.toDataURL('image/png');
+}
+window.fertig = '1';
+</script>

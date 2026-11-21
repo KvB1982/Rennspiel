@@ -1,5 +1,8 @@
 // Rennspiel – Bilder für Oberflächen, selbst gemalt (keine Bilddateien nötig).
 // Jedes Bild wird einmal auf eine unsichtbare Leinwand (canvas) gemalt und dann als Textur benutzt.
+//
+// Dazu kommen ein paar echte Fotos aus dem Ordner bilder/ (Gras und Asphalt von Poly Haven, flache Baum-Bilder).
+// ladeBilder() holt sie einmal vor dem Bauen der Welt. Fehlt ein Foto, bleibt es beim gemalten Bild.
 
 import * as THREE from 'three';
 
@@ -55,6 +58,33 @@ function normalAus(ctx, w, h, staerke = 2) {
   return textur(c, true, false);
 }
 
+// ---------------------------------------------------------------- Fotos aus bilder/
+const FOTOS = {
+  gras: 'bilder/gras.jpg', asphalt: 'bilder/asphalt.jpg',
+  baum_fichte: 'bilder/baum_fichte.webp', baum_laub: 'bilder/baum_laub.webp', baum_pinie: 'bilder/baum_pinie.webp', baum_zypresse: 'bilder/baum_zypresse.webp',
+};
+const fotos = {};
+let fotosLaufen = null;
+// Alle Fotos laden. Wartet höchstens `bis` Millisekunden. Mit ?ohnemodelle bleibt alles selbst gemalt.
+export function ladeBilder({ bis = 6000 } = {}) {
+  if (typeof location !== 'undefined' && /ohnemodelle|ohnefotos/.test(location.search)) return Promise.resolve();
+  if (!fotosLaufen) fotosLaufen = Promise.all(Object.entries(FOTOS).map(([n, datei]) => new Promise(ok => {
+    const b = new Image();
+    b.onload = () => { fotos[n] = b; ok(); };
+    b.onerror = ok;
+    b.src = datei;
+  })));
+  return Promise.race([fotosLaufen, new Promise(ok => setTimeout(ok, bis))]);
+}
+// Ein geladenes Foto (Bild-Element) oder null
+export const foto = name => fotos[name] || null;
+// Foto auf eine Leinwand malen und als Textur zurückgeben
+function fotoTextur(name, w = 512) {
+  const [c, x] = leinwand(w);
+  x.drawImage(fotos[name], 0, 0, w, w);
+  return textur(c);
+}
+
 const cache = new Map();
 const merk = (k, f) => { if (!cache.has(k)) cache.set(k, f()); return cache.get(k); };
 
@@ -75,13 +105,18 @@ function koernig(name, w, grund, punkte, menge, groesse, normal = 2) {
   });
 }
 
-export const asphalt = () => koernig('asphalt', 512, '#4a4c50', ['#2c2d30', '#5d6064', '#6f7276', '#3a3b3e', '#7d7f82'], 26000, 2.2, 3);
+// Asphalt: Farbe vom Foto (wenn geladen), die Körnung ("Normal-Map") bleibt selbst gemacht
+export const asphalt = () => merk('asphalt+', () => {
+  const k = koernig('asphalt', 512, '#4a4c50', ['#2c2d30', '#5d6064', '#6f7276', '#3a3b3e', '#7d7f82'], 26000, 2.2, 3);
+  return fotos.asphalt ? { map: fotoTextur('asphalt'), normalMap: k.normalMap } : k;
+});
 export const kies = () => koernig('kies', 256, '#b7a786', ['#d8ccb0', '#8f8068', '#a89878', '#e9e0cc', '#6f6450'], 9000, 3.2, 4);
 export const teppich = () => koernig('teppich', 256, '#7a2f35', ['#8d3a40', '#6a272c', '#9a4a4e', '#5c2025'], 12000, 2, 2);
 export const beton = () => koernig('beton', 256, '#a9a9a4', ['#bdbdb8', '#929290', '#b4b3ad', '#8a8a86'], 7000, 2, 1.5);
 export const sand = () => koernig('sand', 256, '#d9c79c', ['#e8d9b2', '#c7b386', '#f0e4c6'], 8000, 1.6, 2);
 
 export const gras = () => merk('gras', () => {
+  if (fotos.gras) return { map: fotoTextur('gras') };
   const w = 256, [c, x] = leinwand(w), r = zufall(31);
   x.fillStyle = '#4f7a32'; x.fillRect(0, 0, w, w);
   for (let i = 0; i < 9000; i++) {
@@ -95,7 +130,7 @@ export const gras = () => merk('gras', () => {
 // Rasen mit gemähten Streifen (hell/dunkel) – für den Platz direkt neben der Strecke
 export const rasenStreifen = () => merk('rasenStreifen', () => {
   const w = 256, [c, x] = leinwand(w);
-  x.drawImage(gras().map.image, 0, 0);
+  x.drawImage(gras().map.image, 0, 0, w, w);
   x.fillStyle = 'rgba(255,255,220,0.10)'; x.fillRect(0, 0, w, w / 2);
   x.fillStyle = 'rgba(0,20,0,0.08)'; x.fillRect(0, w / 2, w, w / 2);
   return { map: textur(c) };
