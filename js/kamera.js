@@ -48,7 +48,8 @@ export class Kamera {
     if (this.modus === 'cockpit') {
       // Augen des Fahrers: hinter dem Lenkrad, knapp über dem Rand
       const ex = 0, ey = 0.92, ez = -0.12;
-      const nick = a.neigung, roll = a.kippen;
+      // Der Kopf des Fahrers neigt sich ein wenig in die Kurve hinein (das Auto selbst bleibt fast gerade)
+      const nick = a.neigung, roll = Math.max(-0.1, Math.min(0.1, a.u * a.r / 9.81 * 0.025));
       cam.position.set(a.x + sh * ez + ch * ex, a.y + ey, a.z + ch * ez - sh * ex).multiplyScalar(1);
       if (modell) { cam.position.set(a.x + sh * ez * sc, a.y + ey * sc, a.z + ch * ez * sc); }
       cam.position.x += zit(); cam.position.y += zit();
