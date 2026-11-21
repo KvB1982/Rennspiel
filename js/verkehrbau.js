@@ -102,16 +102,17 @@ export class VerkehrBild {
       }
       this.gruppen.push({ liste, k, l, nah });
     }
-    this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.p = new THREE.Vector3(); this.e = new THREE.Vector3(1, 1, 1); this.Y = new THREE.Vector3(0, 1, 0);
+    this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.p = new THREE.Vector3(); this.e = new THREE.Vector3(1, 1, 1); this.eu = new THREE.Euler(0, 0, 0, 'YXZ');
     this.farbe = new THREE.Color();
   }
   update() {
-    const { m4, q, p, e, Y } = this;
+    const { m4, q, p, e, eu } = this;
     const kp = this.kamera ? this.kamera.position : null;
     for (const { liste, k, l, nah } of this.gruppen) {
       let fern = 0, n = 0;
       liste.forEach((t, i) => {
-        q.setFromAxisAngle(Y, t.h); p.set(t.x, t.y, t.z);
+        // weggeschleuderte Autos kippen und nicken ein wenig (kipp, nick)
+        eu.set(t.nick || 0, t.h, t.kipp || 0); q.setFromEuler(eu); p.set(t.x, t.y, t.z);
         m4.compose(p, q, e); l.setMatrixAt(i, m4);
         // nah: als Modell, weit weg: als Kisten-Form (die Listen werden jedes Bild neu gefüllt)
         if (nah && kp && (t.x - kp.x) ** 2 + (t.z - kp.z) ** 2 < NAH * NAH) {
