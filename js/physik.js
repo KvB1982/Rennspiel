@@ -8,8 +8,9 @@
 // Richtungen: x seitlich, z längs, y hoch. Blickrichtung des Autos: (sin h, cos h). Links vom Auto: (cos h, −sin h).
 // u = Tempo nach vorn, v = Tempo nach links (beides im Auto gemessen), r = Drehtempo (plus = nach links drehen).
 
-import { BELAG } from './strecke.js';
+import { BELAG, inPfuetze } from './strecke.js';
 import { SUPER_AUTOS } from './supercars.js';
+import { RALLYE_AUTOS } from './rallyeautos.js';
 
 const G = 9.81, LUFT = 1.2;
 const MASSSTAB_G = 0.25;   // kleine Autos: Kurvenkräfte sind kleiner, die Neigung soll trotzdem zu sehen sein
@@ -91,7 +92,7 @@ export const AUTOS = {
 };
 
 // Die Supercars (Werte in supercars.js)
-Object.assign(AUTOS, SUPER_AUTOS);
+Object.assign(AUTOS, SUPER_AUTOS, RALLYE_AUTOS);
 
 // Was der Untergrund mit dem Auto macht: Haftung (mal) und Bremswirkung (in g)
 const GRUND = {
@@ -99,7 +100,13 @@ const GRUND = {
   [BELAG.kerb]: { haft: 0.94, zieh: 0.01 },
   [BELAG.gras]: { haft: 0.5, zieh: 0.12 },
   [BELAG.kies]: { haft: 0.42, zieh: 0.55 },
+  // Rallye: loser Schotter rutscht (das Auto driftet schon bei mittlerem Tempo), Matsch noch mehr und bremst,
+  // Wasser bremst stark (Pfütze, Wasserdurchfahrt). Alles geschätzt.
+  [BELAG.schotter]: { haft: 0.74, zieh: 0.015 },
+  [BELAG.matsch]: { haft: 0.56, zieh: 0.06 },
+  [BELAG.wasser]: { haft: 0.6, zieh: 0.32 },
 };
+const IN_DER_LUFT = { haft: 0, zieh: 0 };
 
 // tempo: eigenes Höchsttempo (m/s) für die kleinen Autos (im Menü einstellbar)
 export function neuesAuto(art = 'f1', tempo = 0) {
@@ -136,11 +143,17 @@ export function schritt(a, T, dt) {
   const aus = f.d > 0 ? T.artL[f.i] : T.artR[f.i];
   const kerb = f.d > 0 ? T.kerbL[f.i] : T.kerbR[f.i];
   const kerbB = T.def.modell ? hb * 0.12 : 1.4;
-  a.grund = ad < hb ? BELAG.asphalt : (ad < hb + kerbB && kerb) ? BELAG.kerb : (aus === BELAG.mauer || aus === BELAG.asphalt) ? BELAG.asphalt : aus;
-  const gr = GRUND[a.grund] || GRUND[BELAG.asphalt];
+  a.grund = ad < hb ? (T.belag ? T.belag[f.i] : BELAG.asphalt) : (ad < hb + kerbB && kerb) ? BELAG.kerb : (aus === BELAG.mauer || aus === BELAG.asphalt) ? BELAG.asphalt : aus;
+  if (T.pfuetzen && T.pfuetzen.length && ad < hb + 1 && inPfuetze(T, f.s, f.d)) a.grund = BELAG.wasser;
+  // In der Luft (nach einer Kuppe) haben die Reifen keinen Halt: kein Lenken, kein Gas, keine Bremse
+  const gr = a.luft ? IN_DER_LUFT : GRUND[a.grund] || GRUND[BELAG.asphalt];
 
   // Lenkrad dreht nicht sofort: die Vorderräder folgen dem Wunsch schnell, aber weich
-  const ziel = a.lenkWunsch * lenkGrenze(p, a.u);
+  let lenkGr = lenkGrenze(p, a.u);
+  // Rallye: Bei Tempo darf man normal nur wenig einlenken (sonst wäre das Auto zu zappelig). Rutscht das Heck aber weg,
+  // darf man zum Gegenlenken bis zum vollen Einschlag drehen – so wie ein echter Rallyefahrer, der den Drift fängt.
+  if (p.rallye && a.u > 3 && Math.sign(a.lenkWunsch) === Math.sign(a.v)) lenkGr += (p.lenkMax - lenkGr) * Math.min(1, Math.abs(Math.atan2(a.v, a.u)) / 0.35);
+  const ziel = a.lenkWunsch * lenkGr;
   a.lenk += (ziel - a.lenk) * Math.min(1, dt * 14);
 
   let maxRutschV = 0, maxRutschH = 0;
@@ -318,7 +331,7 @@ export function schritt(a, T, dt) {
       }
     }
   }
-  a.y = f2.y;
+  if (T.def.rallye) huepfen(a, T, f2, dt); else a.y = f2.y;
 
   // Gang und Drehzahl (nur für den Klang und die Anzeige)
   const au = Math.abs(a.u);
@@ -344,12 +357,42 @@ export function schritt(a, T, dt) {
   a.neigung += (((a.brems > 0 && a.u > 1 ? 1 : 0) * 0.012 - a.gas * 0.006) - a.neigung) * Math.min(1, dt * 5);
 }
 
+// Auf und ab (Rallye): Das Auto folgt der Straße, bis eine Kuppe so rund ist, dass die Straße schneller
+// wegfällt, als die Erdanziehung das Auto nach unten ziehen kann. Dann fliegt es – bis es wieder aufsetzt.
+// (Abheben, wenn Tempo² · Krümmung > g. Bei einer Kuppe mit 50 m Halbmesser ab etwa 80 km/h.)
+function huepfen(a, T, f, dt) {
+  const i = f.i, boden = f.y;
+  const sh = Math.sin(a.h), ch = Math.cos(a.h);
+  const vLang = (sh * a.u + ch * a.v) * f.tx + (ch * a.u - sh * a.v) * f.tz;   // Tempo entlang der Straße
+  const steig = T.steig[i], kv = T.kv[i];
+  a.landung = 0;
+  if (a.vy === undefined) { a.vy = 0; a.y = boden; a.luft = false; a.nick = 0; a.flug = 0; }
+  if (a.luft) {
+    a.vy -= G * dt; a.y += a.vy * dt; a.flug += dt;
+    // In der Luft dreht sich das Auto weiter, wie es abgesprungen ist – aber gebremst (Spiel-Wert: sonst landet man zu oft quer)
+    a.r *= Math.exp(-dt * 2.5);
+    if (a.y <= boden) {
+      // aufsetzen: je steiler das Auto im Vergleich zur Straße fällt, desto härter
+      const hart = Math.max(0, steig * vLang - a.vy);
+      a.landung = hart; a.luft = false; a.y = boden; a.vy = steig * vLang;
+      if (hart > 5) { a.u *= 1 - Math.min(0.12, (hart - 5) * 0.015); a.stoss = Math.max(a.stoss, (hart - 5) * 1.5); }
+    }
+  } else {
+    a.vy = steig * vLang; a.y = boden;
+    if (-kv * vLang * vLang > G && Math.abs(vLang) > 8) { a.luft = true; a.flug = 0; }
+  }
+  // Das Auto neigt sich mit der Straße (bergauf: Nase hoch); im Flug folgt es der Flugbahn, die Nase sinkt langsam
+  const ziel = a.luft ? Math.max(-0.5, Math.min(0.5, a.vy / Math.max(6, Math.abs(vLang)))) * 0.8 : steig;
+  a.nick += (ziel - a.nick) * Math.min(1, dt * (a.luft ? 3 : 12));
+}
+
 // Auto an eine Stelle der Strecke setzen (s = Meter seit der Startlinie, d = seitlich, plus = links)
 export function aufStrecke(a, T, s, d = 0) {
   const i = T.index(s);
   a.x = T.x[i] + T.tz[i] * d; a.z = T.z[i] - T.tx[i] * d; a.y = T.y[i];
   a.h = Math.atan2(T.tx[i], T.tz[i]);
   a.u = a.v = a.r = 0; a.lenk = 0; a.idx = i;
+  a.vy = 0; a.luft = false; a.nick = T.steig ? T.steig[i] : 0;
 }
 
 export const kmh = a => Math.abs(a.u) * 3.6;

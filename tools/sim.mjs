@@ -10,6 +10,7 @@ const [nur, runden = 3, gegner = 7, staerke = 'mittel', verkehr = 1] = process.a
 let fehler = 0;
 for (const def of STRECKEN) {
   if (nur && def.id !== nur) continue;
+  if (def.rallye) continue;   // Rallye-Prüfungen: node tools/rallye.mjs
   const T = baueStrecke(def);
   const art = def.slot ? 'slot' : def.drift ? 'drift' : def.modell ? 'modell' : def.strasse ? 'super' : 'f1';
   const R = new Rennen(T, { modus: 'rennen', runden: def.strasse && !nur ? 1 : +runden, gegner: def.modell ? Math.min(3, +gegner) : +gegner, staerke, art, mitSpieler: false, boxen: true, verkehr: +verkehr });

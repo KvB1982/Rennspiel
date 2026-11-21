@@ -149,6 +149,53 @@ export const STRECKEN = [
     hoehe: [[0, 0], [0.06, 0], [0.12, 12], [0.2, 35], [0.28, 22], [0.36, 40], [0.42, 18], [0.47, 4], [0.5, 4], [0.58, 4], [0.66, 14], [0.78, 24], [0.9, 2], [0.95, 0]],
     welt: { art: 'reise', zeit: 'mittag', staedte: [{ x: 0, z: 0, r: 1100, name: 'Valmera' }, { x: 7100, z: -600, r: 900, name: 'Bergheim' }] },
   },
+  // ---------------------------------------------------------------- Rallye: Wertungsprüfungen (WP)
+  // Rallyestrecken sind Wege durchs Gelände: schmal, ohne Leitplanken, mit Wald direkt am Rand.
+  // belag = was auf der Fahrbahn liegt ('schotter' oder 'asphalt'), wellen = kleines Auf und Ab,
+  // spruenge = Kuppen, über die man fliegt, matsch / wasser / pfuetzen siehe strecke.js (rallyeBelag).
+  // Gefahren wird eine Runde: Start an der Startlinie, Ziel ("fliegendes Ziel") 300 m davor, dahinter das Stopp-Schild.
+  {
+    id: 'wp_seen', name: 'WP 1 · Seenland-Sprünge', ort: 'Schnelle Schotterwege im Kiefernwald, Nachmittag',
+    text: 'Breite, schnelle Schotterwege mit vielen Kuppen und Sprüngen – wie in Finnland. Voll auf dem Gas bleiben und dem Beifahrer glauben!',
+    rallye: true, belag: 'schotter', breite: 8.5, glatt: 16, kerbAb: 99, aus: 'gras', grasBreite: 6,
+    ecken: [
+      [0, 0, 70], [300, -150, 140], [700, -100, 200], [1000, -300, 90], [1250, -200, 55], [1400, 100, 160], [1300, 450, 45], [1500, 700, 110],
+      [1350, 1000, 70], [1000, 1050, 180], [650, 900, 50], [450, 1100, 80], [100, 1150, 140], [-200, 950, 60], [-350, 600, 120], [-250, 300, 38], [-400, 100, 90],
+    ],
+    hoehe: [[0, 10], [0.15, 30], [0.3, 18], [0.45, 42], [0.6, 25], [0.75, 38], [0.9, 15]],
+    wellen: [[420, 2.2], [190, 1.0]], schlaengeln: [[260, 14], [130, 4]],
+    spruenge: [[0.07, 2.0, 60], [0.16, 1.6, 50], [0.27, 2.4, 58], [0.38, 1.7, 48], [0.52, 2.6, 62], [0.63, 1.9, 52], [0.77, 2.2, 56], [0.87, 1.6, 46]],
+    pfuetzen: 10, matsch: [[0.41, 0.46]], wasser: [[0.71, 14]],
+    welt: { art: 'rallye', zeit: 'nachmittag', wald: 'kiefer' },
+  },
+  {
+    id: 'wp_nebel', name: 'WP 2 · Nebelwald', ort: 'Enger Matsch-Pfad im Laubwald, trüber Morgen',
+    text: 'Schmal, kurvig und nass – wie in Wales. Matsch, tiefe Pfützen, eine Wasserdurchfahrt und enge Kehren. Hier gewinnt, wer sauber fährt.',
+    rallye: true, belag: 'schotter', breite: 7, glatt: 10, kerbAb: 99, aus: 'gras', grasBreite: 4.5,
+    ecken: [
+      [0, 0, 25], [150, -80, 40], [300, -60, 15], [320, 120, 30], [480, 200, 60], [600, 100, 18], [750, 150, 35], [800, 350, 12], [650, 420, 25],
+      [700, 600, 50], [550, 750, 20], [350, 700, 35], [250, 850, 14], [50, 800, 45], [-100, 650, 22], [0, 500, 30], [-150, 350, 16], [-250, 200, 40], [-150, 80, 25],
+    ],
+    hoehe: [[0, 20], [0.2, 32], [0.4, 22], [0.6, 36], [0.8, 26]],
+    wellen: [[260, 1.4], [120, 0.6]], schlaengeln: [[150, 7], [70, 2]],
+    spruenge: [[0.33, 1.6, 30], [0.68, 1.8, 32]],
+    pfuetzen: 32, matsch: [[0.1, 0.28], [0.44, 0.62], [0.78, 0.9]], wasser: [[0.53, 16]],
+    welt: { art: 'rallye', zeit: 'trueb', wald: 'laub' },
+  },
+  {
+    id: 'wp_pass', name: 'WP 3 · Bergpass', ort: 'Asphalt mit Kehren am Berg, Abendsonne',
+    text: 'Auf Asphalt in Kehren den Berg hinauf, über den Kamm und schnell wieder hinunter – wie bei der Rallye in den Seealpen. Links Fels, rechts der Abgrund.',
+    rallye: true, belag: 'asphalt', breite: 7.5, glatt: 10, kerbAb: 99, aus: 'gras', grasBreite: 4,
+    ecken: [
+      [0, 0, 40], [220, 60, 14], [40, 150, 14], [260, 240, 14], [60, 330, 14], [280, 420, 30], [520, 470, 90], [760, 380, 60],
+      [800, 150, 110], [700, -100, 50], [450, -180, 80], [200, -150, 45], [-100, -160, 60],
+    ],
+    hoehe: [[0, 30], [0.08, 52], [0.15, 78], [0.24, 106], [0.32, 132], [0.42, 140], [0.55, 120], [0.7, 82], [0.85, 50]],
+    wellen: [[300, 0.8]], schlaengeln: [[180, 5]],
+    spruenge: [[0.47, 1.2, 34]],
+    pfuetzen: 4,
+    welt: { art: 'rallye', zeit: 'abend', wald: 'berg' },
+  },
 ];
 
 export const strecke = id => STRECKEN.find(s => s.id === id) || STRECKEN[0];

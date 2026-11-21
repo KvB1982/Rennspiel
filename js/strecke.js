@@ -10,7 +10,7 @@
 // wo er liegt (x, z), wie hoch (y), wohin die Strecke zeigt, wie stark sie sich dort biegt,
 // wie breit sie ist und was neben der Strecke kommt (Gras, Kies, Mauer).
 
-export const BELAG = { asphalt: 0, kerb: 1, gras: 2, kies: 3, mauer: 4 };
+export const BELAG = { asphalt: 0, kerb: 1, gras: 2, kies: 3, mauer: 4, schotter: 5, matsch: 6, wasser: 7 };
 
 // Straßen-Strecken der Supercars: Jede Stelle liegt in einer "Zone". Die Zone sagt, wie breit die Straße ist,
 // was daneben kommt, wie viele Fahrspuren es gibt und wie schnell der Verkehr dort fährt.
@@ -155,6 +155,8 @@ export function baueStrecke(def) {
     for (const p of roh) { const x = p.x, z = p.z; p.x = ox + x * c + z * sn; p.z = oz - x * sn + z * c; }
   }
   const n = roh.length;
+  // Rallye: Die Wege schlängeln sich (kleine Wellen nach links und rechts statt langer gerader Stücke)
+  if (def.schlaengeln) schlaengeln(def, roh, ds);
 
   // Mittellinie glätten, damit Kurven weich ein- und auslaufen (wie bei echten Strecken)
   const gl = def.glatt ?? 25;
@@ -210,7 +212,17 @@ export function baueStrecke(def) {
     return hp[0][1];
   };
   const Y = glaetten(Array.from({ length: n }, (_, i) => hoeheBei(T.s[i] / T.laenge)), 10);
+  // Rallye: dazu viele kleine Hügel (Wellen) und Kuppen, über die das Auto springt
+  if (def.rallye) rallyeHoehe(def, T, Y);
   for (let i = 0; i < n; i++) T.y[i] = Y[i];
+  // Steigung (Höhe pro Meter) und Krümmung nach oben/unten (minus = Kuppe). Damit weiß das Auto, wann es abhebt.
+  T.steig = new Float32Array(n); T.kv = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const a = (i + n - 1) % n, b = (i + 1) % n;
+    T.steig[i] = (Y[b] - Y[a]) / (2 * ds);
+    T.kv[i] = (Y[b] - 2 * Y[i] + Y[a]) / (ds * ds);
+  }
+  { const kv = glaetten(T.kv, 3); for (let i = 0; i < n; i++) T.kv[i] = kv[i]; }
 
   // Breite und Auslauf je Streckenteil, weich ineinander übergehend
   const hbRoh = [], aL = [], aR = [];
@@ -264,6 +276,10 @@ export function baueStrecke(def) {
     }
   }
 
+  // Was liegt auf der Fahrbahn? Asphalt, Schotter, Matsch oder Wasser (Rallye). Dazu die Pfützen.
+  T.belag = new Uint8Array(n).fill(BELAG[def.belag] ?? BELAG.asphalt);
+  T.pfuetzen = [];
+  if (def.rallye) rallyeBelag(def, T);
   // ---------------------------------------------------------------- Nachschlagen: Wo auf der Strecke ist ein Punkt?
   // Sucht in der Nähe des letzten bekannten Messpunkts (hint). Ohne hint wird die ganze Strecke durchsucht.
   T.finde = (px, pz, hint = -1, fenster = 40) => {
@@ -316,4 +332,93 @@ export function selbstBeruehrung(T) {
     if (d < min) { min = d; wo = i; }
   }
   return { abstand: min, wo };
+}
+
+// ---------------------------------------------------------------- Rallye: Hügel, Sprünge, Matsch, Pfützen, Wasser
+// Ein fester Zufall (immer gleich für dieselbe Strecke), damit Hügel und Pfützen bei jedem Start gleich liegen.
+function festerZufall(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+// wellen:   [[Wellenlänge in m, Höhe in m], …] – sanftes Auf und Ab, das über die ganze Prüfung läuft
+// spruenge: [[Anteil der Strecke, Höhe in m, Länge in m], …] – eine Kuppe. Je höher und kürzer, desto eher hebt das Auto ab
+//           (bei Tempo v hebt es ab, wenn v² · Krümmung größer als die Erdanziehung ist)
+function rallyeHoehe(def, T, Y) {
+  const n = T.n, L = T.laenge;
+  const r = festerZufall(def.id.length * 7919 + n);
+  for (const [lang, hoch] of def.wellen || []) {
+    const mal = Math.max(1, Math.round(L / lang)), ph = r() * 6.283;   // ganze Zahl an Wellen, damit die Runde aufgeht
+    for (let i = 0; i < n; i++) Y[i] += hoch * Math.sin(T.s[i] / L * mal * 6.283 + ph);
+  }
+  for (const [f, hoch, lang] of def.spruenge || []) {
+    const mitte = f * L;
+    for (let i = 0; i < n; i++) {
+      let d = T.s[i] - mitte; if (d > L / 2) d -= L; if (d < -L / 2) d += L;
+      // Form: weich hinauf (Rampe), oben rund, hinten etwas steiler hinunter (so landet man auf dem Abhang)
+      const t = d / (lang / 2);
+      if (t <= -1 || t >= 1) continue;
+      const w = t < 0 ? Math.cos(t * Math.PI / 2) ** 2 : Math.cos(t * Math.PI / 2) ** 1.4;
+      Y[i] += hoch * w;
+    }
+  }
+}
+
+// matsch:   [[von, bis], …] als Anteil der Strecke – dort ist die Fahrbahn schlammig (rutschig, bremst)
+// wasser:   [[Anteil, Länge in m], …] – eine Wasserdurchfahrt quer über die Straße
+// pfuetzen: Anzahl Pfützen (liegen vor allem im Matsch)
+function rallyeBelag(def, T) {
+  const n = T.n, L = T.laenge, r = festerZufall(def.id.length * 104729 + 17);
+  const anteil = i => T.s[i] / L;
+  const imMatsch = f => (def.matsch || []).some(([a, b]) => f >= a && f < b);
+  for (let i = 0; i < n; i++) if (imMatsch(anteil(i))) T.belag[i] = BELAG.matsch;
+  T.furten = [];
+  for (const [f, lang] of def.wasser || []) {
+    const s0 = f * L - lang / 2, s1 = f * L + lang / 2;
+    T.furten.push({ s0, s1 });
+    for (let i = 0; i < n; i++) if (T.s[i] >= s0 && T.s[i] <= s1) T.belag[i] = BELAG.wasser;
+  }
+  let zahl = def.pfuetzen || 0, versuche = 0;
+  // nicht direkt am Start und nicht im Ziel
+  while (T.pfuetzen.length < zahl && versuche++ < zahl * 60) {
+    const f = 0.03 + r() * 0.9;
+    if (!imMatsch(f) && r() < 0.65) continue;
+    const s = f * L, i = Math.min(n - 1, Math.floor(f * n));
+    if (T.belag[i] === BELAG.wasser) continue;
+    if (T.pfuetzen.some(p => Math.abs(p.s - s) < 25)) continue;
+    const rad = 1.4 + r() * 2.2;
+    const d = (r() * 2 - 1) * Math.max(0, T.hb[i] - rad * 0.6);
+    T.pfuetzen.push({ s, d, r: rad, lang: rad * (1.6 + r() * 1.4), i });
+  }
+  T.pfuetzen.sort((a, b) => a.s - b.s);
+}
+
+// Schiebt die Punkte der Mittellinie quer zur Fahrtrichtung hin und her: [[Wellenlänge in m, Weite in m], …].
+// Die Weite schwankt langsam (mal fast gerade, mal kurvig). Am Start ist die Verschiebung 0, damit die Runde aufgeht.
+function schlaengeln(def, roh, ds) {
+  const n = roh.length, L = n * ds, r = festerZufall(def.id.length * 31337 + n);
+  const off = new Float64Array(n);
+  for (const [lang, weit] of def.schlaengeln) {
+    const mal = Math.max(1, Math.round(L / lang)), ph = r() * 6.283, mal2 = Math.max(1, Math.round(L / (lang * 4.7))), ph2 = r() * 6.283;
+    for (let i = 0; i < n; i++) {
+      const f = i / n, huelle = 0.55 + 0.45 * Math.sin(f * mal2 * 6.283 + ph2);
+      off[i] += weit * huelle * (Math.sin(f * mal * 6.283 + ph) - Math.sin(ph) * Math.cos(f * Math.PI * 2));
+    }
+  }
+  // in Kurven der Strecke selbst weniger schlängeln (sonst werden enge Kehren noch enger)
+  // (weich verteilt, sonst gäbe es am Übergang Gerade/Kurve einen Knick)
+  const ruhig = glaetten(roh.map(p => Math.max(0, 1 - Math.abs(p.kurve || 0) * 40)), Math.round(60 / ds), 0.5);
+  const pts = roh.map(p => [p.x, p.z]);
+  for (let i = 0; i < n; i++) {
+    const a = pts[(i + n - 1) % n], b = pts[(i + 1) % n];
+    let tx = b[0] - a[0], tz = b[1] - a[1]; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+    roh[i].x += tz * off[i] * ruhig[i]; roh[i].z -= tx * off[i] * ruhig[i];
+  }
+}
+
+// Liegt der Punkt (Strecke bei s, seitlich d) in einer Pfütze?
+export function inPfuetze(T, s, d) {
+  const P = T.pfuetzen; if (!P || !P.length) return false;
+  for (const p of P) {
+    const ds = Math.abs(s - p.s); if (ds > p.lang) continue;
+    if ((ds / p.lang) ** 2 + ((d - p.d) / p.r) ** 2 < 1) return true;
+  }
+  return false;
 }

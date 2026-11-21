@@ -42,6 +42,11 @@ export function ladeSupercars(ids, { bis = 8000 } = {}) {
   if (aus('ohnesupercars')) return Promise.resolve();
   return laden('supercars', ids.map(id => [id, `modelle/supercars/${id}.glb`]), bis, true);
 }
+// Die Rallyeautos laden (modelle/rallye/<id>.glb). ?ohnerallyemodelle = die Autos aus Formen.
+export function ladeRallye(ids, { bis = 8000 } = {}) {
+  if (aus('ohnerallyemodelle')) return Promise.resolve();
+  return laden('rallye', ids.map(id => [id, `modelle/rallye/${id}.glb`]), bis, true);
+}
 // Den Formel-Rennwagen laden. ?ohneformel = das alte Auto aus Formen.
 export function ladeFormel({ bis = 8000 } = {}) {
   if (aus('ohneformel')) return Promise.resolve();

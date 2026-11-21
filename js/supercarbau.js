@@ -14,11 +14,14 @@
 
 import * as THREE from 'three';
 import { rumpf, rad, stange } from './autobau.js';
-import { ladeSupercars as laden, echtesAuto, lackMaterial } from './automodelle.js';
+import { ladeSupercars as laden, ladeRallye, echtesAuto, lackMaterial } from './automodelle.js';
 import { supercar, SUPERCARS } from './supercars.js';
+import { RALLYEAUTOS } from './rallyeautos.js';
 
 // Alle Supercar-Modelle laden (siehe js/automodelle.js)
 export const ladeSupercars = opt => laden(SUPERCARS.map(S => S.id), opt);
+// Alle Rallyeauto-Modelle laden
+export const ladeRallyeautos = opt => ladeRallye(RALLYEAUTOS.map(S => S.id), opt);
 
 const VORN = 1.25, HINTEN = -1.45;   // Achsen (wie in supercars.js: a = 1,25 m, b = 1,45 m)
 const RAD = 0.35;                    // Radhalbmesser
@@ -44,6 +47,13 @@ export const FORMEN = {
   // wie der Falkner, nur ohne Heckflügel (die Form sieht man nur im Cockpit oder wenn das Modell fehlt)
   falkner_s: { W: 0.93, zF: 2.2, zR: -2.3, nase: 0.6, haube: 0.8, huefte: 0.88, heck: 0.84, kv: 0.45, kh: -2.0, dach: 1.3, scheibe: 0.85, flach: 0.55, rund: 2.8,
     licht: 'rund', ruecklicht: 'band', einlass: false, fluegel: 0, auspuff: 'zwei', kabineBreit: 0.74 },
+  // Rallyeautos: kurz und hoch (Kleinwagen, Coupé, Limousine), großer Heckflügel
+  sturmfalke: { W: 0.9, zF: 2.0, zR: -2.1, nase: 0.62, haube: 0.88, huefte: 0.95, heck: 1.0, kv: 0.6, kh: -1.95, dach: 1.45, scheibe: 0.8, flach: 1.2, rund: 3.4,
+    licht: 'schlitz', ruecklicht: 'rund', einlass: false, fluegel: 2, auspuff: 'zwei', kabineBreit: 0.8 },
+  quadra: { W: 0.9, zF: 2.0, zR: -2.2, nase: 0.62, haube: 0.86, huefte: 0.92, heck: 0.95, kv: 0.55, kh: -1.6, dach: 1.36, scheibe: 0.75, flach: 0.8, rund: 4.6,
+    licht: 'vier', ruecklicht: 'band', einlass: false, fluegel: 2, auspuff: 'zwei', kabineBreit: 0.8 },
+  kaiten: { W: 0.9, zF: 2.15, zR: -2.2, nase: 0.6, haube: 0.84, huefte: 0.92, heck: 0.98, kv: 0.6, kh: -1.35, dach: 1.4, scheibe: 0.8, flach: 0.9, rund: 3.6,
+    licht: 'vier', ruecklicht: 'band', einlass: false, fluegel: 2, auspuff: 'zwei', kabineBreit: 0.8 },
 };
 
 // weich zwischen Stützwerten [z, Wert] hin und her (Werte nach z sortiert)

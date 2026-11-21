@@ -80,6 +80,8 @@ const STIMMUNG = {
   mittag: { hoehe: 58, richtung: 140, truebe: 2.2, rayleigh: 0.9, nebel: 0xbcd3e6, nebelWeit: 2600, licht: 3.2, himmel: 0.9, belicht: 0.55 },
   nachmittag: { hoehe: 30, richtung: 230, truebe: 4, rayleigh: 1.4, nebel: 0xc4cfd6, nebelWeit: 2200, licht: 3.0, himmel: 0.8, belicht: 0.55 },
   abend: { hoehe: 5, richtung: 280, truebe: 8, rayleigh: 2.8, nebel: 0xd8a27c, nebelWeit: 2000, licht: 2.4, himmel: 0.75, belicht: 0.62 },
+  // Rallye: trüber Morgen im Wald (tief hängende Wolken, Nebel zwischen den Bäumen)
+  trueb: { grau: true, hoehe: 22, richtung: 150, truebe: 12, rayleigh: 0.5, nebel: 0xa7aeae, nebelNah: 20, nebelWeit: 430, licht: 1.5, himmel: 1.45, belicht: 0.66 },
   drinnen: { hoehe: 50, richtung: 200, truebe: 2, rayleigh: 1, nebel: 0x8a7a6a, nebelWeit: 60, licht: 1.6, himmel: 0.9, belicht: 0.9 },
 };
 export const stimmung = def => STIMMUNG[def.welt.zeit] || STIMMUNG.mittag;

@@ -16,12 +16,16 @@ import { LenkradEmpfang } from './verbindung.js';
 import { Klang } from './klang.js';
 import { SUPERCARS, LACKE, supercar } from './supercars.js';
 import { inApp, istApfelGeraet } from './native.js';
+import { Etappe, zeitText as rallyeZeit } from './rallye.js';
+import { RALLYEAUTOS, rallyeauto } from './rallyeautos.js';
+import { ladeRallyeautos } from './supercarbau.js';
 
 const $ = id => document.getElementById(id);
 
 // ---------------------------------------------------------------- Einstellungen (werden im Browser gemerkt)
 const STANDARD = {
-  fahrzeug: 'f1', modus: 'rennen', strecke: 'kueste', strecke_modell: 'wohnzimmer', strecke_slot: 'slot_oval', strecke_drift: 'drift_matte', strecke_super: 'metropole', tempo: 'mittel',
+  fahrzeug: 'f1', modus: 'rennen', strecke: 'kueste', strecke_modell: 'wohnzimmer', strecke_slot: 'slot_oval', strecke_drift: 'drift_matte', strecke_super: 'metropole', strecke_rallye: 'wp_seen', tempo: 'mittel',
+  rallyeauto: 'sturmfalke', lack_rallye: 0, beifahrer: 'beides', kamera_rallye: 'hinten',
   supercar: 'falkner', lack: 0, verkehr: 'normal', runden_super: 1, gegner_super: 5,
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
   bremshilfe: true, lenkhilfe: false, traktion: true, autogas: false, grafik: 'hoch', linie: true, boxen: true,
@@ -31,7 +35,7 @@ const STANDARD = {
 // Höchsttempo der kleinen Autos in Metern pro Sekunde. 3 m/s sehen beim Maßstab 1:30 aus wie 325 km/h.
 // Drift-Rallye (Maßstab 1:43): 1,2 m/s sehen aus wie gut 180 km/h – langsam genug, um das Auto quer zu halten.
 const TEMPO = { modell: { langsam: 1.6, mittel: 2.3, schnell: 3.0 }, slot: { langsam: 2.6, mittel: 3.5, schnell: 4.5 }, drift: { langsam: 0.9, mittel: 1.2, schnell: 1.5 } };
-const streckenFeld = () => E.fahrzeug === 'modell' ? 'strecke_modell' : E.fahrzeug === 'slot' ? 'strecke_slot' : E.fahrzeug === 'drift' ? 'strecke_drift' : E.fahrzeug === 'super' ? 'strecke_super' : 'strecke';
+const streckenFeld = () => E.fahrzeug === 'modell' ? 'strecke_modell' : E.fahrzeug === 'slot' ? 'strecke_slot' : E.fahrzeug === 'drift' ? 'strecke_drift' : E.fahrzeug === 'super' ? 'strecke_super' : E.fahrzeug === 'rallye' ? 'strecke_rallye' : 'strecke';
 // Wie viel Verkehr: Zahl für verkehr.js (0 = keiner)
 const VERKEHR = { aus: 0, wenig: 0.5, normal: 1, viel: 1.6 };
 const istKlein = () => E.fahrzeug === 'modell' || E.fahrzeug === 'slot' || E.fahrzeug === 'drift';   // die kleinen Autos (Maßstab 1:30, Drift 1:43)
@@ -47,7 +51,9 @@ const ladeGeist = (id, art) => { try { return JSON.parse(localStorage.getItem(be
 const speichereGeist = (id, art, g) => { try { localStorage.setItem(bestKey(id, art), JSON.stringify(g)); } catch (e) {} };
 
 // Bestzeiten der kleinen Autos gelten je Höchsttempo (sonst wären sie nicht vergleichbar)
-const geistArt = () => E.fahrzeug === 'f1' ? '' : E.fahrzeug === 'super' ? '.' + E.supercar : '.' + E.tempo;
+const geistArt = () => E.fahrzeug === 'f1' ? '' : E.fahrzeug === 'super' ? '.' + E.supercar : E.fahrzeug === 'rallye' ? '.' + E.rallyeauto : '.' + E.tempo;
+// Die ganze Rallye: drei Prüfungen nacheinander
+const RALLYE_FOLGE = ['wp_seen', 'wp_nebel', 'wp_pass'];
 const streckenCache = new Map();
 const holeStrecke = id => { if (!streckenCache.has(id)) streckenCache.set(id, baueStrecke(strecke(id))); return streckenCache.get(id); };
 
@@ -59,6 +65,7 @@ export function starteSpiel() {
   let kurven = null;   // für jede Stelle der Strecke: wo die nächste Kurve ist und welcher Gang dort passt
   let laeuft = false, pausiert = false, letzteZeit = 0, infoTakt = 0, meldungBis = 0, fertigGezeigt = false;
   const app = { E, empfang, eingabe, klang };
+  const sprecher = new Beifahrer();
   window.__rennspiel = app;
 
   // ---------------------------------------------------------------- Menü
@@ -67,10 +74,20 @@ export function starteSpiel() {
     waehle('mFahrzeug', E.fahrzeug); waehle('mModus', E.modus);
     // Strecken passend zum Fahrzeug
     const box = $('mStrecke'); box.innerHTML = '';
-    const liste = STRECKEN.filter(s => E.fahrzeug === 'slot' ? s.slot : E.fahrzeug === 'drift' ? s.drift : E.fahrzeug === 'modell' ? s.modell && !s.slot && !s.drift : E.fahrzeug === 'super' ? s.strasse : !s.modell && !s.strasse);
+    const liste = STRECKEN.filter(s => E.fahrzeug === 'slot' ? s.slot : E.fahrzeug === 'drift' ? s.drift : E.fahrzeug === 'modell' ? s.modell && !s.slot && !s.drift : E.fahrzeug === 'super' ? s.strasse : E.fahrzeug === 'rallye' ? s.rallye : !s.modell && !s.strasse && !s.rallye);
     // Supercars: Auswahl des Autos
-    $('mSuper').hidden = E.fahrzeug !== 'super';
-    if (E.fahrzeug === 'super') autosBauen();
+    $('mSuper').hidden = E.fahrzeug !== 'super' && E.fahrzeug !== 'rallye';
+    $('mAutoTitel').textContent = E.fahrzeug === 'rallye' ? 'Dein Rallyeauto' : 'Dein Supercar';
+    if (E.fahrzeug === 'super' || E.fahrzeug === 'rallye') autosBauen();
+    // Rallye: Zeitfahren heißt hier "einzelne Prüfung", Rennen heißt "ganze Rallye"
+    const [mz, mr] = [$('mModus').querySelector('[data-wert=zeit]'), $('mModus').querySelector('[data-wert=rennen]')];
+    if (E.fahrzeug === 'rallye') {
+      mz.innerHTML = '<span class="gross">⏱️</span><b>Eine Prüfung</b><small>Eine Wertungsprüfung gegen die Uhr – mit Geist-Auto deiner Bestzeit</small>';
+      mr.innerHTML = '<span class="gross">🏆</span><b>Ganze Rallye</b><small>Alle drei Prüfungen nacheinander, die Zeiten werden zusammengezählt</small>';
+    } else {
+      mz.innerHTML = '<span class="gross">⏱️</span><b>Zeitfahren</b><small>Allein gegen die Uhr, mit Geist-Auto deiner besten Runde</small>';
+      mr.innerHTML = '<span class="gross">🏆</span><b>Rennen</b><small>Gegen Computerfahrer, mit Startampel</small>';
+    }
     const feld = streckenFeld(), aktiv = E[feld];
     for (const def of liste) {
       const b = document.createElement('button'); b.dataset.wert = def.id;
@@ -103,7 +120,12 @@ export function starteSpiel() {
       ein.appendChild(z);
     };
     const rennenAn = E.modus === 'rennen', modell = istKlein(), slot = E.fahrzeug === 'slot', sup = E.fahrzeug === 'super', drift = E.fahrzeug === 'drift';   // modell = eines der kleinen Autos
-    if (sup) {
+    const rallye = E.fahrzeug === 'rallye';
+    if (rallye) {
+      zeile('Stärke der anderen Fahrer', 'staerke', [['leicht', 'leicht'], ['mittel', 'mittel'], ['schwer', 'schwer']]);
+      zeile('Beifahrer', 'beifahrer', [['beides', 'spricht und zeigt'], ['bild', 'nur zeigen'], ['aus', 'aus']]);
+      zeile('Kamera', 'kamera_rallye', [['hinten', 'hinter dem Auto'], ['weit', 'weiter weg'], ['haube', 'Motorhaube']]);
+    } else if (sup) {
       zeile('Gegner', 'gegner_super', [3, 5, 7].map(n => [n, String(n)]), rennenAn);
       zeile('Stärke der Gegner', 'staerke', [['leicht', 'leicht'], ['mittel', 'mittel'], ['schwer', 'schwer']], rennenAn);
       zeile('Runden', 'runden_super', [1, 2, 3, 5].map(n => [n, String(n)]), rennenAn);
@@ -114,10 +136,10 @@ export function starteSpiel() {
       zeile('Stärke der Gegner', 'staerke', [['leicht', 'leicht'], ['mittel', 'mittel'], ['schwer', 'schwer']], rennenAn);
       zeile('Runden', 'runden', (modell ? [3, 5, 10, 20] : [1, 3, 5, 10]).map(n => [n, String(n)]), rennenAn);
     }
-    if (!modell) zeile('Kamera', 'kamera', [['hinten', 'hinter dem Auto'], ['weit', 'weiter weg'], ['cockpit', 'im Cockpit']]);
+    if (!modell && !rallye) zeile('Kamera', 'kamera', [['hinten', 'hinter dem Auto'], ['weit', 'weiter weg'], ['cockpit', 'im Cockpit']]);
     zeile('Höchsttempo', 'tempo', [['langsam', 'langsam'], ['mittel', 'mittel'], ['schnell', 'schnell']], modell);
     zeile('Tanken und Reifen', 'boxen', [[true, 'an'], [false, 'aus']], modell && rennenAn && !drift);
-    zeile('Ideallinie und Bremszonen', 'linie', [[true, 'an'], [false, 'aus']], !modell);
+    zeile('Ideallinie und Bremszonen', 'linie', [[true, 'an'], [false, 'aus']], !modell && !rallye);
     zeile('Bremshilfe', 'bremshilfe', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Lenkhilfe', 'lenkhilfe', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Traktionskontrolle', 'traktion', [[true, 'an'], [false, 'aus']], !slot && !drift);
@@ -128,13 +150,14 @@ export function starteSpiel() {
     zeile('Lenken beim Neigen', 'neigStufe', [[2, 'ruhig'], [3, 'normal'], [4, 'direkt'], [5, 'sehr direkt']], neigenGeht && E.neigen);
     zeile('Grafik', 'grafik', [['hoch', 'schön'], ['mittel', 'mittel'], ['niedrig', 'schnell']]);
     // Farbe des eigenen Autos (Supercar: Lackfarbe, sonst Rennstall)
-    const z = document.createElement('div'); z.className = 'zeile'; z.innerHTML = `<span>${sup ? 'Lackfarbe' : 'Dein Rennstall'}</span><div class="wahl"></div>`;
-    if (sup) LACKE.forEach((l, k) => {
-      const b = document.createElement('button'); b.className = 'farbe' + (E.lack === k ? ' an' : ''); b.title = l.name;
-      const f = l.farbe ?? supercar(E.supercar).farbe;
+    const z = document.createElement('div'); z.className = 'zeile'; z.innerHTML = `<span>${sup || rallye ? 'Lackfarbe' : 'Dein Rennstall'}</span><div class="wahl"></div>`;
+    const lackFeld = rallye ? 'lack_rallye' : 'lack';
+    if (sup || rallye) LACKE.forEach((l, k) => {
+      const b = document.createElement('button'); b.className = 'farbe' + (E[lackFeld] === k ? ' an' : ''); b.title = l.name;
+      const f = l.farbe ?? (rallye ? rallyeauto(E.rallyeauto) : supercar(E.supercar)).farbe;
       b.style.background = '#' + f.toString(16).padStart(6, '0');
       if (l.farbe === null) b.style.boxShadow = 'inset 0 0 0 3px rgba(0,0,0,.35)';
-      b.addEventListener('click', () => { E.lack = k; merken(); menueBauen(); });
+      b.addEventListener('click', () => { E[lackFeld] = k; merken(); menueBauen(); });
       z.lastChild.appendChild(b);
     });
     else TEAMS.forEach((t, k) => {
@@ -148,7 +171,8 @@ export function starteSpiel() {
     ton.innerHTML = `<span>Ton</span><div class="wahl"><button class="${klang.an ? 'an' : ''}">an</button><button class="${klang.an ? '' : 'an'}">aus</button></div>`;
     ton.querySelectorAll('button').forEach((b, k) => b.addEventListener('click', () => { klang.schalten(k === 0); menueBauen(); }));
     ein.appendChild(ton);
-    $('mBest').textContent = drift ? 'Drift-Rallye: Gib in der Kurve Gas, dann kommt das Heck – lenk dagegen und halte das Auto quer. Handbremse: Gas und Bremse gleichzeitig (Tastatur: Leertaste). Je schräger und schneller du rutschst, desto mehr Drift-Punkte. Hängst du Drifts aneinander, steigt der Faktor bis x5. In die Bande = Drift verloren. Mit 🎥 wechselst du die Stelle, an der du stehst.'
+    $('mBest').textContent = rallye ? 'Rallye: Du fährst allein gegen die Uhr, die anderen Fahrer sind schon gefahren. Hör auf deinen Beifahrer: Die Zahl sagt, wie eng die Kurve ist (1 = Haarnadel, 6 = fast gerade), „und“ heißt, die nächste kommt gleich danach. Auf Schotter driftet das Auto – lenk dagegen und gib Gas. Handbremse: Leertaste oder Gas und Bremse zugleich. Nicht schneiden: Innen liegen Felsen!'
+      : drift ? 'Drift-Rallye: Gib in der Kurve Gas, dann kommt das Heck – lenk dagegen und halte das Auto quer. Handbremse: Gas und Bremse gleichzeitig (Tastatur: Leertaste). Je schräger und schneller du rutschst, desto mehr Drift-Punkte. Hängst du Drifts aneinander, steigt der Faktor bis x5. In die Bande = Drift verloren. Mit 🎥 wechselst du die Stelle, an der du stehst.'
       : slot ? 'Slotcar: Du gibst nur Gas. Vor der Kurve vom Gas gehen, sonst fliegt das Auto raus! Spur wechseln: an einer gelben Weiche nach links oder rechts lenken. Boxengasse: auf der rechten Spur an der Einfahrt nach rechts lenken und im blauen Feld anhalten. Mit 🎥 wechselst du die Stelle, an der du stehst.'
       : modell ? 'Ferngesteuertes Auto: Du stehst neben der Bahn. Tanken und Reifen wechseln: in der Boxengasse rechts neben der Startgeraden im blauen Feld anhalten. Mit 🎥 wechselst du die Stelle, an der du stehst.'
       : sup ? 'Supercar: Rechts fährt der Verkehr in deine Richtung, links kommt dir Gegenverkehr entgegen. Auf der Autobahn ist der Gegenverkehr hinter der Mittelmauer. Überhol vorsichtig!' : '';
@@ -156,13 +180,14 @@ export function starteSpiel() {
   // Karten der Supercars: Bild des Autos in der gewählten Lackfarbe, Name, Vorbild, Leistung
   function autosBauen() {
     const box = $('mAutos'); box.innerHTML = '';
-    for (const S of SUPERCARS) {
+    const rallye = E.fahrzeug === 'rallye', feld = rallye ? 'rallyeauto' : 'supercar', lack = E[rallye ? 'lack_rallye' : 'lack'];
+    for (const S of rallye ? RALLYEAUTOS : SUPERCARS) {
       const b = document.createElement('button'); b.dataset.wert = S.id;
       const ps = Math.round(S.p.leistung / 735.5), kmhMax = Math.round(S.p.vMax * 3.6);
-      b.innerHTML = `<canvas width="600" height="240"></canvas><b>${S.name}</b><small>Vorbild: ${S.vorbild}</small><small>${S.text}</small><span class="werte">${ps} PS · ${kmhMax} km/h · ${S.p.masse} kg</span>`;
-      autoBild(b.querySelector('canvas'), S, E.supercar === S.id && LACKE[E.lack] && LACKE[E.lack].farbe !== null ? LACKE[E.lack].farbe : S.farbe);
-      b.classList.toggle('an', S.id === E.supercar);
-      b.addEventListener('click', () => { E.supercar = S.id; merken(); menueBauen(); });
+      b.innerHTML = `<canvas width="600" height="240"></canvas><b>${S.name}</b><small>Vorbild: ${S.vorbild}</small><small>${S.text}</small><span class="werte">${ps} PS · ${kmhMax} km/h · ${S.p.masse} kg${S.jahr && rallye ? ' · Allrad' : ''}</span>`;
+      autoBild(b.querySelector('canvas'), S, E[feld] === S.id && LACKE[lack] && LACKE[lack].farbe !== null ? LACKE[lack].farbe : S.farbe);
+      b.classList.toggle('an', S.id === E[feld]);
+      b.addEventListener('click', () => { E[feld] = S.id; merken(); menueBauen(); });
       box.appendChild(b);
     }
   }
@@ -178,7 +203,7 @@ export function starteSpiel() {
     return await eingabe.neigung.start();
   };
   $('mEinst').addEventListener('click', () => { neigenAn(); });   // Einstellung „an“ getippt: gleich einschalten
-  $('mStart').addEventListener('click', async () => { klang.wecken(); await neigenAn(); starten(); });
+  $('mStart').addEventListener('click', async () => { klang.wecken(); await neigenAn(); app.rallyeStand = null; starten(); });
   // App: Dieses Gerät wird zum Lenkrad für ein iPad in der Nähe
   $('lbNahLenkrad').addEventListener('click', () => { location.href = location.pathname + '?nahlenkrad'; });
   $('lbNeigen').addEventListener('click', async () => {
@@ -214,19 +239,25 @@ export function starteSpiel() {
   function starten() {
     zeige('laden', true);
     setTimeout(async () => {
-      await Promise.all([ladeModelle(), ladeBilder(), ...(E.fahrzeug === 'super' ? [ladeSupercars(), ladeVerkehr(Object.keys(ARTEN))] : [ladeFormel()])]);   // fertige 3D-Modelle (nur beim ersten Start; ohne Internet geht es nach ein paar Sekunden mit Kisten weiter)
+      const rallye = E.fahrzeug === 'rallye';
+      await Promise.all([ladeModelle(), ladeBilder(), ...(E.fahrzeug === 'super' ? [ladeSupercars(), ladeVerkehr(Object.keys(ARTEN))] : rallye ? [ladeRallyeautos()] : [ladeFormel()])]);   // fertige 3D-Modelle (nur beim ersten Start; ohne Internet geht es nach ein paar Sekunden mit Kisten weiter)
       const modell = istKlein(), slot = E.fahrzeug === 'slot', sup = E.fahrzeug === 'super', drift = E.fahrzeug === 'drift';
-      const id = E[streckenFeld()];
+      // Ganze Rallye: welche Prüfung ist dran? (app.rallyeStand merkt sich die Zeiten der fertigen Prüfungen)
+      if (rallye && E.modus === 'rennen' && !app.rallyeStand) app.rallyeStand = { nr: 0, fertig: [] };
+      const ganz = rallye && E.modus === 'rennen';
+      const id = ganz ? RALLYE_FOLGE[app.rallyeStand.nr] : E[streckenFeld()];
       T = holeStrecke(id);
-      rennen = new Rennen(T, { modus: E.modus, runden: sup ? E.runden_super : E.runden, gegner: sup ? E.gegner_super : modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: E.fahrzeug, spielerFarbe: E.farbe, tempo: modell ? TEMPO[E.fahrzeug][E.tempo] || 0 : 0, boxen: modell && !drift && E.boxen,
+      if (sprecher) sprecher.stopp();
+      rennen = rallye ? new Etappe(T, { auto: E.rallyeauto, lack: LACKE[E.lack_rallye] ? LACKE[E.lack_rallye].farbe : null, staerke: E.staerke, nr: ganz ? app.rallyeStand.nr + 1 : 0 })
+        : new Rennen(T, { modus: E.modus, runden: sup ? E.runden_super : E.runden, gegner: sup ? E.gegner_super : modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: E.fahrzeug, spielerFarbe: E.farbe, tempo: modell ? TEMPO[E.fahrzeug][E.tempo] || 0 : 0, boxen: modell && !drift && E.boxen,
         auto: E.supercar, lack: sup && LACKE[E.lack] ? LACKE[E.lack].farbe : null, verkehr: sup ? VERKEHR[E.verkehr] ?? 1 : 0 });
-      kurven = rennen.L && !modell ? kurvenFinden(T, rennen.L, rennen.ich.a.p) : null;
+      kurven = rennen.L && !modell && !rallye ? kurvenFinden(T, rennen.L, rennen.ich.a.p) : null;
       rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
       if (rennen.ich) rennen.ich.a.tc = E.traktion ? true : false;
       eingabe.autoGas = E.autogas && !slot;
       eingabe.sanft = E.fahrzeug === 'modell' ? 0.5 : 1;
-      eingabe.handbremseDa = drift;
-      if (E.modus === 'zeit') {
+      eingabe.handbremseDa = drift || rallye;
+      if (E.modus === 'zeit' || rallye) {
         const g = ladeGeist(id, E.fahrzeug + geistArt());
         if (g) { rennen.setzeGeist(g); }
         rennen.wennBestzeit = neu => {
@@ -236,19 +267,20 @@ export function starteSpiel() {
       }
       rennen.wennBestzeit = rennen.wennBestzeit || null;
       if (!buehne || buehne.qualitaet !== E.grafik) { buehne = new Buehne($('bild'), E.grafik); app.buehne = buehne; }
-      buehne.laden(T, rennen.autos, rennen.L, { linie: E.linie, verkehr: rennen.verkehr });
+      buehne.laden(T, rennen.autos, rennen.L, { linie: E.linie, verkehr: rennen.verkehr, etappe: rallye ? rennen : null });
       $('hEinheit').textContent = modell ? 'km/h im Maßstab' : 'km/h';
       kamera = new Kamera(buehne.kamera);
-      kamera.setze(modell ? 'stand' : E.kamera);
+      kamera.setze(modell ? 'stand' : rallye ? E.kamera_rallye : E.kamera);
       groesse();
       zeige('menue', false); zeige('laden', false); zeige('ergebnis', false); zeige('pause', false); zeige('hud', true);
       eingabe.neigung.kalibrieren();   // so wie man das Gerät beim Start hält, ist „geradeaus“
       pedaleZeigen();
-      $('hHilfe').textContent = eingabe.quelle === 'handy' || empfang.verbunden ? (slot ? 'Spur wechseln: an einer gelben Weiche nach links oder rechts lenken' : drift ? 'Handbremse: Gas und Bremse gleichzeitig' : '')
-        : eingabe.neigung.an && drift ? 'Gerät wie ein Lenkrad drehen   Gas rechts, Bremse links   Handbremse: beide zugleich'
+      $('hHilfe').textContent = eingabe.quelle === 'handy' || empfang.verbunden ? (slot ? 'Spur wechseln: an einer gelben Weiche nach links oder rechts lenken' : drift || rallye ? 'Handbremse: Gas und Bremse gleichzeitig' : '')
+        : eingabe.neigung.an && (drift || rallye) ? 'Gerät wie ein Lenkrad drehen   Gas rechts, Bremse links   Handbremse: beide zugleich'
         : eingabe.neigung.an ? (slot ? 'Gerät neigen = Spur wechseln (an einer gelben Weiche)   Gas rechts, Bremse links' : 'Gerät wie ein Lenkrad drehen   Gas rechts, Bremse links (im Stand: rückwärts)   Mitte neu setzen: Pause ⏸')
         : E.neigen && neigenGeht ? 'Der Bewegungssensor ist nicht erlaubt – Seite neu laden und „Erlauben“ tippen'
         : drift ? 'Lenken ← →   Gas ↑   Bremse ↓   Handbremse Leertaste   Standort C   Pause P   Zurück auf die Matte R'
+        : rallye ? 'Lenken ← →   Gas ↑   Bremse ↓   Handbremse Leertaste   Kamera C   Pause P   Zurück auf den Weg R'
         : slot ? 'Gas ↑   Bremse ↓   Spur wechseln ← → (an einer gelben Weiche)   Standort C   Pause P'
         : sup ? 'Lenken ← →   Gas ↑   Bremse ↓ (im Stand: rückwärts)   Kamera C   Pause P   Zurück auf die Straße R'
         : 'Lenken ← →   Gas ↑   Bremse ↓ (im Stand: rückwärts)   Kamera C   Pause P   Zurück auf die Strecke R';
@@ -259,22 +291,24 @@ export function starteSpiel() {
   }
 
   function zumMenue() {
-    laeuft = false; pausiert = false;
+    laeuft = false; pausiert = false; app.rallyeStand = null;
+    if (sprecher) sprecher.stopp();
     zeige('hud', false); zeige('pause', false); zeige('ergebnis', false); zeige('menue', true);
     if (klang.ctx) klang.update({ ...rennen.ich.a, u: 0, gas: 0 }, null, false, false);
     menueBauen();
   }
-  function pauseAn() { if (!laeuft) return; pausiert = true; zeige('pause', true); }
+  function pauseAn() { if (!laeuft) return; pausiert = true; zeige('pause', true); if (sprecher) sprecher.stopp(); }
   function pauseAus() { pausiert = false; zeige('pause', false); letzteZeit = performance.now(); }
   function kameraWeiter() {
     if (!kamera) return;
     if (kamera.modus === 'stand') { kamera.standNr = (kamera.standNr + 1) % Math.max(1, buehne.welt.standorte.length); kamera.frisch = true; melden(buehne.welt.standorte[kamera.standNr].name); return; }
-    const folge = ['hinten', 'weit', 'cockpit'];
+    const folge = rennen && rennen.rallye ? ['hinten', 'weit', 'haube'] : ['hinten', 'weit', 'cockpit'];
     kamera.setze(folge[(folge.indexOf(kamera.modus) + 1) % folge.length]);
     melden(SICHTEN[kamera.modus]);
   }
   function zurueckAufStrecke() {
     const c = rennen && rennen.ich; if (!c || rennen.slot) return;
+    if (rennen.rallye) return rennen.zuruecksetzen();
     const d = Math.max(-T.hb[c.a.idx] * 0.5, Math.min(T.hb[c.a.idx] * 0.5, c.a.d));
     aufStrecke(c.a, T, c.a.s, d);
     c.a.y = T.y[c.a.idx];
@@ -284,7 +318,12 @@ export function starteSpiel() {
     if (a === 'weiter') pauseAus(); else if (a === 'neu') starten(); else if (a === 'menue') zumMenue();
     else if (a === 'kamera') kameraWeiter(); else if (a === 'mitte') { empfang.senden({ t: 'mitte' }); eingabe.neigung.kalibrieren(); pauseAus(); }
   });
-  $('ergebnis').addEventListener('click', e => { const a = e.target.dataset.a; if (a === 'neu') starten(); else if (a === 'menue') zumMenue(); });
+  $('ergebnis').addEventListener('click', e => {
+    const a = e.target.dataset.a;
+    if (a === 'neu') { if (rennen && rennen.rallye && app.rallyeStand) app.rallyeStand.fertig.length = app.rallyeStand.nr; starten(); }   // Prüfung nochmal: ihre Zeit zählt nicht
+    else if (a === 'weiter') { app.rallyeStand.nr++; starten(); }
+    else if (a === 'menue') zumMenue();
+  });
   $('hPause').addEventListener('click', () => pausiert ? pauseAus() : pauseAn());
   $('hKamera').addEventListener('click', kameraWeiter);
   // Pedale auf dem Bildschirm (wenn dieses Gerät selbst das Lenkrad ist)
@@ -308,6 +347,7 @@ export function starteSpiel() {
   };
   let kartenGrund = null;
   function hudMalen() {
+    if (rennen.rallye) return hudRallye();
     const R = rennen, c = R.ich, a = c.a;
     const modell = !!T.def.modell;
     // Platz und Runde
@@ -377,6 +417,8 @@ export function starteSpiel() {
 
   function ergebnisZeigen() {
     const R = rennen;
+    $('eWeiter').hidden = true;
+    if (R.rallye) return ergebnisRallye();
     $('eTitel').textContent = R.ich.ziel !== null ? (R.ich.platz === 1 ? '🏆 Sieg!' : 'Platz ' + R.ich.platz) : 'Rennen vorbei';
     const sieger = R.reihenfolge[0];
     if (R.drift) {
@@ -387,6 +429,93 @@ export function starteSpiel() {
       $('eTitel').textContent += ` · 🌀 ${D.gesamt.toLocaleString('de-DE')} Drift-Punkte` + (D.gesamt > alt && alt > 0 ? ' (neuer Rekord!)' : '');
     }
     $('eTabelle').innerHTML = R.reihenfolge.map(o => `<tr class="${o.ich ? 'ich' : ''}"><td>${o.platz}.</td><td>${o.ich ? 'Du' : o.name}</td><td>${o.team}</td><td>${o.ziel !== null ? (o === sieger ? zeitText(o.ziel) : '+' + (o.ziel - sieger.ziel).toFixed(3)) : 'noch unterwegs'}</td><td>beste ${zeitText(o.beste)}</td></tr>`).join('');
+    zeige('ergebnis', true);
+  }
+
+  // ---------------------------------------------------------------- Rallye: Anzeige und Ergebnis
+  function hudRallye() {
+    const R = rennen, c = R.ich, a = c.a;
+    $('hPlatz').innerHTML = R.nr ? 'WP ' + R.nr + '<small>/3</small>' : '⏱';
+    const rest = Math.max(0, R.zielS - R.weg);
+    $('hRunde').textContent = R.phase === 'start' ? 'Start in ' + Math.max(1, Math.ceil(R.countdown)) + ' …' : R.phase === 'los' ? (rest >= 1000 ? (rest / 1000).toFixed(1) + ' km' : Math.round(rest / 10) * 10 + ' m') + ' bis zum Ziel' : 'Im Ziel';
+    // Liste: an der letzten Zwischenzeit die drei Schnellsten und du; nach dem Ziel die Wertung
+    const zeile = (platz, name, zeit, ich) => `<div class="rallye ${ich ? 'ich' : ''}"><b>${platz}</b>${name}<span>${zeit}</span></div>`;
+    let liste = '';
+    if (R.tabelle && R.phase !== 'los') {
+      const T5 = R.tabelle.slice(0, 5), ich = R.tabelle.find(o => o.ich);
+      if (!T5.includes(ich)) T5.push(ich);
+      liste = T5.map(o => zeile(o.platz, o.ich ? 'Du' : o.name, o.platz === 1 ? rallyeZeit(o.ziel) : '+' + (o.ziel - R.tabelle[0].ziel).toFixed(1), o.ich)).join('');
+    } else {
+      const k = R.zw.length;
+      const zeitVon = o => k ? o.zw[k - 1] : o.zeit;
+      const reihe = [...R.rivalen].sort((p, q) => zeitVon(p) - zeitVon(q));
+      const kopf = `<div class="rallye"><span>${k ? 'Zwischenzeit ' + k : 'Bestzeiten'}</span></div>`;
+      liste = kopf + reihe.slice(0, 3).map((o, n) => zeile(n + 1, o.name, rallyeZeit(zeitVon(o)), false)).join('');
+      if (k) { const ich = R.zw[k - 1], platz = 1 + reihe.filter(o => zeitVon(o) < ich).length; liste += zeile(platz, 'Du', rallyeZeit(ich), true); }
+    }
+    if (liste !== app.listeAlt) { $('hListe').innerHTML = liste; app.listeAlt = liste; }
+    // Zeiten
+    const jetzt = R.phase === 'los' ? R.zeit : c.ziel;
+    let z = `<div class="gross">${rallyeZeit(R.phase === 'start' ? 0 : jetzt)}</div>`;
+    R.zw.forEach((t, k) => {
+      const best = Math.min(...R.rivalen.map(o => o.zw[k])), ab = t - best;
+      z += `<div class="zw">⏱${k + 1} ${rallyeZeit(t)} <span class="${ab <= 0 ? 'gut' : 'schlecht'}">${ab <= 0 ? '−' : '+'}${Math.abs(ab).toFixed(1)}</span></div>`;
+    });
+    const ab = R.abstand();
+    if (ab !== null) z += `<div class="${ab < 0 ? 'gut' : 'schlecht'}">👻 ${ab < 0 ? '−' : '+'}${Math.abs(ab).toFixed(1)}</div>`;
+    if (app.rallyeStand && app.rallyeStand.fertig.length) z += `<div class="zw">Gesamt ${rallyeZeit(app.rallyeStand.fertig.reduce((s, f) => s + f.zeit, 0) + (R.phase === 'los' ? R.zeit : c.ziel ?? 0))}</div>`;
+    $('hZeiten').innerHTML = z;
+    // Tacho
+    $('hKmh').textContent = Math.round(kmh(a));
+    $('hGang').textContent = a.u < -0.5 ? 'R' : Math.abs(a.u) < 0.3 && a.gas < 0.05 ? 'N' : a.gang;
+    $('hDz').firstChild.style.width = (Math.max(0, (a.drehzahl - 3000) / (a.p.drehzahlMax - 3000)) * 100).toFixed(1) + '%';
+    if (app.hinAlt !== '') { $('hKurve').innerHTML = ''; app.hinAlt = ''; }
+    $('hAmpel').classList.remove('an');
+    // Ansagen des Beifahrers als Bild
+    const kommend = E.beifahrer === 'aus' ? [] : R.kommende(3);
+    const key = kommend.map(n => n.s + ':' + Math.max(0, Math.round(n.weg / 10))).join();
+    if (key !== app.ansageAlt) { app.ansageAlt = key; $('hAnsage').innerHTML = kommend.map((n, k) => ansageKarte(n, k === 0)).join(''); }
+    // Meldungen
+    while (R.ereignisse.length) {
+      const m = R.ereignisse.shift();
+      melden(m.text, m.art, m.art === 'ziel' ? 4 : m.art === 'zaehlen' ? 0.8 : 2.4);
+      if (m.art === 'zaehlen') klang.piep(660, 0.15, 0.25);
+      if (m.art === 'start') klang.piep(1100, 0.5, 0.3);
+      if (m.art === 'beste') klang.piep(880, 0.25, 0.2);
+    }
+    if (performance.now() > meldungBis) $('hMeldung').className = '';
+    // Karte
+    const kc = $('hKarte'), ctx = kc.getContext('2d');
+    if (!kartenGrund) { kartenGrund = document.createElement('canvas'); kartenGrund.width = kc.width; kartenGrund.height = kc.height; app.karte = karteMalen(kartenGrund, T, 'rgba(255,255,255,0.85)', 5); }
+    ctx.clearRect(0, 0, kc.width, kc.height); ctx.drawImage(kartenGrund, 0, 0);
+    const k = app.karte, gl = R.geistBei();
+    if (gl) { ctx.fillStyle = '#9fe8ff'; ctx.beginPath(); ctx.arc(k.x(gl.x), k.y(gl.z), 4, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.arc(k.x(a.x), k.y(a.z), 6, 0, 7); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  function ergebnisRallye() {
+    const R = rennen, ich = R.ich, tab = R.tabelle || R.plaetze();
+    const sieger = tab[0];
+    let titel = ich.ziel !== null ? (ich.platz === 1 ? '🏆 Bestzeit! ' : 'Platz ' + ich.platz + ' · ') + rallyeZeit(ich.ziel) : 'Prüfung vorbei';
+    const reihe = (o, bezug) => `<tr class="${o.ich ? 'ich' : ''}"><td>${o.platz}.</td><td>${o.ich ? 'Du' : o.name}</td><td>${o.ich ? ich.team : rallyeauto(o.team).name}</td><td>${o === bezug ? rallyeZeit(o.ziel) : '+' + (o.ziel - bezug.ziel).toFixed(1)}</td></tr>`;
+    let html = `<tr class="kopf"><td colspan="4">${T.def.name}</td></tr>` + tab.map(o => reihe(o, sieger)).join('');
+    const St = app.rallyeStand;
+    if (St) {
+      // Zeit dieser Prüfung merken (wer nicht ins Ziel kam, bekommt die langsamste Zeit plus eine Minute)
+      const langsam = tab[tab.length - 1].ziel;
+      St.fertig[St.nr] = { id: T.def.id, zeit: ich.ziel ?? (isFinite(langsam) ? langsam : 0) + 60, rivalen: Object.fromEntries(R.rivalen.map(o => [o.name, o.zeit])) };
+      St.fertig.length = St.nr + 1;
+      // Gesamtwertung nach dieser Prüfung
+      const summe = name => St.fertig.reduce((s, f) => s + (name ? f.rivalen[name] : f.zeit), 0);
+      const ges = [...R.rivalen.map(o => ({ name: o.name, team: o.auto, ziel: summe(o.name), ich: false })), { name: 'Du', team: ich.team, ziel: summe(null), ich: true }].sort((p, q) => p.ziel - q.ziel);
+      ges.forEach((o, n) => { o.platz = n + 1; });
+      const meinPlatz = ges.find(o => o.ich).platz, letzte = St.nr >= RALLYE_FOLGE.length - 1;
+      html += `<tr class="kopf"><td colspan="4">${letzte ? 'Endstand der Rallye' : 'Gesamt nach ' + (St.nr + 1) + ' von ' + RALLYE_FOLGE.length + ' Prüfungen'}</td></tr>` + ges.map(o => reihe(o, ges[0])).join('');
+      if (letzte) titel = meinPlatz === 1 ? '🏆 Rallye gewonnen!' : 'Rallye beendet – Platz ' + meinPlatz;
+      $('eWeiter').hidden = letzte;
+    }
+    $('eTitel').textContent = titel;
+    $('eTabelle').innerHTML = html;
     zeige('ergebnis', true);
   }
 
@@ -421,8 +550,11 @@ export function starteSpiel() {
       // Ampel piept
       if (R.phase === 'ampel' && R.ampel !== app.letzteAmpel) { if (R.ampel > 0) klang.piep(440, 0.15, 0.2); app.letzteAmpel = R.ampel; }
       if (R.phase === 'fertig' && !fertigGezeigt) { fertigGezeigt = true; setTimeout(ergebnisZeigen, 1200); }
+      // Rallye: Der Beifahrer liest die nächste Ansage vor
+      if (R.rallye && R.ansageNeu) { const g = R.ansageNeu; R.ansageNeu = null; if (E.beifahrer === 'beides') sprecher.sagen(g.sprache, g.s - R.weg); }
     }
     kamera.update(dt, R.ich.a, { modell: !!T.def.modell, standorte: buehne.welt.standorte, massstab: T.sc });
+    if (!pausiert) buehne.schritt(dt, R.ich.a);
     if (!malen) return;
     buehne.malen(dt, R.ich.a, R.geistBei(), R.phase === 'ampel' ? R.ampel : 0, false, kamera.modus === 'cockpit' ? R.ich : null);
     hudMalen();
@@ -559,4 +691,62 @@ function umriss(cv, S, farbe) {
     for (const z of [1.25, -1.45]) { ctx.beginPath(); ctx.arc(X(z), Y(0.35), 0.35 * sc, 0, 7); ctx.fillStyle = '#111'; ctx.fill(); ctx.beginPath(); ctx.arc(X(z), Y(0.35), 0.2 * sc, 0, 7); ctx.fillStyle = '#9aa0a8'; ctx.fill(); }
     if (F.fluegel === 2) { ctx.fillStyle = '#111'; ctx.fillRect(X(F.zR + 0.1), Y(F.heck + 0.4), 0.5 * sc, 0.06 * sc); }
   });
+}
+
+// ---------------------------------------------------------------- Rallye: der Beifahrer spricht (Sprachausgabe des Geräts)
+class Beifahrer {
+  constructor() {
+    this.geht = typeof window !== 'undefined' && 'speechSynthesis' in window;
+    this.stimme = null;
+    if (this.geht) {
+      const waehlen = () => {
+        const alle = speechSynthesis.getVoices().filter(v => /^de/i.test(v.lang));
+        // lieber eine klare, schnelle Stimme (auf Apple-Geräten heißen sie z. B. "Anna", "Markus", "Yannick")
+        this.stimme = alle.find(v => /Markus|Yannick|Viktor|Martin|Google Deutsch/i.test(v.name)) || alle[0] || null;
+      };
+      waehlen(); speechSynthesis.onvoiceschanged = waehlen;
+    }
+  }
+  // text sagen; weg = wie weit die Stelle noch weg ist (ist sie nah, spricht er schneller)
+  sagen(text, weg = 150) {
+    if (!this.geht || !text) return;
+    // hängt er hinterher (noch zwei Sätze offen), wird der älteste abgebrochen – lieber kurz als zu spät
+    if (speechSynthesis.pending) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'de-DE'; if (this.stimme) u.voice = this.stimme;
+    u.rate = weg < 90 ? 1.55 : 1.35; u.pitch = 1; u.volume = 1;
+    speechSynthesis.speak(u);
+  }
+  stopp() { if (this.geht) speechSynthesis.cancel(); }
+}
+
+// Eine Karte für die Anzeige: Pfeil mit Zahl (Kurve) oder ein Zeichen (Kuppe, Sprung, Wasser …)
+function ansageKarte(n, erst) {
+  const t = n.text || { haupt: '', mehr: '', weiter: '' };
+  const kurve = n.art === 'kurve';
+  const bild = kurve ? pfeilSvg(n.seite, n.grad, n.zusatz.includes('kehre'))
+    : `<div class="zeichen">${{ kuppe: '⛰️', sprung: '🚀', wasser: '🌊', matsch: '🟤', ziel: '🏁' }[n.art] || '•'}</div>`;
+  const zahl = kurve ? `<div class="zahl">${n.zusatz.includes('kehre') ? 'K' : n.grad}</div>` : `<div class="was">${t.haupt}</div>`;
+  const weg = erst ? `<div class="weg">${n.weg > 5 ? Math.round(n.weg / 10) * 10 + ' m' : 'jetzt'}</div>` : (t.weiter ? `<div class="weg">${t.weiter === 'und' ? 'und' : t.weiter + ' m'}</div>` : '');
+  return `<div class="karte ${erst ? 'erst' : ''} ${n.achtung ? 'warn' : ''}">${bild}${zahl}${t.mehr ? `<div class="was">${t.mehr}</div>` : ''}${weg}</div>`;
+}
+
+// Pfeil für eine Kurve: je kleiner die Zahl, desto enger der Bogen (1 = Haarnadel, 6 = leichter Knick)
+function pfeilSvg(seite, grad, kehre) {
+  const g = Math.max(1, Math.min(6, grad || 3));
+  const winkel = (kehre ? 180 : [160, 120, 95, 72, 50, 30][g - 1]) * Math.PI / 180, radius = kehre ? 9 : [10, 13, 17, 22, 30, 42][g - 1];
+  const sg = seite === 'links' ? -1 : 1, pts = [[0, 0]];
+  let x = 0, y = 0, h = 0;
+  const schritt = l => { x += Math.sin(h) * l; y -= Math.cos(h) * l; pts.push([x, y]); };
+  schritt(20);
+  for (let k = 0; k < 18; k++) { h += sg * winkel / 18; schritt(radius * winkel / 18); }
+  schritt(6);
+  // Pfeilspitze
+  const sx = Math.sin(h), sy = -Math.cos(h), qx = -sy, qy = sx;
+  const spitze = [[x + sx * 11, y + sy * 11], [x + qx * 9, y + qy * 9], [x - qx * 9, y - qy * 9]];
+  const alle = pts.concat(spitze);
+  const minX = Math.min(...alle.map(p => p[0])) - 6, maxX = Math.max(...alle.map(p => p[0])) + 6, minY = Math.min(...alle.map(p => p[1])) - 6, maxY = Math.max(...alle.map(p => p[1])) + 6;
+  const w = Math.max(maxX - minX, maxY - minY), cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  const f = v => v.toFixed(1);
+  return `<svg viewBox="${f(cx - w / 2)} ${f(cy - w / 2)} ${f(w)} ${f(w)}"><path d="M${pts.map(p => f(p[0]) + ' ' + f(p[1])).join(' L')}" stroke="#fff" stroke-width="${f(w * 0.09)}" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M${spitze.map(p => f(p[0]) + ' ' + f(p[1])).join(' L')}Z" fill="#fff"/></svg>`;
 }

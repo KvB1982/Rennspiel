@@ -85,6 +85,15 @@ und sechs Autos für den Verkehr in `modelle/verkehr/` (Kleinwagen, Limousine, G
 Alle ohne Logo und ohne Schrift. Die Bilder waren als „ausgedachtes Auto“ bestellt; die Limousine hat trotzdem eine Front,
 die an eine bekannte Marke erinnert. Es gilt dasselbe wie bei den Supercars: vor einer Veröffentlichung prüfen.
 
+### Rallyeautos aus 3D AI Studio
+
+Am 21.11.2026 mit 3D AI Studio erzeugt (Bild mit Nano Banana 2.1, Modell mit Prism 3.1) und mit `tools/supercars.mjs rallye`
+verkleinert: `modelle/rallye/sturmfalke.glb`, `quadra.glb`, `kaiten.glb` (Räder einzeln). Bestellt als ausgedachte Rallyeautos
+ohne Logo, ohne Schrift und ohne echte Lackierung; die Formen erinnern mit Absicht an bekannte Rallyeautos (Vorbilder stehen im Menü).
+Es gilt dasselbe wie bei den Supercars: vor einer Veröffentlichung prüfen. Die Startnummern-Flächen sind leer.
+
+Alles andere im Rallye-Modus (Wege, Wald, Zuschauer, Staub, Spritzer, Schilder, Knirschen auf Schotter) malt oder erzeugt das Spiel selbst.
+
 ### Bilder für das Menü
 
 `bilder/menue/` (zusammen etwa 300 KB) sind Bilder aus dem Spiel selbst: `strecke_<id>.webp` und `fahrzeug_<art>.webp` sind

@@ -10,6 +10,8 @@ import { MASSSTAB } from './strecke.js';
 import { baueSupercar } from './supercarbau.js';
 import { AUTOS } from './physik.js';
 import { VerkehrBild } from './verkehrbau.js';
+import { baueWpWelt } from './wpbau.js';
+import { Spritzer } from './partikel.js';
 
 export class Buehne {
   constructor(canvas, qualitaet = 'hoch') {
@@ -62,7 +64,7 @@ export class Buehne {
 
   // Strecke T laden und Autos (Liste aus dem Rennen) hinstellen
   // verkehr = der Verkehr aus dem Rennen (Supercar-Strecken), sonst null
-  laden(T, autos, L, { linie = false, verkehr = null } = {}) {
+  laden(T, autos, L, { linie = false, verkehr = null, etappe = null } = {}) {
     if (this.szene) this.aufraeumen();
     const s = this.szene = new THREE.Scene();
     const def = T.def, st = stimmung(def), modell = !!def.modell;
@@ -80,12 +82,13 @@ export class Buehne {
       const u = himmel.material.uniforms;
       u.turbidity.value = st.truebe; u.rayleigh.value = st.rayleigh; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.85;
       u.sunPosition.value.copy(sonne);
-      s.add(himmel);
+      // trüber Tag (Rallye im Nebelwald): grauer Himmel statt Sonne und Blau
+      if (st.grau) s.background = new THREE.Color(st.nebel); else s.add(himmel);
       // Spiegelungen im Lack kommen vom Himmel
       const hs = new THREE.Scene(); const h2 = new Sky(); h2.scale.setScalar(1000); h2.material = himmel.material; hs.add(h2);
       this.umgebung = pmrem.fromScene(hs, 0, 0.1, 2000).texture;
       s.environment = this.umgebung;
-      s.fog = new THREE.Fog(st.nebel, 400, st.nebelWeit);
+      s.fog = new THREE.Fog(st.nebel, st.nebelNah ?? 400, st.nebelWeit);
       this.kamera.near = 0.1; this.kamera.far = 9000;
     } else {
       s.background = new THREE.Color(0x8a7a6a);
@@ -113,7 +116,11 @@ export class Buehne {
     }
 
     // Strecke und Landschaft
-    this.welt = baueWelt(T, s, { qualitaet: this.qualitaet });
+    // Rallye: eigene Landschaft (Waldweg, Zuschauer, Start und Ziel), dazu Staub und Wasser hinter den Rädern
+    this.welt = def.rallye ? baueWpWelt(T, s, { qualitaet: this.qualitaet, etappe }) : baueWelt(T, s, { qualitaet: this.qualitaet });
+    this.etappe = etappe;
+    this.spritzer = def.rallye ? new Spritzer(s, { staubFarbe: def.welt.wald === 'laub' ? 0x8f7a5c : def.welt.wald === 'berg' ? 0xb0aa9c : 0xcbb894, viel: this.qualitaet === 'hoch' ? 1 : this.qualitaet === 'mittel' ? 0.65 : 0.35 }) : null;
+    if (def.rallye) { L = null; s.fog.near = st.nebelNah ?? 150; }
     if (T.strasse) {
       // Straßen-Strecken sind riesig: weiter sehen, die Berge am Horizont nur leicht im Dunst
       const weit = Math.max(9000, (this.welt.weit || 6000) + 2500);
@@ -162,6 +169,16 @@ export class Buehne {
     this.uhr = 0;
   }
 
+  // Jedes Bild (auch wenn nicht gemalt wird, z. B. beim Vorspulen): Zuschauer, Staub und Wasser weiterrechnen
+  schritt(dt, ziel) {
+    if (!this.szene) return;
+    if (this.welt.update) this.welt.update(dt, ziel, this.etappe);
+    if (this.spritzer && dt > 0) {
+      for (const { c } of this.autos) this.spritzer.auto(c.a, dt);
+      this.spritzer.update(dt, this.kamera, this.h || 720, this.licht.intensity / 3 * 1.2 + 0.35);
+    }
+  }
+
   // Ein Bild malen. ziel = wohin das Schattenlicht schauen soll (das eigene Auto)
   malen(dt, ziel, geistLage, ampel = 0, ampelGruen = false, ichSicht = null) {
     this.uhr += dt;
@@ -175,6 +192,7 @@ export class Buehne {
     }
     if (this.verkehrBild) this.verkehrBild.update();
     if (this.spuren) for (const { c } of this.autos) this.spurSetzen(c.a);
+
     // Himmel wandert mit der Kamera mit (die Straßen-Strecken sind größer als der Himmel)
     if (this.himmel && this.T.strasse) this.himmel.position.copy(this.kamera.position);
     // Geist

@@ -7,6 +7,8 @@
 // Fahrphysik: dieselbe wie beim Rennwagen (physik.js), nur mit Werten für ein Straßenauto:
 // schwerer, weniger Abtrieb, Reifen für die Straße, größerer Lenkeinschlag.
 
+import { RALLYEAUTOS } from './rallyeautos.js';
+
 const KMH = 1 / 3.6;
 
 // Gemeinsame Werte aller Supercars
@@ -86,7 +88,8 @@ export const LACKE = [
   { name: 'Schwarz', farbe: 0x141416 }, { name: 'Weiß', farbe: 0xf4f4f2 }, { name: 'Silber', farbe: 0xb5bcc4 }, { name: 'Lila', farbe: 0x6a3bb0 },
 ];
 
-export const supercar = id => SUPERCARS.find(s => s.id === id) || SUPERCARS[0];
+// Sucht auch unter den Rallyeautos (die werden genauso gebaut und gezeichnet wie die Supercars)
+export const supercar = id => SUPERCARS.find(s => s.id === id) || RALLYEAUTOS.find(s => s.id === id) || SUPERCARS[0];
 
 // Werte für die Fahrphysik (werden in physik.js zu AUTOS hinzugefügt)
 export const SUPER_AUTOS = Object.fromEntries(SUPERCARS.map(s => [s.id, {
