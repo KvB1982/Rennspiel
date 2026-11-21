@@ -280,13 +280,17 @@ export function schritt(a, T, dt) {
       //    mit (ein). Dreht es zu schnell (Heck kommt) oder gegen die Lenkung, fängt es sanft ab (fang).
       //    Die Lenkung wird dabei nie schwächer gemacht: Es gibt nur Hilfe dazu.
       const rRad = u * Math.tan(a.lenk) / L;
-      const rMax = (muF + muR) / p.masse / au * A.griff;
+      // Rallye (belag): Auf losem Grund (Schotter, Matsch, Wasser) fehlt Haftung – die Hilfe gleicht einen Teil davon aus
+      const lose = A.belag && gr.haft < 1 ? 1 + (1 / gr.haft - 1) * A.belag : 1;
+      const rMax = (muF + muR) / p.masse / au * A.griff * lose;
       const rZiel = Math.max(-rMax, Math.min(rMax, rRad));
       const fehlt = rZiel - r;
-      dr += fehlt * (r * rZiel >= 0 && Math.abs(rZiel) > Math.abs(r) ? A.ein : A.fang);
+      // Mit Handbremse darf sich das Auto in die Kurve drehen (sonst käme man nicht um die Kehren): dann nur wenig fangen
+      const fang = hand && A.freiHand ? A.fang * 0.25 : A.fang;
+      dr += fehlt * (r * rZiel >= 0 && Math.abs(rZiel) > Math.abs(r) ? A.ein : fang);
       // 2. Reifen-Helfer: Rutscht das Auto mehr als "frei" (Winkel) zur Seite, zieht die Hilfe das Rutschen zurück,
       //    ohne Tempo zu kosten (das Tempo wird nur in Fahrtrichtung gedreht). Ein kleiner Drift bleibt erlaubt.
-      const freiV = au * Math.tan(A.frei);
+      const freiV = au * Math.tan(hand && A.freiHand ? A.freiHand : A.frei);
       const zuviel = Math.sign(v) * Math.max(0, Math.abs(v) - freiV);
       const dvH = -zuviel * A.halt;
       dv += dvH; du -= v * dvH / au;
@@ -317,6 +321,9 @@ export function schritt(a, T, dt) {
   //    etwas zurück: Fahrtrichtung und Auto drehen sich gemeinsam ein Stück in Richtung der Straße. Je näher am Rand
   //    und je schneller, desto mehr. Mitten auf der Straße merkt man nichts davon.
   if (A && A.rand && Math.abs(a.u) > 5) streckenHelfer(a, T, f, A, dt);
+  // In der Luft (Rallye-Sprung) kann man nicht lenken. Die Arcade-Hilfe dreht das Auto im Flug sanft in Richtung Straße,
+  // damit es nach der Landung nicht quer in den Wald schießt (so machen es viele Arcade-Rallyespiele).
+  else if (a.luft && a.arcade && p.arcade && p.arcade.rand && Math.abs(a.u) > 5) luftHelfer(a, T, f, dt);
 
   // Begrenzung (Leitplanke, Reifenstapel, Mauer): abprallen
   a.stoss = 0;
@@ -383,6 +390,14 @@ export function schritt(a, T, dt) {
   const [jeG, hoechstens] = p.super ? [0.045, 0.07] : [0.014, 0.038];
   a.kippen += (Math.max(-hoechstens, Math.min(hoechstens, querG * jeG)) - a.kippen) * Math.min(1, dt * 6);
   a.neigung += (((a.brems > 0 && a.u > 1 ? 1 : 0) * 0.012 - a.gas * 0.006) - a.neigung) * Math.min(1, dt * 5);
+}
+
+function luftHelfer(a, T, f, dt) {
+  const i = f.i, rw = Math.atan2(T.tx[i], T.tz[i]);
+  let d = rw - a.h; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+  if (Math.abs(d) > 1.2) return;                                // fährt das Auto quer oder rückwärts: nicht eingreifen
+  a.h += d * Math.min(1, dt * 2.5);                             // Nase und Fahrtrichtung drehen zusammen zur Straße
+  a.r *= Math.exp(-dt * 3);                                     // Drehen in der Luft hört langsam auf
 }
 
 function streckenHelfer(a, T, f, A, dt) {

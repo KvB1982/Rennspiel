@@ -11,6 +11,17 @@ import { lenkGrenze } from '../js/physik.js';
 
 const [auto = 'sturmfalke', nur, ansagen] = process.argv.slice(2);
 const tempo = +(process.env.TEMPO || 0.9);
+// WILD=1: ein hektischer Fahrer wie ein Mensch mit Handy (schon kleine Fehler = voller Einschlag, meist Vollgas, kein Gegenlenken)
+// AUS=1: ohne Arcade-Hilfe (zum Vergleichen)
+const wild = !!process.env.WILD, ohneHilfe = !!process.env.AUS;
+
+function wilderFahrer(a, T, L) {
+  const sh = Math.sin(a.h), ch = Math.cos(a.h), i = T.index(a.s + 0.5 * Math.abs(a.u) + 6);
+  const dx = L.lx[i] - a.x, dz = L.lz[i] - a.z;
+  const fw = Math.atan2(dx * ch - dz * sh, Math.max(1, dx * sh + dz * ch));
+  const plan = L.tempo[T.index(a.s + Math.abs(a.u) * 0.3)];
+  return { lenk: Math.max(-1, Math.min(1, fw / 0.1)), gas: a.u < plan * 1.1 ? 1 : 0, brems: a.u > plan * 1.3 ? 1 : 0 };
+}
 
 // Testfahrer: schaut weit voraus auf die Ideallinie und regelt das Drehtempo (sonst pendelt er auf Schotter).
 // Er lenkt nach der Richtung, in die das Auto wirklich fährt – so fängt er einen Drift ab.
@@ -35,13 +46,15 @@ for (const def of STRECKEN.filter(s => s.rallye && (!nur || s.id === nur))) {
   console.log(`  ${E.ansagen.length} Ansagen in ${E.gruppen.length} Gruppen, ${E.zuschauer.length} Zuschauer-Stellen, ${E.felsen.length} Felsen, ${T.pfuetzen.length} Pfützen, ${(T.furten || []).length} Furt`);
   if (ansagen) console.log(E.gruppen.slice(0, 16).map(g => `    ${String(Math.round(g.s)).padStart(5)} m: ${g.sprache}`).join('\n'));
   E.countdown = 0;
-  const a = E.ich.a;
+  const a = E.ich.a; a.tc = true; a.arcade = !ohneHilfe;
+  let zurueck = 0;
   let flug = 0, maxFlug = 0, stoesse = 0;
   for (let k = 0; k < 400 * 60 && E.phase !== 'fertig' && E.ich.ziel === null; k++) {
-    E.update(1 / 60, testFahrer(a, T, E.L));
+    E.update(1 / 60, (wild ? wilderFahrer : testFahrer)(a, T, E.L));
+    while (E.ereignisse.length) if (E.ereignisse.shift().art === 'warn') zurueck++;
     if (a.luft) flug++;
     maxFlug = Math.max(maxFlug, a.flug || 0);
     if (a.stoss > 2) stoesse++;
   }
-  console.log(`  Testfahrer (${Math.round(tempo * 100)} % vom Plan): ${E.ich.ziel !== null ? zeitText(E.ich.ziel) + ', Platz ' + E.ich.platz : 'nicht im Ziel (' + Math.round(E.weg) + ' m)'}, ${(flug / 60).toFixed(1)} s in der Luft, längster Sprung ${maxFlug.toFixed(2)} s, ${stoesse} Bilder mit Anstoß`);
+  console.log(`  ${wild ? 'Wilder Fahrer' : 'Testfahrer (' + Math.round(tempo * 100) + ' % vom Plan)'}${ohneHilfe ? ' ohne Hilfe' : ''}: ${zurueck}-mal zurückgesetzt, ${E.ich.ziel !== null ? zeitText(E.ich.ziel) + ', Platz ' + E.ich.platz : 'nicht im Ziel (' + Math.round(E.weg) + ' m)'}, ${(flug / 60).toFixed(1)} s in der Luft, längster Sprung ${maxFlug.toFixed(2)} s, ${stoesse} Bilder mit Anstoß`);
 }
