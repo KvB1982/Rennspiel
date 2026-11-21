@@ -20,6 +20,8 @@ const BASIS = {
   widerstand: 0.75,                 // Luftwiderstand (Fläche mal Beiwert, m²)
   rollen: 0.013,
   bremse: 1.0, bremseVorn: 0.68,
+  bremsGriff: 1.9,                 // kräftige Spiel-Bremse: längs halten die Reifen mehr aus als zur Seite
+  esp: { beta: 0.14, dreh: 9, quer: 0.5 },   // Schleuderschutz: bis etwa 8° Driften ist erlaubt, dann fängt er das Auto
   lenkMax: 0.5, lenkTempo: 22,
   gaenge: 7, drehzahlMax: 8500, rueck: 8, abregeln: true,
   schritte: 8, unten: 3,

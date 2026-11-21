@@ -71,7 +71,7 @@ export function tempoPlan(T, kr, p, sicher = 0.9) {
     for (let k = 2 * n; k > 0; k--) {
       const i = k % n, j = (k + 1) % n;
       const vj = v[j];
-      const brems = mu * (G + q * vj * vj) * p.bremse * 0.8 + wid * vj * vj;
+      const brems = mu * (G + q * vj * vj) * p.bremse * (p.bremsGriff || 1) * 0.8 + wid * vj * vj;
       v[i] = Math.min(v[i], Math.sqrt(vj * vj + 2 * brems * ds));
     }
     // vorwärts: beschleunigen braucht Zeit

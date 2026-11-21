@@ -4,19 +4,26 @@
 // (Stadt langsam, Landstraße schneller, Autobahn am schnellsten). Rechts fahren sie in deine Richtung,
 // links kommen sie dir entgegen (Gegenverkehr). Auf der Autobahn fährt der Gegenverkehr hinter der Mittelmauer.
 // Sie fahren nicht wie die Rennfahrer mit Physik, sondern wie auf Schienen entlang ihrer Spur:
-// Ist vorn jemand langsamer, bremsen sie. Wer in sie hineinfährt, prallt ab – sie sind schwer und bleiben auf ihrer Spur.
+// Ist vorn jemand langsamer, bremsen sie. Kracht ein Supercar hinein, fliegt das Verkehrsauto weg ("frei"):
+// Es rutscht und dreht sich, springt ein wenig hoch, bleibt mit Warnblinker stehen und fährt dann weiter.
+// Das Supercar zählt beim Stoß wie ein viel schwereres Auto (RENNER_MASSE) und bleibt deshalb fast auf Kurs.
 
 import { ZONEN, ZONEN_LISTE } from './strecke.js';
 
 // Fahrzeugarten: Länge, Breite, Höhe (m), wo sie fahren dürfen, wie oft
+// masse = wie schwer es beim Zusammenstoß zählt (kg)
 export const ARTEN = {
-  kompakt: { lang: 4.0, breit: 1.75, hoch: 1.45, oft: 3 },
-  limousine: { lang: 4.8, breit: 1.85, hoch: 1.45, oft: 3 },
-  gelaende: { lang: 4.7, breit: 1.92, hoch: 1.7, oft: 2 },
-  transporter: { lang: 5.6, breit: 2.0, hoch: 2.5, oft: 1.2 },
-  lkw: { lang: 10, breit: 2.5, hoch: 3.6, oft: 0.8, nicht: ['stadt', 'dorf'] },
-  bus: { lang: 12, breit: 2.55, hoch: 3.1, oft: 0.6, nur: ['stadt'] },
+  kompakt: { lang: 4.0, breit: 1.75, hoch: 1.45, oft: 3, masse: 1100 },
+  limousine: { lang: 4.8, breit: 1.85, hoch: 1.45, oft: 3, masse: 1500 },
+  gelaende: { lang: 4.7, breit: 1.92, hoch: 1.7, oft: 2, masse: 1900 },
+  transporter: { lang: 5.6, breit: 2.0, hoch: 2.5, oft: 1.2, masse: 2400 },
+  lkw: { lang: 10, breit: 2.5, hoch: 3.6, oft: 0.8, nicht: ['stadt', 'dorf'], masse: 6000 },
+  bus: { lang: 12, breit: 2.55, hoch: 3.1, oft: 0.6, nur: ['stadt'], masse: 7000 },
 };
+const RENNER_MASSE = 4;    // beim Stoß zählt ein Rennauto so viel mal schwerer, als es ist (Spiel-Wert: du bleibst stabil)
+const WEG_AB = 2.5;        // ab diesem Aufprall-Tempo (m/s) fliegt das Verkehrsauto aus der Spur
+const RUTSCH = 7;          // so stark bremst ein weggeschleudertes Auto beim Rutschen (m/s²)
+const WARTEN = 2.5;        // so lange steht es danach (s), bevor es zurück in die Spur fährt
 const FARBEN = [0xe8e8e8, 0x1c1c1e, 0x8a9099, 0xb02a2a, 0x2a4f8a, 0x3c6e47, 0xd9d2c0, 0x5a5f66, 0xc9c9c9, 0x7a2f45, 0xe0b020, 0x2f8fc0];
 const ABSTAND = 14;   // so viel Platz lassen sie zum Vordermann (m)
 
@@ -85,7 +92,9 @@ export class Verkehr {
       const liste = A.filter(t => t.dir === dir).sort((p, q) => dir * (p.s - q.s));
       const m = liste.length;
       for (let k = 0; k < m; k++) {
-        const t = liste[k], Z = ZONEN[ZONEN_LISTE[T.zone[t.idx]]];
+        const t = liste[k];
+        if (t.frei) { this.fliegen(t, dt); continue; }
+        const Z = ZONEN[ZONEN_LISTE[T.zone[t.idx]]];
         let ziel = Z.tempo * t.mal;
         // nach vorn schauen: das nächste Auto auf derselben Spur
         for (let q = 1; q < Math.min(m, 12); q++) {
@@ -118,11 +127,53 @@ export class Verkehr {
         if (t.stoss > 0) t.stoss = Math.max(0, t.stoss - dt);
         if (t.blink > 0) t.blink -= dt;
         this.stellen(t);
+        // nach dem Wegfliegen: Schräglage und Drehung weich wieder gerade machen
+        if (t.dh) { t.h += t.dh; t.dh *= Math.max(0, 1 - dt * 1.5); if (Math.abs(t.dh) < 0.01) t.dh = 0; }
       }
     }
   }
 
-  // Zusammenstöße mit den Rennautos: Das Rennauto prallt ab, das Verkehrsauto bleibt (fast) auf seiner Spur.
+  // Ein weggeschleudertes Auto: rutscht frei über die Straße, dreht sich, springt und kippt ein wenig
+  fliegen(t, dt) {
+    const T = this.T, F = t.frei;
+    const v = Math.hypot(F.vx, F.vz);
+    if (v > 0) { const nv = Math.max(0, v - RUTSCH * dt); F.vx *= nv / v; F.vz *= nv / v; }
+    F.w *= Math.max(0, 1 - dt * 1.2);
+    t.x += F.vx * dt; t.z += F.vz * dt; t.h += F.w * dt;
+    // hoch und wieder runter
+    F.vy -= 9.81 * dt; F.y += F.vy * dt;
+    if (F.y < 0) { F.y = 0; F.vy = Math.abs(F.vy) > 2 ? -F.vy * 0.3 : 0; }
+    F.kipp *= Math.max(0, 1 - dt * 2.5); F.nick *= Math.max(0, 1 - dt * 2.5);
+    // nicht durch Häuser und Mauern: an der Begrenzung abprallen
+    const f = T.finde(t.x, t.z, t.idx, 8);
+    const zuRand = f.d > 0 ? T.hb[f.i] + T.ausL[f.i] + (T.zone[f.i] === 3 ? 2 * T.hb[f.i] + 1.4 : 0) - t.breit / 2
+      : -(T.hb[f.i] + T.ausR[f.i] - t.breit / 2);
+    if (Math.abs(f.d) > Math.abs(zuRand)) {
+      const seite = Math.sign(f.d), nx = f.tz * seite, nz = -f.tx * seite, zu = Math.abs(f.d) - Math.abs(zuRand);
+      t.x -= nx * zu; t.z -= nz * zu;
+      const geg = F.vx * nx + F.vz * nz;
+      if (geg > 0) { F.vx -= nx * geg * 1.4; F.vz -= nz * geg * 1.4; F.w *= 0.6; }
+    }
+    t.idx = f.i; t.s = f.s; t.d = f.d; t.y = f.y + F.y;
+    // Tempo entlang der Strecke (für die Computerfahrer)
+    t.u = F.vx * f.tx + F.vz * f.tz; t.v = Math.abs(t.u);
+    if (Math.hypot(F.vx, F.vz) < 0.3 && F.y === 0) {
+      F.steht += dt;
+      if (F.steht > WARTEN) {
+        // zurück in den Verkehr: Es fährt von hier langsam los und gleitet in seine Spur
+        const bahn = Math.atan2(f.tx, f.tz) + (t.dir < 0 ? Math.PI : 0);
+        let dh = t.h - bahn; dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+        t.dh = Math.abs(dh) > 1.2 ? 0 : dh;   // ganz verdreht: einfach gerade stellen
+        t.frei = null; t.v = 0; t.kipp = 0; t.nick = 0;
+        return;
+      }
+    }
+    t.kipp = F.kipp; t.nick = F.nick;
+    if (t.blink > 0) t.blink -= dt;
+  }
+
+  // Zusammenstöße mit den Rennautos. Gerechnet wird ein Stoß zwischen zwei Körpern: Das Rennauto zählt
+  // RENNER_MASSE-mal schwerer, darum bleibt es fast auf Kurs, und das Verkehrsauto wird weggeschubst.
   // Gibt zurück, wie hart das Auto "ich" getroffen wurde (0 = gar nicht).
   stoesse(renner, ich = null) {
     let hart = 0;
@@ -134,6 +185,8 @@ export class Verkehr {
         const rt = t.breit / 2, ra = 1.0;
         const st = Math.sin(t.h), ct = Math.cos(t.h);
         const kreise = Math.max(1, Math.round(t.lang / t.breit));
+        const mA = (a.p.masse || 1500) * RENNER_MASSE, mT = t.masse;
+        const anteilA = mT / (mA + mT);       // so viel vom Ineinander-Stecken und vom Stoß bekommt das Rennauto ab
         for (const ka of [-1.5, 1.5]) {
           const ax = a.x + Math.sin(a.h) * ka, az = a.z + Math.cos(a.h) * ka;
           for (let q = 0; q < kreise; q++) {
@@ -143,21 +196,51 @@ export class Verkehr {
             if (d >= ra + rt || d < 1e-6) continue;
             nx /= d; nz /= d;
             const tief = ra + rt - d;
-            a.x += nx * tief; a.z += nz * tief;          // ganz herausschieben: das Verkehrsauto ist schwer
+            // Tempo beider Autos in der Welt
             const sh = Math.sin(a.h), ch = Math.cos(a.h);
             let wx = sh * a.u + ch * a.v, wz = ch * a.u - sh * a.v;
-            const vtx = st * t.v, vtz = ct * t.v;
-            const rel = (wx - vtx) * nx + (wz - vtz) * nz;
-            if (rel < 0) {
-              wx -= nx * rel * 1.35; wz -= nz * rel * 1.35;
-              wx = vtx + (wx - vtx) * 0.92; wz = vtz + (wz - vtz) * 0.92;   // ein bisschen Reibung beim Aneinander-Entlangschrammen
-              a.u = sh * wx + ch * wz; a.v = ch * wx - sh * wz;
-              a.r += (Math.random() - 0.5) * Math.min(2, -rel * 0.08);
-              a.stoss = Math.max(a.stoss, -rel);
-              t.v *= Math.max(0.4, 1 - (-rel) * 0.02);   // das Verkehrsauto bremst erschrocken
-              t.stoss = 1.5; t.blink = 6;                  // und schaltet die Warnblinker ein
-              if (a === ich) hart = Math.max(hart, -rel);
+            const F = t.frei;
+            const vtx = F ? F.vx : st * t.v, vtz = F ? F.vz : ct * t.v;
+            const rel = (wx - vtx) * nx + (wz - vtz) * nz;    // minus = sie fahren aufeinander zu
+            if (rel >= 0) {
+              // nur ineinander, nicht aufeinander zu: auseinanderschieben
+              a.x += nx * tief * (F ? anteilA : 1); a.z += nz * tief * (F ? anteilA : 1);
+              if (F) { t.x -= nx * tief * (1 - anteilA); t.z -= nz * tief * (1 - anteilA); }
+              continue;
             }
+            const j = -(1 + 0.35) * rel;              // Stoß (Tempo-Änderung beider zusammen)
+            const hartHier = -rel;
+            if (!F && hartHier < WEG_AB) {
+              // leichter Rempler: Das Verkehrsauto bleibt in der Spur, nur das Rennauto wird etwas abgelenkt
+              a.x += nx * tief; a.z += nz * tief;
+              wx += nx * j * 0.6; wz += nz * j * 0.6;
+              t.v *= 0.9;
+            } else {
+              // Rumms: Das Verkehrsauto fliegt los
+              a.x += nx * tief * anteilA; a.z += nz * tief * anteilA;
+              wx += nx * j * anteilA; wz += nz * j * anteilA;
+              let fx = vtx - nx * j * (1 - anteilA), fz = vtz - nz * j * (1 - anteilA);
+              // ein Teil vom Tempo des Rennautos nimmt es mit (es wird geschoben)
+              fx += (wx - fx) * 0.25; fz += (wz - fz) * 0.25;
+              t.x -= nx * tief * (1 - anteilA); t.z -= nz * tief * (1 - anteilA);
+              // Drehung: je weiter hinten oder vorn getroffen, desto mehr dreht es sich
+              const hebel = off / (t.lang / 2 + 0.01);
+              const quer = nx * ct - nz * st;           // wie sehr der Stoß von der Seite kommt
+              const w = -hebel * quer * j * (1 - anteilA) * 0.35 + (Math.random() - 0.5) * Math.min(4, hartHier * 0.1);
+              if (F) {
+                F.vx = fx; F.vz = fz; F.w += w; F.vy = Math.max(F.vy, Math.min(5, hartHier * 0.12)); F.steht = 0;
+              } else {
+                t.frei = { vx: fx, vz: fz, w, y: 0, vy: Math.min(5, hartHier * 0.12),
+                  kipp: Math.max(-0.6, Math.min(0.6, (quer + (Math.random() - 0.5) * 0.6) * hartHier * 0.02)),
+                  nick: Math.max(-0.4, Math.min(0.4, (Math.random() - 0.5) * hartHier * 0.02)), steht: 0 };
+              }
+              t.blink = 8;
+            }
+            a.u = sh * wx + ch * wz; a.v = ch * wx - sh * wz;
+            a.r += (Math.random() - 0.5) * Math.min(0.4, hartHier * 0.01);   // nur ein kleiner Ruck für das Rennauto
+            a.stoss = Math.max(a.stoss, hartHier * anteilA * 2);
+            t.stoss = 1.5;
+            if (a === ich) hart = Math.max(hart, hartHier);
           }
         }
       }
