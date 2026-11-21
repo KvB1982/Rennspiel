@@ -12,7 +12,7 @@ import { BELAG, MASSSTAB } from './strecke.js';
 import { weichen, WEICHE_LANG } from './slot.js';
 import { boxLage } from './box.js';
 import { baueStrassenWelt } from './stadtbau.js';
-import { modell, alsGruppe, baumModell } from './modelle.js';
+import { modell, alsGruppe, baumModell, echtGruppe } from './modelle.js';
 
 // ---------------------------------------------------------------- Hilfen
 
@@ -750,7 +750,7 @@ function baueZimmer(T, gruppe, welt, r) {
     const rahmen = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.6, 0.04), leiste); rahmen.position.set(mx + x, 1.5, mz - D / 2 + 0.005); gruppe.add(rahmen);
     rahmen.scale.z = 0.5;
   }
-  // Möbel: fertige Modelle (Kenney Furniture Kit), sonst wie früher aus Kisten
+  // Möbel: fertige Modelle (Poly Haven und Kenney), sonst wie früher aus Kisten
   if (!zimmerMoebel(gruppe, welt, mx, mz, W, D)) {
     // Sofa
     const stoff = new THREE.MeshStandardMaterial({ color: 0x3f5d7a, roughness: 0.95 });
@@ -797,26 +797,31 @@ function baueZimmer(T, gruppe, welt, r) {
   ];
 }
 
-// Möbel im Wohnzimmer aus fertigen Modellen (Kenney Furniture Kit, CC0). Gibt false zurück, wenn die Modelle fehlen.
-// Die Modelle schauen nach +z; die Wand mit dem Fernseher liegt bei −z, das Sofa steht an der Wand bei +z.
+// Möbel im Wohnzimmer aus fertigen Modellen. Gibt false zurück, wenn die Modelle fehlen.
+// Zuerst die echt aussehenden von Poly Haven (mit Holz- und Stoffbild), sonst die bunten von Kenney (beide CC0).
 function zimmerMoebel(gruppe, welt, mx, mz, W, D) {
   if (!modell('sofa') || !modell('fernsehschrank')) return false;
   const hin = (g, x, z, dreh = 0, y = 0) => { if (!g) return null; g.position.set(x, y, z); g.rotation.y = dreh; gruppe.add(g); return g; };
-  // Sofa an der Wand, schaut ins Zimmer; daneben ein Sessel und eine Stehlampe
-  hin(alsGruppe('sofa', { breit: 2.2 }, { stoff: 0x3f5d7a }), mx, mz + D / 2 - 0.5, Math.PI);
-  hin(alsGruppe('sessel', { breit: 1.0 }, { stoff: 0x8a4f3a }), mx + 1.9, mz + D / 2 - 0.6, Math.PI + 0.5);
+  // echtes Modell mit seiner Größe, sonst Kenney mit seiner Größe und Farbe
+  const stueck = (name, echt, kenney, farben) => echtGruppe(name, echt) || alsGruppe(name, kenney, farben);
+  const holz = { rest: 0xb98a5e };   // Holz etwas dunkler als bei Kenney
+  // Sofa an der Wand, schaut ins Zimmer; daneben ein Beistelltisch, ein Sessel und eine Stehlampe
+  hin(stueck('sofa', { breit: 1.9 }, { breit: 2.2 }, { stoff: 0x3f5d7a }), mx, mz + D / 2 - 0.5, Math.PI);
+  hin(echtGruppe('beistelltisch', { hoch: 0.55 }), mx + 1.25, mz + D / 2 - 0.35, Math.PI);
+  hin(stueck('sessel', { hoch: 1.05 }, { breit: 1.0 }, { stoff: 0x8a4f3a }), mx + 2.0, mz + D / 2 - 0.6, Math.PI + 0.5);
   hin(alsGruppe('stehlampe', { hoch: 1.75 }), mx - 1.5, mz + D / 2 - 0.35);
   // Fernseh-Schrank mit Fernseher, Lautsprechern und einer kleinen Pflanze
-  const holz = { rest: 0xb98a5e };   // Holz etwas dunkler als bei Kenney
-  const schrank = hin(alsGruppe('fernsehschrank', { breit: 2.0 }, holz), mx, mz - D / 2 + 0.3);
+  const schrank = hin(stueck('fernsehschrank', { breit: 1.8, hoch: 0.8 }, { breit: 2.0 }, holz), mx, mz - D / 2 + 0.3);
   const oben = schrank ? schrank.userData.masse.hoch : 0.5;
   welt.fernseher = hin(alsGruppe('fernseher', { breit: 1.45 }), mx, mz - D / 2 + 0.3, 0, oben);
   for (const s of [-1, 1]) hin(alsGruppe('lautsprecher', { hoch: 1.1 }), mx + s * 1.3, mz - D / 2 + 0.3);
-  hin(alsGruppe('pflanze_klein', { hoch: 0.45 }), mx + 0.8, mz - D / 2 + 0.3, 0, oben);
-  hin(alsGruppe('radio', { breit: 0.4 }), mx - 0.8, mz - D / 2 + 0.3, 0, oben);
+  hin(stueck('pflanze_klein', { hoch: 0.35 }, { hoch: 0.45 }), mx + 0.75, mz - D / 2 + 0.3, 0, oben);
+  hin(alsGruppe('radio', { breit: 0.4 }), mx - 0.75, mz - D / 2 + 0.3, 0, oben);
   // große Pflanze in der Ecke
   hin(alsGruppe('pflanze', { hoch: 1.3 }), mx + W / 2 - 0.45, mz - D / 2 + 0.45);
-  // zwei Regale an der linken Wand, sie schauen ins Zimmer (+x)
-  for (const dz of [0.05, 1.0]) hin(alsGruppe('regal', { hoch: 1.9 }, holz), mx - W / 2 + 0.3, mz + dz, Math.PI / 2);
+  // Regal an der linken Wand, es schaut ins Zimmer (+x): ein echtes, sonst zwei von Kenney
+  const regal = echtGruppe('regal', { hoch: 1.9 });
+  if (regal) hin(regal, mx - W / 2 + 0.32, mz + 0.5, Math.PI / 2);
+  else for (const dz of [0.05, 1.0]) hin(alsGruppe('regal', { hoch: 1.9 }, holz), mx - W / 2 + 0.3, mz + dz, Math.PI / 2);
   return true;
 }

@@ -10,6 +10,11 @@
 //   passend(m, { breit, hoch, lang }) – Formen auf eine Größe bringen: Mitte bei x = z = 0, unten bei y = 0
 //
 // Alle Modelle schauen nach vorn in Richtung +z.
+//
+// Dazu kommen echt aussehende Modelle von Poly Haven (CC0) in modelle/echt/, gemacht mit tools/polyhaven.mjs.
+// Sie behalten ihr Farbbild (Holz, Stoff …) und werden deshalb nicht in Teile zerlegt:
+//   echtGruppe('sofa', { breit: 2.2 }) – fertige Gruppe zum Hinstellen, oder null (dann nimmt das Spiel das Kenney-Modell)
+// Mit ?ohneecht in der Adresse bleiben die Kenney-Modelle (zum Vergleichen).
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -22,7 +27,11 @@ export const NAMEN = [
   'haus_a', 'haus_g', 'haus_h', 'haus_i', 'haus_m', 'haus_q',
 ];
 
+// echte Modelle: Name → Drehung, damit sie wie die Kenney-Modelle nach +z schauen
+export const ECHT = { sofa: 0, sessel: 0, beistelltisch: 0, fernsehschrank: 0, regal: 0, pflanze_klein: 0 };
+
 const vorrat = new Map();   // Name → { teile: { name: Form }, kiste: Box3 }
+const echtVorrat = new Map();   // Name → three.js-Szene aus der Datei
 let laeuft = null;
 
 // Alle Modelle laden. Wartet höchstens `bis` Millisekunden; was dann noch fehlt, bleibt weg.
@@ -53,7 +62,12 @@ export function ladeModelle({ bis = 6000 } = {}) {
         teile[o.name || o.parent.name] = neu;
       });
       vorrat.set(n, { teile, kiste });
-    }).catch(() => { /* fehlt: dann eben Kisten */ })));
+    }).catch(() => { /* fehlt: dann eben Kisten */ })).concat(
+      (typeof location !== 'undefined' && /ohneecht/.test(location.search)) ? [] : Object.keys(ECHT).map(n => lader.loadAsync(`modelle/echt/${n}.glb`).then(g => {
+        g.scene.rotation.y = ECHT[n];
+        g.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
+        echtVorrat.set(n, g.scene);
+      }).catch(() => { /* fehlt: dann Kenney */ }))));
   }
   return Promise.race([laeuft, new Promise(ok => setTimeout(ok, bis))]);
 }
@@ -105,4 +119,24 @@ export function baumModell(name, hoch) {
   if (!m || !m.teile.krone || !m.teile.stamm) return null;
   const t = passend(m, { hoch });
   return { krone: t.krone, stamm: t.stamm, kroneMat: eckMaterial(0xffffff, { roughness: 0.95 }), stammMat: eckMaterial(0xffffff, { roughness: 1 }) };
+}
+
+// Ein echtes Modell (mit Farbbild) als Gruppe zum Hinstellen, auf eine Größe gebracht wie bei passend().
+// Mitte bei x = z = 0, unten bei y = 0. Gibt null zurück, wenn das Modell fehlt.
+export function echtGruppe(name, { breit, hoch, lang, mal } = {}) {
+  const vorlage = echtVorrat.get(name);
+  if (!vorlage) return null;
+  const innen = vorlage.clone(true);          // Formen und Bilder werden geteilt, nur die Knoten sind neu
+  const k = new THREE.Box3().setFromObject(innen), g = k.getSize(new THREE.Vector3()), mi = k.getCenter(new THREE.Vector3());
+  const f = [breit && breit / g.x, hoch && hoch / g.y, lang && lang / g.z].filter(Boolean);
+  const gleich = mal || (f.length ? f.reduce((a, b) => a + b) / f.length : 1);
+  const s = new THREE.Vector3(breit ? breit / g.x : gleich, hoch ? hoch / g.y : gleich, lang ? lang / g.z : gleich);
+  const mitte = new THREE.Group();           // innere Gruppe: verschieben und vergrößern
+  mitte.add(innen);
+  innen.position.set(-mi.x, -k.min.y, -mi.z);
+  mitte.scale.copy(s);
+  const aussen = new THREE.Group();          // äußere Gruppe: die stellt das Spiel hin und dreht sie
+  aussen.add(mitte);
+  aussen.userData.masse = { breit: g.x * s.x, hoch: g.y * s.y, lang: g.z * s.z };
+  return aussen;
 }
