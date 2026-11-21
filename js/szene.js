@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { baueWelt, gummiAuftragen, stimmung } from './streckebau.js';
+import { baueWelt, gummiAuftragen, linieZeigen, stimmung } from './streckebau.js';
 import { baueAuto, autoStellen } from './autobau.js';
 import { MASSSTAB } from './strecke.js';
 
@@ -27,7 +27,7 @@ export class Buehne {
   }
 
   // Strecke T laden und Autos (Liste aus dem Rennen) hinstellen
-  laden(T, autos, L) {
+  laden(T, autos, L, { linie = false } = {}) {
     if (this.szene) this.aufraeumen();
     const s = this.szene = new THREE.Scene();
     const def = T.def, st = stimmung(def), modell = !!def.modell;
@@ -80,6 +80,7 @@ export class Buehne {
     // Strecke und Landschaft
     this.welt = baueWelt(T, s, { qualitaet: this.qualitaet });
     if (L) gummiAuftragen(this.welt, T, L);
+    if (L && linie && !modell) linieZeigen(this.welt, T, L);
     if (modell) {
       const g = this.welt.grenzen;
       this.decke.position.set(g.mx, 2.6, g.mz);

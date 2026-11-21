@@ -10,6 +10,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as TX from './texturen.js';
 import { BELAG, MASSSTAB } from './strecke.js';
 import { weichen, WEICHE_LANG } from './slot.js';
+import { boxLage } from './box.js';
 
 // ---------------------------------------------------------------- Hilfen
 
@@ -197,8 +198,11 @@ export function baueWelt(T, szene, { qualitaet = 'hoch' } = {}) {
 
   // ---------------------------------------------------------------- Auslauf (Gras, Kies, Gehweg)
   const grasT = TX.rasenStreifen(), kiesT = TX.kies(), betonT = TX.beton();
-  const grasMat = new THREE.MeshStandardMaterial({ map: grasT.map, roughness: 0.95, color: art === 'kueste' ? 0xd6e0a8 : 0xffffff });
-  const kiesMat = new THREE.MeshStandardMaterial({ map: kiesT.map, normalMap: kiesT.normalMap, roughness: 1 });
+  // kleine Bahnen: grüner Filz statt Gras, heller Auslauf-Streifen statt Kies (einfarbig, die großen Bilder wären dort unscharf)
+  const grasMat = modell ? new THREE.MeshStandardMaterial({ color: 0x3f8a4a, roughness: 1 })
+    : new THREE.MeshStandardMaterial({ map: grasT.map, roughness: 0.95, color: art === 'kueste' ? 0xd6e0a8 : 0xffffff });
+  const kiesMat = modell ? new THREE.MeshStandardMaterial({ color: def.slot ? 0xb8bcc2 : 0xd8c79a, roughness: 1 })
+    : new THREE.MeshStandardMaterial({ map: kiesT.map, normalMap: kiesT.normalMap, roughness: 1 });
   const randMat = modell
     ? new THREE.MeshStandardMaterial({ color: 0x6d7076, roughness: 0.5 })
     : new THREE.MeshStandardMaterial({ map: betonT.map, normalMap: betonT.normalMap, roughness: 0.9, color: 0xd8d8d0 });
@@ -212,6 +216,9 @@ export function baueWelt(T, szene, { qualitaet = 'hoch' } = {}) {
       }
     }
   }
+
+  // ---------------------------------------------------------------- Boxengasse (kleine Autos)
+  if (modell && T.box) baueBox(T, gruppe);
 
   // ---------------------------------------------------------------- Begrenzung: Leitplanke, Reifen, Mauer
   baueBegrenzung(T, gruppe, viel, modell);
@@ -227,6 +234,68 @@ export function baueWelt(T, szene, { qualitaet = 'hoch' } = {}) {
     if (art === 'hafen') baueStadt(T, gruppe, welt, viel, r);
   }
   return welt;
+}
+
+// Boxengasse rechts neben der Start-Ziel-Geraden: Boden, Linien, blauer Halte-Bereich, Schild.
+// Bei der Slotcar-Bahn zweigt ein dritter Schlitz ab.
+function baueBox(T, gruppe) {
+  const B = T.box, def = T.def, n = T.n, ds = T.laenge / n, hb = T.hb[0];
+  const von = Math.round(B.ab / ds), bis = von + Math.round(B.lang / ds);
+  const rel = i => ((((i - von) % n) + n) % n) * ds;
+  const glatt = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+  const prof = r => Math.min(glatt(r / B.rampe), glatt((B.lang - r) / B.rampe));   // 0 an den Enden, 1 in der Mitte
+  const farbe = (c, off = -2, mehr = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: off, ...mehr });
+  if (def.slot) {
+    // Boden: Die Bahn wird nach rechts breiter
+    gruppe.add(mesh(band(T, von, bis, 1, (i, j) => -hb + 0.002 - j * (B.breite * prof(rel(i)) + 0.002), () => 0.0001), farbe(0x4a4c50, 0, { vertexColors: false }), false, true));
+    // dritter Schlitz mit Metallstreifen
+    const lage = i => boxLage(T, rel(i), -def.spur);
+    for (const m of [-1, 1]) gruppe.add(mesh(band(T, von, bis, 1, (i, j) => lage(i) + m * 0.006 + (j - 0.5) * 0.004, () => 0.0005), farbe(0xc8ccd2, -2, { metalness: 0.9, roughness: 0.25 }), false, true));
+    gruppe.add(mesh(band(T, von, bis, 1, (i, j) => lage(i) + (j - 0.5) * 0.004, () => 0.0008), farbe(0x0c0c0c, -3), false, true));
+    // weißer Rand außen
+    gruppe.add(mesh(band(T, von, bis, 1, (i, j) => -hb - B.breite * prof(rel(i)) + 0.004 + j * 0.006, () => 0.0006), farbe(0xf2f2ee, -2), false, true));
+  } else {
+    // weiße Linie zwischen Strecke und Boxengasse
+    gruppe.add(mesh(band(T, von, bis, 1, (i, j) => -hb - 0.004 - j * 0.008, () => 0.0006), farbe(0xf2f2ee, -3), false, true));
+  }
+  // Halte-Bereich: blaues Feld mit gelbem Anfang und Ende
+  const h0 = von + Math.round(B.halt[0] / ds), h1 = von + Math.round(B.halt[1] / ds), halb = B.breite * (def.slot ? 0.3 : 0.4);
+  const neben = def.slot ? 0.03 : 0;   // bei der Slotcar-Bahn links und rechts vom Schlitz je ein Streifen
+  for (const seite of def.slot ? [-1, 1] : [0]) {
+    gruppe.add(mesh(band(T, h0, h1, 1, (i, j) => B.d + seite * (neben + halb / 2) - (def.slot ? halb / 2 : halb) + j * (def.slot ? halb : 2 * halb), () => 0.0004),
+      farbe(0x2a6fd6, -2), false, true));
+  }
+  for (const h of [h0, h1]) gruppe.add(mesh(band(T, h - 1, h, 1, (i, j) => B.d - B.breite * 0.45 + j * B.breite * 0.9, () => 0.0007), farbe(0xf2c21a, -3), false, true));
+  // Schild "BOX" an der Einfahrt
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64;
+  const ctx = cv.getContext('2d'); ctx.fillStyle = '#1f5fc4'; ctx.fillRect(0, 0, 128, 64); ctx.fillStyle = '#fff'; ctx.font = 'bold 46px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('BOX', 64, 34);
+  const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace;
+  const i0 = ((von % n) + n) % n, aussen = -(hb + B.breite + 0.06);
+  const schild = new THREE.Group();
+  const pfahl = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.14, 6), farbe(0x555555)); pfahl.position.y = 0.07; schild.add(pfahl);
+  const tafel = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, 0.004), [farbe(0x1f5fc4), farbe(0x1f5fc4), farbe(0x1f5fc4), farbe(0x1f5fc4), new THREE.MeshStandardMaterial({ map: tx, roughness: 0.6 }), new THREE.MeshStandardMaterial({ map: tx, roughness: 0.6 })]);
+  tafel.position.y = 0.16; schild.add(tafel);
+  schild.position.set(T.x[i0] + T.tz[i0] * aussen, 0, T.z[i0] - T.tx[i0] * aussen);
+  schild.rotation.y = Math.atan2(T.tx[i0], T.tz[i0]);
+  gruppe.add(schild);
+}
+
+// Ideallinie und Bremszonen auf die Fahrbahn malen (Fahrhilfe für den Rennwagen):
+// ganz zart hellblau die beste Linie, kräftig rot die Stücke, auf denen man bremsen muss.
+export function linieZeigen(welt, T, L) {
+  const n = T.n, ds = T.laenge / n;
+  // gebremst wird dort, wo der Tempo-Plan deutlich langsamer wird (mehr als 5 m/s² Verzögerung)
+  const bremst = i => { const v0 = L.tempo[i], v1 = L.tempo[(i + 1) % n]; return (v0 * v0 - v1 * v1) / (2 * ds) > 5; };
+  const zart = new THREE.MeshBasicMaterial({ color: 0x9fdcff, transparent: true, opacity: 0.16, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
+  const rot = new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -5 });
+  const g = new THREE.Group();
+  g.add(mesh(band(T, 0, n, 1, (i, j) => L.off[i] + (j - 0.5) * 0.7, () => 0.02), zart, false, false));
+  for (const [von, bis] of abschnitte(n, bremst)) {
+    if (bis - von < 3) continue;
+    g.add(mesh(band(T, von, bis, 1, (i, j) => L.off[i] + (j - 0.5) * 1.1, () => 0.03), rot, false, false));
+  }
+  welt.gruppe.add(g);
+  welt.linie = g;
 }
 
 // Gummi auf der Ideallinie: Die Fahrbahn wird dort etwas dunkler (wie bei echten Rennstrecken)

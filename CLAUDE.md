@@ -36,7 +36,8 @@ Lenken, Drehen, seitlicher Abstand: plus = links.
 |---|---|
 | `js/strecken.js` | Die Strecken (`STRECKEN`): Eckpunkte mit Kurvenhalbmesser (`ecken`), Breite, Höhenverlauf (`hoehe`), was neben der Strecke liegt (`aus`), Landschaft (`welt`). Alle ausgedacht |
 | `js/strecke.js` | Mittellinie ausrechnen (ohne three.js): Ecken → Geraden und Kreisbögen (`eckenZuTeilen`) → Messpunkte alle `ds` Meter mit Richtung, Krümmung, Höhe, Breite, Auslauf, Randsteinen. `T.finde(x, z, hint)` = wo auf der Strecke ist ein Punkt |
-| `js/slot.js` | Slotcar (ohne three.js): Auto fährt im Schlitz einer von zwei Spuren (`def.spur`), nur Gas und Bremse. Kurvenkraft über `AUTOS.slot.haft` = Heck schwenkt aus, dann Abflug (`slotSchritt` gibt `'raus'` zurück, nach `RAUS_ZEIT` wird das Auto wieder eingesetzt). Spurwechsel an den Weichen (`def.weichen`, von `weichen(T)` auf gerade Stücke geschoben): Lenkrad links/rechts halten. `slotPlan`, `slotFahren` = Computerfahrer, `slotStoesse` = Auffahren in derselben Spur |
+| `js/slot.js` | Slotcar (ohne three.js): Auto fährt im Schlitz einer von zwei Spuren (`def.spur`), nur Gas und Bremse. Kurvenkraft über `AUTOS.slot.haft` = Heck schwenkt aus, dann Abflug (`slotSchritt` gibt `'raus'` zurück, nach `RAUS_ZEIT` wird das Auto wieder eingesetzt). Knapp über der Grenze driftet es erst und wird langsamer (bis 1,25-mal `haft`). Dritter Schlitz = Boxengasse (`sl.box`, Einfahrt: rechte Spur und nach rechts lenken). Spurwechsel an den Weichen (`def.weichen`, von `weichen(T)` auf gerade Stücke geschoben): Lenkrad links/rechts halten. `slotPlan`, `slotFahren` = Computerfahrer, `slotStoesse` = Auffahren in derselben Spur |
+| `js/box.js` | Boxengasse der kleinen Autos (ohne three.js): `boxAnlegen(T)` legt sie rechts neben die Start-Ziel-Gerade (`T.box`: `ab`, `lang`, `rampe`, `d`, `halt`). Tank und Reifen (`c.sprit`, `c.reifen`, `verbrauch`, `TANK_RUNDEN`, `REIFEN_RUNDEN`), Stopp im blauen Halte-Bereich (`boxDienst`, `DIENST_DAUER`), abgefahrene Reifen = weniger Halt (`reifenHalt`). Computerfahrer mit ferngesteuertem Auto fahren wie auf einer Schiene durch die Box (`boxFahrt`). Nur im Rennen und wenn im Menü „Tanken und Reifen“ an ist (`rennen.boxen`) |
 | `js/physik.js` | Fahrphysik (ohne three.js): Einspurmodell mit Reifenkurve, Abtrieb, Luftwiderstand, Haftkreis, Traktionskontrolle, Untergrund, Abprallen an der Begrenzung. Werte in `AUTOS` (`f1`, `modell`, `slot`) – alle geschätzt. Kleine Autos: Maßstab 1:30 (`MASSSTAB` in `strecke.js`), Höchsttempo einstellbar (`neuesAuto(art, tempo)`, `TEMPO` in `spiel.js`), Motor regelt bei `vMax` ab, rollt ohne Gas aus (`rollen`, `motorBremse`). Bremse im Stand = rückwärts (bis `rueck`) |
 | `js/ki.js` | Ideallinie (`ideallinie`), Tempo-Plan mit Bremszonen (`tempoPlan`), Computerfahrer mit Überholen (`fahren`), Bremshilfe und Lenkhilfe für den Spieler |
 | `js/rennen.js` | Rennen/Zeitfahren (ohne three.js): Startampel, Runden, Zeiten, Plätze, Zusammenstöße, Strecke verlassen = Runde ungültig, Geist-Auto der Bestrunde. Ausgedachte Teams (`TEAMS`) und Fahrer (`FAHRER`) |
@@ -50,7 +51,7 @@ Lenken, Drehen, seitlicher Abstand: plus = links.
 | `js/szene.js` | Renderer, Himmel (Sky), Sonne mit Schatten, Spiegelungen, Autos und Geist im Bild |
 | `js/kamera.js` | Kameras: `hinten`, `weit`, `cockpit`, `stand` (Modellauto: man steht an einer festen Stelle und dreht nur den Kopf; Stellen in `welt.standorte`) |
 | `js/klang.js` | Motor, Reifen, Wind, Aufprall, Piepen – alles mit WebAudio erzeugt |
-| `js/spiel.js` | Menü, Spiel-Schleife, Anzeige, Ergebnis, QR-Code |
+| `js/spiel.js` | Menü, Spiel-Schleife, Anzeige, Ergebnis, QR-Code. Rennwagen: Gang für die nächste Kurve (`kurvenFinden`: Scheitelpunkte = Tiefpunkte des Tempo-Plans), Ideallinie und rote Bremszonen auf der Fahrbahn (`linieZeigen` in `streckebau.js`, Einstellung `E.linie`) |
 | `js/main.js` | Start: Lenkrad-Seite oder Spiel |
 
 ## Handy als Lenkrad
@@ -66,6 +67,7 @@ Lenken, Drehen, seitlicher Abstand: plus = links.
 ## Bekannte Grenzen
 
 - Ferngesteuertes Auto und Slotcar (Stand 21.11.2026): Tempo, Haftung, Abflug-Grenze und Ausrollen sind geschätzt. Geprüft mit `tools/sim.mjs` und als Standbilder im Test-Browser, nicht von Hand gefahren. Das Slotcar fliegt immer geradeaus von der Bahn und wird nach gut 2 Sekunden wieder eingesetzt; es überschlägt sich nicht. Die Tacho-Zahl der kleinen Autos ist mal 30 hochgerechnet.
+- Boxengasse, Tank, Reifen, Auslauf-Streifen, größere Slotcar-Bahn (30 cm breit statt 20 cm wie bei einer echten Kunststoffbahn), Ideallinie, Bremszonen und Kurven-Gang (Stand 21.11.2026): mit `tools/sim.mjs`, kleinen Rechen-Tests und als Standbilder geprüft, nicht von Hand gefahren. Verbrauch, Reifenabnutzung und Slotcar-Haftung (`haft: 15`, wie mit Haftmagnet) sind geschätzt. Die Boxengasse des Rennwagens fehlt. Im Zeitfahren gibt es keinen Verbrauch.
 - Im Cockpit ist der Halo-Bügel des eigenen Autos ausgeblendet (`m.halo` in `szene.js`), weil er genau vor den Augen läge.
 
 - Nur in einem Test-Browser ohne Grafikkarte und ohne Internet geprüft (three.js, PeerJS und QR-Bibliothek dort von einer lokalen Kopie). Nicht mit einem echten Handy, nicht auf dem iPad, nicht auf einem Fernseher. Die Verbindung über PeerJS ist nicht erprobt, nur die Test-Verbindung über BroadcastChannel.

@@ -4,6 +4,7 @@
 import { neuesAuto, schritt, aufStrecke } from './physik.js';
 import { MASSSTAB } from './strecke.js';
 import { slotStellen, slotSchritt, slotStoesse, slotFahren, slotPlan } from './slot.js';
+import { boxNeu, verbrauch, boxDienst, boxFahrt, boxRel, reifenHalt } from './box.js';
 import { ideallinie, neuerFahrer, fahren, bremsHilfe, lenkZurLinie } from './ki.js';
 
 // Ausgedachte Rennställe und Fahrer (keine echten Teams, Farben frei gewählt)
@@ -26,10 +27,12 @@ export const STAERKE = { leicht: [0.8, 0.86], mittel: [0.87, 0.93], schwer: [0.9
 
 export class Rennen {
   // modus: 'zeit' (allein gegen die Uhr) oder 'rennen'. art: 'f1', 'modell' oder 'slot'. tempo: Höchsttempo der kleinen Autos (m/s).
-  constructor(T, { modus = 'rennen', runden = 3, gegner = 7, staerke = 'mittel', art = 'f1', spielerFarbe = 0, name = 'Du', mitSpieler = true, tempo = 0 } = {}) {
+  constructor(T, { modus = 'rennen', runden = 3, gegner = 7, staerke = 'mittel', art = 'f1', spielerFarbe = 0, name = 'Du', mitSpieler = true, tempo = 0, boxen = false } = {}) {
     this.T = T; this.modus = modus; this.runden = runden; this.art = art;
     this.sc = T.def.modell ? MASSSTAB : 1;
     this.slot = art === 'slot';
+    // Tanken und Reifenwechsel: nur bei den kleinen Autos, nur im Rennen, nur wenn die Strecke eine Boxengasse hat
+    this.boxen = !!(boxen && T.box && modus === 'rennen');
     const muster = neuesAuto(art, tempo).p;
     this.L = this.slot ? null : ideallinie(T, muster);
     this.plan = this.slot ? slotPlan(T, muster) : null;
@@ -73,6 +76,7 @@ export class Rennen {
       if (this.slot) slotStellen(this.autos[this.autos.length - 1], T, modus === 'zeit' ? T.laenge - 1.5 : slots[platz].s, modus === 'zeit' ? 1 : slots[platz].d);
       if (!ich) k++;
     }
+    for (const c of this.autos) { boxNeu(c); c.haft0 = c.a.p.haft; }
     for (const c of this.autos) { if (!this.slot) { const f = T.finde(c.a.x, c.a.z, -1); c.a.idx = f.i; c.a.s = f.s; } c.prevS = c.a.s; }
     this.ich = this.autos.find(c => c.ich) || null;
     this.geist = { punkte: [], takt: 0 };   // laufende Runde (Spieler) für einen neuen Geist
@@ -93,8 +97,16 @@ export class Rennen {
 
     const steht = this.phase === 'ampel';
     if (this.slot) { this.slotUpdate(dt, eingabe, steht); this.runden_zaehlen(); this.plaetze(); return; }
+    let nr = 0;
     for (const c of this.autos) {
       const a = c.a;
+      nr++;
+      if (this.boxen && !steht) {
+        this.boxUpdate(c, dt);
+        a.p.haft = c.haft0 * reifenHalt(c);
+        // Computerfahrer fährt wie auf einer Schiene durch die Boxengasse
+        if (c.fahrer && (c.bf || (c.boxWill && c.ziel === null && boxRel(T, a.s) < 0.4))) { boxFahrt(c, T, dt, nr); continue; }
+      }
       if (c.ich) {
         a.lenkWunsch = eingabe.lenk; a.gas = eingabe.gas; a.brems = eingabe.brems;
         if (this.hilfe.lenken) a.lenkWunsch = Math.max(-1, Math.min(1, eingabe.lenk * 0.6 + lenkZurLinie(a, T, this.L) * 0.55));
@@ -104,6 +116,7 @@ export class Rennen {
         fahren(c.fahrer, a, T, this.L, this.autos, dt);
         if (c.ziel !== null) { a.gas = Math.min(a.gas, 0.5); }
       }
+      if (this.boxen && c.sprit === 0) a.gas = Math.min(a.gas, 0.3);   // Tank leer: nur noch Schleichfahrt
       // vor dem Start stehen alle still (der Motor darf aber schon heulen)
       if (steht) { a.u = 0; a.v = 0; a.r = 0; a.drehzahl = 5000 + a.gas * 6000; continue; }
       schritt(a, T, dt);
@@ -118,11 +131,25 @@ export class Rennen {
     this.plaetze();
   }
 
+  // Tank und Reifen eines Autos: verbrauchen, in der Box auffüllen, Computerfahrer entscheidet sich für einen Stopp
+  boxUpdate(c, dt) {
+    verbrauch(c, dt, this.T.laenge);
+    const erg = boxDienst(c, this.T, dt);
+    if (c.ich) {
+      if (erg === 'fertig') this.melden('Aufgetankt, neue Reifen – los!', 'beste');
+      if (c.sprit === 0 && !c.leerGemeldet) { c.leerGemeldet = true; this.melden('Tank leer! Ab in die Box', 'warn'); }
+      if (c.sprit > 0.5) c.leerGemeldet = false;
+    } else if (c.ziel === null && (c.sprit < 0.22 || c.reifen < 0.25) && c.runde <= this.runden) c.boxWill = true;
+    if (c.fahrer) c.fahrer.mal = Math.sqrt(reifenHalt(c));
+  }
+
   // Slotcar-Rennen: nur Gas und Spurwechsel
   slotUpdate(dt, eingabe, steht) {
     const T = this.T;
     for (const c of this.autos) {
       const a = c.a;
+      if (this.boxen && !steht) this.boxUpdate(c, dt);
+      else { c.sprit = 1; c.reifen = 1; }
       if (c.ich && !(c.ziel !== null && this.modus === 'rennen')) {
         a.gas = eingabe.gas; a.brems = eingabe.brems; a.lenkWunsch = eingabe.lenk; c.slot.wunsch = 0;
       } else {

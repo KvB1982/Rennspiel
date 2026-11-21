@@ -136,6 +136,7 @@ export function fahren(f, a, T, L, andere, dt) {
   a.lenkWunsch = lenkZurLinie(a, T, L, f.extra + f.fehler * sc);
   const i = T.index(a.s + Math.abs(a.u) * 0.25);
   let ziel = L.tempo[i] * f.staerke;
+  if (f.mal) ziel *= f.mal;   // abgefahrene Reifen: langsamer durch die Kurven
   if (Math.abs(f.extra) > 1 * sc) ziel *= 0.98;
   ziel = Math.min(ziel, bremsWegen);
   const diff = ziel - a.u, ein = p.vMax / 90;
