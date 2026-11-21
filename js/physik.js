@@ -11,6 +11,7 @@
 import { BELAG } from './strecke.js';
 
 const G = 9.81, LUFT = 1.2;
+const MASSSTAB_G = 0.25;   // kleine Autos: Kurvenkräfte sind kleiner, die Neigung soll trotzdem zu sehen sein
 
 // Werte für die Autos. Alle Zahlen sind geschätzt, damit es sich gut fahren lässt.
 export const AUTOS = {
@@ -43,6 +44,7 @@ export const AUTOS = {
     bremse: 0.55, bremseVorn: 0.55,
     lenkMax: 0.5, lenkTempo: 2.6,
     gaenge: 1, drehzahlMax: 30000, vMax: 2.3, abregeln: true, rueck: 0.7,
+    prall: 0.55,                        // so stark springt es von der Bande zurück (0 = gar nicht, 1 = wie ein Flummi)
     schritte: 16, unten: 0.35,
   },
   // Slotcar: fährt im Schlitz der Bahn, gerechnet in slot.js. Hier stehen nur die Werte.
@@ -204,15 +206,28 @@ export function schritt(a, T, dt) {
     const gegen = wx * nx + wz * nz;
     if (gegen > 0) {
       a.stoss = gegen;
-      wx -= nx * gegen * 1.35; wz -= nz * gegen * 1.35;     // abprallen (ein wenig zurück)
-      const reib = Math.max(0, 1 - gegen * 0.06);            // an der Wand entlang schleifen bremst
-      wx *= reib; wz *= reib;
-      a.u = sh * wx + ch * wz; a.v = ch * wx - sh * wz;
-      a.r *= 0.5;
-      // Auto dreht sich ein wenig parallel zur Wand
       const tw = Math.atan2(f2.tx, f2.tz);
       let dh = tw - a.h; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
-      if (Math.abs(dh) < Math.PI / 2) a.h += dh * Math.min(0.5, gegen * 0.05);
+      if (p.prall) {
+        // Kleines, leichtes Auto: springt wie ein Gummiball von der Bande zurück und bleibt nicht hängen.
+        // Mindestens ein kleiner Schubs weg von der Wand, auch wenn man nur langsam dagegen fährt.
+        const weg = gegen * (1 + p.prall) + 0.12;
+        wx -= nx * weg; wz -= nz * weg;
+        // Die Nase dreht sich dabei in die Richtung, in die das Auto jetzt weiterrollt (an der Bande entlang)
+        if (Math.abs(dh) > Math.PI / 2) dh -= Math.sign(dh) * Math.PI;     // rückwärts zur Strecke: andere Richtung ist näher
+        const weit = Math.min(1, 0.35 + gegen * 0.5);
+        a.h += dh * weit + seite * 0.12 * weit * (Math.abs(dh) < 1.2 ? 1 : 0);   // und noch ein wenig von der Wand weg
+        a.u = Math.sin(a.h) * wx + Math.cos(a.h) * wz; a.v = (Math.cos(a.h) * wx - Math.sin(a.h) * wz) * 0.4;
+        a.r = 0;
+      } else {
+        wx -= nx * gegen * 1.35; wz -= nz * gegen * 1.35;     // abprallen (ein wenig zurück)
+        const reib = Math.max(0, 1 - gegen * 0.06);            // an der Wand entlang schleifen bremst
+        wx *= reib; wz *= reib;
+        a.u = sh * wx + ch * wz; a.v = ch * wx - sh * wz;
+        a.r *= 0.5;
+        // Auto dreht sich ein wenig parallel zur Wand
+        if (Math.abs(dh) < Math.PI / 2) a.h += dh * Math.min(0.5, gegen * 0.05);
+      }
     }
   }
   a.y = f2.y;
@@ -232,7 +247,10 @@ export function schritt(a, T, dt) {
   a.radDreh += a.u * dt / (T.def.modell ? 0.012 : 0.33);
   // Karosserie nickt beim Bremsen und neigt sich in der Kurve (nur Bild)
   const quer = a.u * a.r;
-  a.kippen += ((-quer / 60) - a.kippen) * Math.min(1, dt * 6);
+  // In der Kurve drückt die Fliehkraft das Auto nach außen: Es neigt sich ganz leicht von der Kurve weg
+  // (ein Rennwagen ist hart gefedert: höchstens gut 1 Grad).
+  const querG = quer / (T.def.modell ? G * MASSSTAB_G : G);
+  a.kippen += (Math.max(-0.022, Math.min(0.022, querG * 0.0055)) - a.kippen) * Math.min(1, dt * 6);
   a.neigung += (((a.brems > 0 && a.u > 1 ? 1 : 0) * 0.012 - a.gas * 0.006) - a.neigung) * Math.min(1, dt * 5);
 }
 
