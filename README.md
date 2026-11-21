@@ -21,6 +21,8 @@ Ohne Handy: Pfeiltasten oder W A S D, ein Controller, oder auf einem Tablet „d
 - **Ferngesteuertes Auto:** Strecke im Wohnzimmer (Maßstab 1:30, das Tempo ist mit heruntergerechnet und einstellbar). Du stehst an einer festen Stelle neben der Bahn und lenkst das kleine Auto aus der Ferne (mit 🎥 wechselst du die Stelle).
 - **Slotcar-Bahn:** Zwei Spuren mit Schlitz. Du gibst nur Gas. Wer zu schnell in die Kurve fährt, fliegt raus – also rechtzeitig vom Gas gehen. An den gelben Weichen wechselst du die Spur: dabei nach links oder rechts lenken.
 - **Rückwärts:** Im Stand die Bremse halten.
+- **Fahrhilfen im Rennwagen:** Auf der Fahrbahn liegt zart die Ideallinie, rote Stücke zeigen, wo du bremsen musst. Über dem Tacho steht der Gang für die nächste Kurve. Im Zeitfahren fährt deine beste Runde als durchsichtiges Geist-Auto mit.
+- **Boxengasse (kleine Autos, im Rennen):** Tank und Reifen werden weniger. Rechts neben der Startgeraden liegt die Boxengasse: im blauen Feld anhalten, nach gut 2 Sekunden ist alles frisch.
 - **Fahrhilfen:** Bremshilfe, Lenkhilfe, Traktionskontrolle, Gas von allein.
 
 Alle Teams, Fahrer, Werbung und Strecken sind ausgedacht.

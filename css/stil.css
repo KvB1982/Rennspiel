@@ -113,3 +113,10 @@ body.verbunden #hlStatus { color: var(--gruen); }
 #hlStart #hlCode { color: var(--gelb); letter-spacing: 3px; }
 #hlQuer { display: none; position: fixed; inset: 0; background: #101319; align-items: center; justify-content: center; font-size: 22px; z-index: 4; }
 @media (orientation: portrait) { body.handy #hlQuer { display: flex; } }
+
+/* Hinweis über dem Tacho: Gang für die nächste Kurve, Tank und Reifen */
+#hKurve { position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: calc(max(18px, env(safe-area-inset-bottom)) + 150px); display: flex; gap: 10px; align-items: baseline; font-size: 18px; background: rgba(8,12,20,.45); padding: 6px 12px; border-radius: 12px; }
+#hKurve:empty { display: none; }
+#hKurve b { font-size: 26px; color: var(--gelb); }
+#hKurve b.runter { color: #ff6b5e; }
+#hKurve .knapp { color: #ff6b5e; font-weight: bold; }

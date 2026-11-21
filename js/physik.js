@@ -49,12 +49,14 @@ export const AUTOS = {
   },
   // Slotcar: fährt im Schlitz der Bahn, gerechnet in slot.js. Hier stehen nur die Werte.
   slot: {
-    name: 'Slotcar 1:30',
-    a: 0.055, b: 0.065, vMax: 3.0,
-    zug: 5.5,          // Beschleunigung bei Vollgas aus dem Stand (m/s²)
+    name: 'Slotcar',
+    a: 0.055, b: 0.065, vMax: 3.5,
+    zug: 7,            // Beschleunigung bei Vollgas aus dem Stand (m/s²)
     rollen: 1.6,       // so stark bremst das Auto von selbst, wenn man das Gas loslässt (m/s²)
-    bremse: 7,         // Bremse (m/s²)
-    haft: 8,           // so viel Kurvenkraft hält das Auto im Schlitz (m/s²) – darüber fliegt es raus
+    bremse: 9,         // Bremse (m/s²)
+    // So viel Kurvenkraft hält das Auto im Schlitz (m/s²). Slotcars haben unten Magnete, die sie auf die
+    // Metallstreifen der Bahn ziehen – deshalb halten sie deutlich mehr aus als ein Auto nur mit Reifen (etwa 10 m/s²).
+    haft: 15,
     gaenge: 1, drehzahlMax: 30000,
   },
 };

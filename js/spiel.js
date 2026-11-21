@@ -16,10 +16,10 @@ const $ = id => document.getElementById(id);
 const STANDARD = {
   fahrzeug: 'f1', modus: 'rennen', strecke: 'kueste', strecke_modell: 'wohnzimmer', strecke_slot: 'slot_oval', tempo: 'mittel',
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
-  bremshilfe: true, lenkhilfe: false, traktion: true, autogas: false, grafik: 'hoch',
+  bremshilfe: true, lenkhilfe: false, traktion: true, autogas: false, grafik: 'hoch', linie: true, boxen: true,
 };
 // Höchsttempo der kleinen Autos in Metern pro Sekunde. 3 m/s sehen beim Maßstab 1:30 aus wie 325 km/h.
-const TEMPO = { modell: { langsam: 1.6, mittel: 2.3, schnell: 3.0 }, slot: { langsam: 2.2, mittel: 3.0, schnell: 3.8 } };
+const TEMPO = { modell: { langsam: 1.6, mittel: 2.3, schnell: 3.0 }, slot: { langsam: 2.6, mittel: 3.5, schnell: 4.5 } };
 const streckenFeld = () => E.fahrzeug === 'modell' ? 'strecke_modell' : E.fahrzeug === 'slot' ? 'strecke_slot' : 'strecke';
 const E = Object.assign({}, STANDARD);
 try { Object.assign(E, JSON.parse(localStorage.getItem('rennspiel.einst') || '{}')); } catch (e) {}
@@ -40,6 +40,7 @@ export function starteSpiel() {
   const eingabe = new Eingabe(empfang);
   const klang = new Klang();
   let buehne = null, kamera = null, rennen = null, T = null;
+  let kurven = null;   // für jede Stelle der Strecke: wo die nächste Kurve ist und welcher Gang dort passt
   let laeuft = false, pausiert = false, letzteZeit = 0, infoTakt = 0, meldungBis = 0, fertigGezeigt = false;
   const app = { E, empfang, eingabe, klang };
   window.__rennspiel = app;
@@ -86,6 +87,8 @@ export function starteSpiel() {
     zeile('Runden', 'runden', (modell ? [3, 5, 10, 20] : [1, 3, 5, 10]).map(n => [n, String(n)]), rennenAn);
     if (!modell) zeile('Kamera', 'kamera', [['hinten', 'hinter dem Auto'], ['weit', 'weiter weg'], ['cockpit', 'im Cockpit']]);
     zeile('Höchsttempo', 'tempo', [['langsam', 'langsam'], ['mittel', 'mittel'], ['schnell', 'schnell']], modell);
+    zeile('Tanken und Reifen', 'boxen', [[true, 'an'], [false, 'aus']], modell && rennenAn);
+    zeile('Ideallinie und Bremszonen', 'linie', [[true, 'an'], [false, 'aus']], !modell);
     zeile('Bremshilfe', 'bremshilfe', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Lenkhilfe', 'lenkhilfe', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Traktionskontrolle', 'traktion', [[true, 'an'], [false, 'aus']], !slot);
@@ -104,8 +107,8 @@ export function starteSpiel() {
     ton.innerHTML = `<span>Ton</span><div class="wahl"><button class="${klang.an ? 'an' : ''}">an</button><button class="${klang.an ? '' : 'an'}">aus</button></div>`;
     ton.querySelectorAll('button').forEach((b, k) => b.addEventListener('click', () => { klang.schalten(k === 0); menueBauen(); }));
     ein.appendChild(ton);
-    $('mBest').textContent = slot ? 'Slotcar: Du gibst nur Gas. Vor der Kurve vom Gas gehen, sonst fliegt das Auto raus! Spur wechseln: an einer gelben Weiche nach links oder rechts lenken. Mit 🎥 wechselst du die Stelle, an der du stehst.'
-      : modell ? 'Ferngesteuertes Auto: Du stehst neben der Bahn. Mit 🎥 wechselst du die Stelle, an der du stehst.' : '';
+    $('mBest').textContent = slot ? 'Slotcar: Du gibst nur Gas. Vor der Kurve vom Gas gehen, sonst fliegt das Auto raus! Spur wechseln: an einer gelben Weiche nach links oder rechts lenken. Boxengasse: auf der rechten Spur an der Einfahrt nach rechts lenken und im blauen Feld anhalten. Mit 🎥 wechselst du die Stelle, an der du stehst.'
+      : modell ? 'Ferngesteuertes Auto: Du stehst neben der Bahn. Tanken und Reifen wechseln: in der Boxengasse rechts neben der Startgeraden im blauen Feld anhalten. Mit 🎥 wechselst du die Stelle, an der du stehst.' : '';
   };
   $('mFahrzeug').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { E.fahrzeug = b.dataset.wert; merken(); menueBauen(); } });
   $('mModus').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { E.modus = b.dataset.wert; merken(); menueBauen(); } });
@@ -144,7 +147,8 @@ export function starteSpiel() {
       const modell = E.fahrzeug !== 'f1', slot = E.fahrzeug === 'slot';
       const id = E[streckenFeld()];
       T = holeStrecke(id);
-      rennen = new Rennen(T, { modus: E.modus, runden: E.runden, gegner: modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: E.fahrzeug, spielerFarbe: E.farbe, tempo: modell ? TEMPO[E.fahrzeug][E.tempo] || 0 : 0 });
+      rennen = new Rennen(T, { modus: E.modus, runden: E.runden, gegner: modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: E.fahrzeug, spielerFarbe: E.farbe, tempo: modell ? TEMPO[E.fahrzeug][E.tempo] || 0 : 0, boxen: modell && E.boxen });
+      kurven = rennen.L && !modell ? kurvenFinden(T, rennen.L, rennen.ich.a.p) : null;
       rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
       if (rennen.ich) rennen.ich.a.tc = E.traktion ? true : false;
       eingabe.autoGas = E.autogas && !slot;
@@ -159,7 +163,7 @@ export function starteSpiel() {
       }
       rennen.wennBestzeit = rennen.wennBestzeit || null;
       if (!buehne || buehne.qualitaet !== E.grafik) { buehne = new Buehne($('bild'), E.grafik); app.buehne = buehne; }
-      buehne.laden(T, rennen.autos, rennen.L);
+      buehne.laden(T, rennen.autos, rennen.L, { linie: E.linie });
       $('hEinheit').textContent = modell ? 'km/h im Maßstab' : 'km/h';
       kamera = new Kamera(buehne.kamera);
       kamera.setze(modell ? 'stand' : E.kamera);
@@ -240,6 +244,20 @@ export function starteSpiel() {
     $('hKmh').textContent = Math.round(kmh(a) * (modell ? 1 / MASSSTAB : 1));
     $('hGang').textContent = R.slot ? (c.slot.raus > 0 ? '💥' : c.slot.spur > 0 ? '◀ links' : 'rechts ▶') : modell ? (a.u < -0.05 ? 'R' : '') : (a.u < -0.5 ? 'R' : Math.abs(a.u) < 0.3 && a.gas < 0.05 ? 'N' : a.gang);
     $('hDz').firstChild.style.width = (modell ? Math.min(1, Math.abs(a.u) / a.p.vMax) * 100 : Math.max(0, (a.drehzahl - 4000) / (a.p.drehzahlMax - 4000)) * 100).toFixed(1) + '%';
+    // Hinweis über dem Tacho: beim Rennwagen der Gang für die nächste Kurve, bei den kleinen Autos Tank und Reifen
+    let hin = '';
+    if (kurven && R.phase === 'los') {
+      const k = kurven.naechste[a.idx >= 0 ? a.idx : 0];
+      if (k >= 0) {
+        let weg = T.s[k] - a.s; if (weg < 0) weg += T.laenge;
+        if (weg < 450) hin = `<span class="kurve">Kurve in ${Math.round(weg / 10) * 10} m</span><b class="${a.gang > kurven.gang[k] ? 'runter' : ''}">Gang ${kurven.gang[k]}</b>`;
+      }
+    }
+    if (R.boxen) {
+      const pr = v => Math.round(v * 100), kl = v => v < 0.25 ? 'knapp' : '';
+      hin = `<span class="${kl(c.sprit)}">⛽ ${pr(c.sprit)} %</span><span class="${kl(c.reifen)}">🛞 ${pr(c.reifen)} %</span>` + (c.dienst > 0 ? '<b>Boxenstopp …</b>' : '');
+    }
+    if (hin !== app.hinAlt) { $('hKurve').innerHTML = hin; app.hinAlt = hin; }
     // Ampel
     const amp = $('hAmpel');
     amp.classList.toggle('an', R.phase === 'ampel');
@@ -326,6 +344,25 @@ export function starteSpiel() {
   app.step = (n = 1, dt = 1 / 60) => { for (let k = 0; k < n; k++) bild(dt, k === n - 1); };
   app.starten = starten; app.zumMenue = zumMenue; app.kameraWeiter = kameraWeiter;
   app.zustand = () => ({ laeuft, pausiert });
+}
+
+// ---------------------------------------------------------------- nächste Kurve und passender Gang
+// Eine Kurve ist dort, wo der Tempo-Plan der Ideallinie am langsamsten ist (Scheitelpunkt).
+// Der Gang ergibt sich aus dem Tempo dort, genauso gerechnet wie die Gang-Anzeige in physik.js.
+function kurvenFinden(T, L, p) {
+  const n = T.n, t = L.tempo, w = Math.max(2, Math.round(25 / T.ds)), stufe = p.vMax / p.gaenge;
+  const naechste = new Int32Array(n).fill(-1), gang = new Uint8Array(n);
+  const scheitel = [];
+  for (let i = 0; i < n; i++) {
+    if (t[i] > p.vMax * 0.9) continue;
+    let tief = true;
+    for (let j = 1; j <= w && tief; j++) if (t[(i + j) % n] < t[i] || t[(i - j + n) % n] <= t[i]) tief = false;
+    if (tief) { scheitel.push(i); gang[i] = Math.min(p.gaenge, Math.max(1, Math.floor(t[i] / stufe * 0.95) + 1)); }
+  }
+  if (!scheitel.length) return null;
+  let k = scheitel[0];
+  for (let i = 2 * n - 1; i >= 0; i--) { const m = i % n; if (gang[m]) k = m; naechste[m] = k; }
+  return { naechste, gang, scheitel };
 }
 
 // ---------------------------------------------------------------- Streckenkarte (Menü und Anzeige)

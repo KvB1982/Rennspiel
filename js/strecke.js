@@ -116,6 +116,8 @@ export function eckenZuTeilen(ecken, start = 0.6) {
   return { teile: teile.filter(t => t.g === undefined || t.g > 1e-6), lage };
 }
 
+import { boxAnlegen } from './box.js';
+
 // Maßstab der kleinen Autos (ferngesteuertes Auto und Slotcar): 1:30. Ein 5,6 m langer Rennwagen ist dann knapp 19 cm lang.
 export const MASSSTAB = 1 / 30;
 
@@ -260,6 +262,8 @@ export function baueStrecke(def) {
 
   // Wert an einer Stelle s (Meter seit dem Start) – für weiche Übergänge
   T.index = s => { s = ((s % T.laenge) + T.laenge) % T.laenge; return Math.min(n - 1, Math.floor(s / T.laenge * n)); };
+  // kleine Autos: Boxengasse neben der Start-Ziel-Geraden
+  if (def.modell) boxAnlegen(T);
   return T;
 }
 
