@@ -38,6 +38,22 @@ Kenney-Paket mit seiner Lizenzdatei aufbewahrt (kenney.nl selbst ist im Test-Rec
 | `zelt`, `zelt_lang`, `flutlicht`, `fahne_ziel`, `tv_kamera`, `fahnenturm` | Rennstrecke | [Racing Kit 2.0](https://kenney.nl/assets/racing-kit) | `tent`, `tentLong`, `lightPostLarge`, `flagCheckers`, `camera_exclusive`, `bannerTowerRed` |
 | `haus_a`, `haus_g`, `haus_h`, `haus_i`, `haus_m`, `haus_q` | Dorfhäuser | [City Kit Suburban 2.0](https://kenney.nl/assets/city-kit-suburban) | `building-type-a`, `-g`, `-h`, `-i`, `-m`, `-q` |
 
+### Echt aussehende Modelle von Poly Haven
+
+Die Modelle im Ordner `modelle/echt/` stammen von **Poly Haven** ([polyhaven.com](https://polyhaven.com)) und stehen
+unter **CC0** (gemeinfrei, frei nutzbar, auch ohne Namensnennung – [Lizenz](https://polyhaven.com/license)). Danke, Poly Haven!
+Geladen am 21.11.2026 als glTF mit 1k-Bildern. `tools/polyhaven.mjs` hat nur das Farbbild behalten (auf 512 × 512 verkleinert)
+und Modelle mit vielen Dreiecken vereinfacht.
+
+| Datei | Wofür | Vorlage |
+| --- | --- | --- |
+| `sofa` | Wohnzimmer | [Sofa 01](https://polyhaven.com/a/Sofa_01) |
+| `sessel` | Wohnzimmer | [Arm Chair 01](https://polyhaven.com/a/ArmChair_01) |
+| `beistelltisch` | Wohnzimmer | [Side Table 01](https://polyhaven.com/a/side_table_01) |
+| `fernsehschrank` | Wohnzimmer (Tisch unter dem Fernseher) | [Classic Console 01](https://polyhaven.com/a/ClassicConsole_01) |
+| `regal` | Wohnzimmer | [Wooden Bookshelf Worn](https://polyhaven.com/a/wooden_bookshelf_worn) |
+| `pflanze_klein` | Wohnzimmer (auf dem Schrank) | [Potted Plant 04](https://polyhaven.com/a/potted_plant_04) |
+
 ## Programme
 
 - [three.js](https://threejs.org) r160, MIT-Lizenz, geladen von jsDelivr.
