@@ -28,6 +28,8 @@ export const AUTOS = {
     rollen: 0.015,
     leistung: 610000, schubMax: 10000, // Watt, größte Zugkraft
     bremse: 1.1, bremseVorn: 0.6,     // Bremse (Anteil der Haftung), Anteil vorn
+    bremsGriff: 1.25,                 // beim Bremsen halten die Reifen längs mehr aus als zur Seite (Spiel-Wert: kräftigere Bremse)
+    esp: { beta: 0.1, dreh: 6, quer: 0.4 },   // Schleuderschutz (siehe unten)
     lenkMax: 0.42, lenkTempo: 32,     // größter Lenkeinschlag (rad); ab diesem Tempo (m/s) lenkt man weniger
     gaenge: 8, drehzahlMax: 12500, vMax: 92, rueck: 14,
     schritte: 8, unten: 3,
@@ -125,7 +127,7 @@ export function schritt(a, T, dt) {
     let Fzf = p.masse * G * p.b / L + down * p.abtriebVorn;
     let Fzr = p.masse * G * p.a / L + down * (1 - p.abtriebVorn);
     // Straßenautos: Beim Beschleunigen drückt das Gewicht auf die Hinterräder, beim Bremsen auf die Vorderräder
-    if (p.super) { const um = Math.max(-0.35, Math.min(0.35, (a.ax || 0) * p.hoehe / (L * G))) * p.masse * G; Fzf -= um; Fzr += um; }
+    if (p.super) { const um = Math.max(-0.15, Math.min(0.2, (a.ax || 0) * p.hoehe / (L * G))) * p.masse * G; Fzf -= um; Fzr += um; }
     const mu = p.haft * gr.haft;
     // Die Hinterreifen sind breiter und haften etwas besser (das macht das Auto gutmütiger)
     const muH = mu * (p.hinten || 1);
@@ -138,11 +140,14 @@ export function schritt(a, T, dt) {
       if (p.abregeln) Fx *= Math.max(0, Math.min(1, (p.vMax * 1.03 - u) / (p.vMax * 0.12)));
     }
     const muF = mu * Fzf, muR = muH * Fzr;
+    // Beim Bremsen halten die Reifen längs mehr aus (bremsGriff). Das macht die Bremse kräftiger,
+    // ohne dass die Reifen in der Kurve mehr halten.
+    const bg = p.bremsGriff || 1;
     if (a.brems > 0) {
       if (u > 0.3) {
-        const Fb = a.brems * p.bremse * (muF + muR);
+        const Fb = a.brems * p.bremse * (muF + muR) * bg;
         // Straßenautos haben ein Antiblockiersystem: Die Hinterräder bremsen nie bis an die Grenze (sonst bricht das Heck aus)
-        Fbf = Math.min(Fb * p.bremseVorn, muF * 0.98); Fbr = Math.min(Fb * (1 - p.bremseVorn), muR * (p.super ? 0.7 : 0.98));
+        Fbf = Math.min(Fb * p.bremseVorn, muF * 0.98 * bg); Fbr = Math.min(Fb * (1 - p.bremseVorn), muR * (p.super ? 0.6 : 0.98) * bg);
       } else if (a.gas <= 0) {
         // steht das Auto, heißt Bremse: Rückwärtsgang (bis zum Rückwärts-Tempo "rueck")
         Fx = -a.brems * p.schubMax * 0.7 * Math.max(0, Math.min(1, (p.rueck + u) / (p.rueck * 0.25)));
@@ -169,7 +174,7 @@ export function schritt(a, T, dt) {
     const alF = a.lenk * sgn - Math.atan2(v + p.a * r, us);
     const alR = -Math.atan2(v - p.b * r, us);
     // Haftkreis: was zum Bremsen/Ziehen gebraucht wird, fehlt für die Kurve
-    const lfx = Fbf + Math.abs(Fxf), lrx = Math.abs(Fx) + Fbr;
+    const lfx = Fbf / bg + Math.abs(Fxf), lrx = Math.abs(Fx) + Fbr / bg;
     const DF = Math.sqrt(Math.max(0, muF * muF - lfx * lfx));
     const DR = Math.sqrt(Math.max(0, muR * muR - lrx * lrx));
     // Ganz langsam rollt das Auto einfach dorthin, wohin die Räder zeigen (siehe unten "leicht").
@@ -188,6 +193,27 @@ export function schritt(a, T, dt) {
     let du = (Fx + Fxf * cs - Fb - Fd - Fyf * sn) / p.masse + v * r;
     let dv = (Fyf * cs + Fxf * sn + Fyr) / p.masse - u * r;
     let dr = (p.a * (Fyf * cs + Fxf * sn) - p.b * Fyr) / p.traeg;
+    // Schleuderschutz (wie ESP im echten Auto): Dreht sich das Auto schneller, als die Räder lenken,
+    // oder rutscht das Heck zu weit zur Seite, dreht ein Gegen-Moment es zurück und es bremst ein wenig.
+    // Ein bisschen Driften (bis "beta") bleibt erlaubt. Ausgeschaltet zusammen mit der Traktionskontrolle.
+    if (p.esp && a.tc !== false && au > 4) {
+      const E = p.esp;
+      const rLenk = u * Math.tan(a.lenk) / L;                            // so schnell wollen die Räder drehen
+      const rGrip = (muF + muR) / p.masse / au * 1.08;                    // so schnell geht es höchstens mit der Haftung
+      const rZiel = Math.max(-rGrip, Math.min(rGrip, rLenk));
+      const beta = Math.atan2(v, au);                                     // wie schräg das Auto rutscht (plus = Heck nach rechts)
+      let korr = 0;
+      // dreht zu schnell in dieselbe Richtung (Heck kommt)
+      if (r * rZiel >= 0 && Math.abs(r) > Math.abs(rZiel)) korr -= (r - rZiel) * E.dreh;
+      else if (r * rZiel < 0) korr -= r * E.dreh;                         // dreht gegen die Lenkung
+      // rutscht zu schräg: Nase in Fahrtrichtung drehen
+      const zuviel = Math.abs(beta) - E.beta;
+      if (zuviel > 0) korr += Math.sign(beta) * zuviel * E.dreh * 6;
+      const grenze = E.dreh * 1.2;
+      korr = Math.max(-grenze, Math.min(grenze, korr));
+      dr += korr;
+      du -= Math.abs(korr) * E.quer;                                      // ESP bremst dabei einzelne Räder
+    }
     a.ax = du - v * r;
 
     a.u += du * h; a.v += dv * h; a.r += dr * h;

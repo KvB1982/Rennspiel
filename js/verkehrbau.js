@@ -86,13 +86,14 @@ export class VerkehrBild {
       szene.add(k, l);
       this.gruppen.push({ liste, k, l });
     }
-    this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.p = new THREE.Vector3(); this.e = new THREE.Vector3(1, 1, 1); this.Y = new THREE.Vector3(0, 1, 0);
+    this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.p = new THREE.Vector3(); this.e = new THREE.Vector3(1, 1, 1); this.eu = new THREE.Euler(0, 0, 0, 'YXZ');
   }
   update() {
-    const { m4, q, p, e, Y } = this;
+    const { m4, q, p, e, eu } = this;
     for (const { liste, k, l } of this.gruppen) {
       liste.forEach((t, i) => {
-        q.setFromAxisAngle(Y, t.h); p.set(t.x, t.y, t.z);
+        // weggeschleuderte Autos kippen und nicken ein wenig (kipp, nick)
+        eu.set(t.nick || 0, t.h, t.kipp || 0); q.setFromEuler(eu); p.set(t.x, t.y, t.z);
         m4.compose(p, q, e); k.setMatrixAt(i, m4); l.setMatrixAt(i, m4);
       });
       k.instanceMatrix.needsUpdate = true; l.instanceMatrix.needsUpdate = true;
