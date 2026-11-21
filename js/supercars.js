@@ -20,10 +20,11 @@ const BASIS = {
   widerstand: 0.75,                 // Luftwiderstand (Fläche mal Beiwert, m²)
   rollen: 0.013,
   bremse: 1.0, bremseVorn: 0.68,
+  zugGriff: 1.7, schub: 1.35,       // kräftiger Antritt: Reifen halten längs mehr aus, Motor zieht 1,35-mal so stark (Spiel-Werte)
   bremsGriff: 1.9,                 // kräftige Spiel-Bremse: längs halten die Reifen mehr aus als zur Seite
   esp: { beta: 0.14, dreh: 9, quer: 0.5 },   // Schleuderschutz: bis etwa 8° Driften ist erlaubt, dann fängt er das Auto
   lenkMax: 0.5, lenkTempo: 22,
-  lenkGriff: 1.35, lenkDazu: 0.012,   // Übersetzung des Lenkrads (siehe lenkGrenze in physik.js)
+  lenkGriff: 1.35, lenkDazu: 0.05,   // Schutz vor zu starkem Einlenken (siehe lenkSchutz in physik.js)
   gaenge: 7, drehzahlMax: 8500, rueck: 8, abregeln: true,
   schritte: 8, unten: 3,
   tcRest: 0.82,                     // Traktionskontrolle lässt mehr Haftung für die Kurve übrig als beim Rennwagen
