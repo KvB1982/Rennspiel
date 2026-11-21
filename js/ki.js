@@ -145,7 +145,7 @@ export function tempoPlan(T, kr, p, sicher = 0.9) {
     for (let k = 0; k < 2 * n; k++) {
       const i = k % n, j = (k + 1) % n;
       const vi = Math.max(v[i], 1);
-      const zug = Math.min(p.leistung / (p.masse * vi), p.schubMax / p.masse, mu * (G + q * vi * vi) * 0.55) - wid * vi * vi;
+      const zug = Math.min(p.leistung / (p.masse * vi) * (p.schub || 1), p.schubMax / p.masse * (p.schub || 1), mu * (G + q * vi * vi) * 0.55 * Math.min(p.zugGriff || 1, 1.3)) - wid * vi * vi;
       v[j] = Math.min(v[j], Math.sqrt(Math.max(0, v[i] * v[i] + 2 * Math.max(0, zug) * ds)));
     }
   }

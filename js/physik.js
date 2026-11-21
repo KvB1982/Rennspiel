@@ -26,13 +26,14 @@ export const AUTOS = {
     abtrieb: 3.6, abtriebVorn: 0.44,  // Flügel: Abtrieb (Fläche mal Beiwert), Anteil vorn
     widerstand: 1.35,                 // Luftwiderstand (Fläche mal Beiwert)
     rollen: 0.015,
-    leistung: 610000, schubMax: 10000, // Watt, größte Zugkraft
+    leistung: 780000, schubMax: 15000, // Watt, größte Zugkraft (kräftiger als echt: soll nach vorn reißen)
+    zugGriff: 1.9,                    // beim Beschleunigen halten die Reifen längs mehr aus (Spiel-Wert: kräftiger Antritt)
     bremse: 1.1, bremseVorn: 0.6,     // Bremse (Anteil der Haftung), Anteil vorn
     bremsGriff: 1.25,                 // beim Bremsen halten die Reifen längs mehr aus als zur Seite (Spiel-Wert: kräftigere Bremse)
     esp: { beta: 0.1, dreh: 6, quer: 0.4 },   // Schleuderschutz (siehe unten)
     lenkMax: 0.42, lenkTempo: 32,     // größter Lenkeinschlag (rad); ab diesem Tempo (m/s) lenkt man weniger
-    lenkGriff: 1.3, lenkDazu: 0.035,   // Übersetzung des Lenkrads (siehe lenkGrenze)
-    gaenge: 8, drehzahlMax: 12500, vMax: 92, rueck: 14,
+    lenkGriff: 1.3, lenkDazu: 0.035,   // Schutz vor zu starkem Einlenken (siehe lenkSchutz)
+    gaenge: 8, drehzahlMax: 12500, vMax: 96, rueck: 14,
     schritte: 8, unten: 3,
   },
   // Ferngesteuertes Auto im Maßstab 1:30. Das Tempo ist mit heruntergerechnet:
@@ -98,14 +99,15 @@ export function neuesAuto(art = 'f1', tempo = 0) {
 const reifen = (al, D, B, C) => D * Math.sin(C * Math.atan(B * al));
 
 // Größter Lenkeinschlag bei diesem Tempo (bei hohem Tempo lenkt man feiner)
-// Große Autos (lenkGriff gesetzt): Das Lenkrad ist bei jedem Tempo so übersetzt, dass voller Ausschlag
-// ungefähr die engste Kurve ergibt, die die Reifen bei diesem Tempo gerade noch schaffen (mal lenkGriff, plus lenkDazu
-// für den Schräglauf der Reifen). So nutzt man den ganzen Weg des Lenkrads, und eine kleine Bewegung
-// wirft das Auto bei hohem Tempo nicht gleich von der Strecke.
-export const lenkGrenze = (p, u) => {
-  if (!p.lenkGriff) return p.lenkMax / (1 + (Math.abs(u) / p.lenkTempo) ** 2);
+export const lenkGrenze = (p, u) => p.lenkMax / (1 + (Math.abs(u) / p.lenkTempo) ** 2);
+// Schutz vor zu starkem Einlenken (große Autos, lenkGriff gesetzt): Mehr Lenkeinschlag als die engste Kurve, die die Reifen
+// bei diesem Tempo gerade noch schaffen (mal lenkGriff, plus lenkDazu für den Schräglauf), bringt nichts –
+// die Vorderräder würden nur rutschen und das Auto geradeaus von der Strecke schieben. Deshalb ist dort Schluss.
+// Bis dahin lenkt das Auto so direkt wie immer.
+export const lenkSchutz = (p, u) => {
+  if (!p.lenkGriff) return Infinity;
   const quer = p.haft * (G + 0.5 * LUFT * p.abtrieb * u * u / p.masse);   // so viel Kurvenkraft geht höchstens (m/s²)
-  return Math.min(p.lenkMax, p.lenkGriff * (p.a + p.b) * quer / Math.max(u * u, 1) + p.lenkDazu);
+  return p.lenkGriff * (p.a + p.b) * quer / Math.max(u * u, 1) + p.lenkDazu;
 };
 
 // Einen Zeitschritt rechnen. T = Strecke (für Untergrund, Höhe, Begrenzung).
@@ -123,7 +125,8 @@ export function schritt(a, T, dt) {
   const gr = GRUND[a.grund] || GRUND[BELAG.asphalt];
 
   // Lenkrad dreht nicht sofort: die Vorderräder folgen dem Wunsch schnell, aber weich
-  const ziel = a.lenkWunsch * lenkGrenze(p, a.u);
+  const schutz = lenkSchutz(p, a.u);
+  const ziel = Math.max(-schutz, Math.min(schutz, a.lenkWunsch * lenkGrenze(p, a.u)));
   a.lenk += (ziel - a.lenk) * Math.min(1, dt * 14);
 
   let maxRutschV = 0, maxRutschH = 0;
@@ -144,7 +147,7 @@ export function schritt(a, T, dt) {
     // Antrieb und Bremse
     let Fx = 0, Fbf = 0, Fbr = 0;
     if (a.gas > 0 && u > -0.5) {
-      Fx = a.gas * Math.min(p.schubMax, p.leistung / Math.max(au, 1));
+      Fx = a.gas * Math.min(p.schubMax, p.leistung / Math.max(au, 1)) * (p.schub || 1);
       // kleine Autos: Der Motor dreht nicht höher, kurz vor dem Höchsttempo lässt der Schub nach
       if (p.abregeln) Fx *= Math.max(0, Math.min(1, (p.vMax * 1.03 - u) / (p.vMax * 0.12)));
     }
@@ -170,10 +173,12 @@ export function schritt(a, T, dt) {
     const rest = p.tcRest || 0.93;
     const vz = p.allrad || 0;
     let Fxf = Fx * vz; Fx *= 1 - vz;
-    const zugGrenze = a.tc === false ? muR * 0.97 : Math.sqrt(Math.max(0, (muR * rest) ** 2 - (a.Fyr || 0) ** 2));
+    // zugGriff: Beim Beschleunigen halten die Reifen längs mehr aus als zur Seite (Spiel-Wert wie bremsGriff: kräftigerer Antritt)
+    const zg = p.zugGriff || 1;
+    const zugGrenze = (a.tc === false ? muR * 0.97 : Math.sqrt(Math.max(0, (muR * rest) ** 2 - (a.Fyr || 0) ** 2))) * zg;
     if (Math.abs(Fx) > zugGrenze) Fx = Math.sign(Fx) * zugGrenze;
     if (vz) {
-      const zugVorn = a.tc === false ? muF * 0.97 : Math.sqrt(Math.max(0, (muF * rest) ** 2 - (a.Fyf || 0) ** 2));
+      const zugVorn = (a.tc === false ? muF * 0.97 : Math.sqrt(Math.max(0, (muF * rest) ** 2 - (a.Fyf || 0) ** 2))) * zg;
       if (Math.abs(Fxf) > zugVorn) Fxf = Math.sign(Fxf) * zugVorn;
     }
 
@@ -183,7 +188,7 @@ export function schritt(a, T, dt) {
     const alF = a.lenk * sgn - Math.atan2(v + p.a * r, us);
     const alR = -Math.atan2(v - p.b * r, us);
     // Haftkreis: was zum Bremsen/Ziehen gebraucht wird, fehlt für die Kurve
-    const lfx = Fbf / bg + Math.abs(Fxf), lrx = Math.abs(Fx) + Fbr / bg;
+    const lfx = Fbf / bg + Math.abs(Fxf) / zg, lrx = Math.abs(Fx) / zg + Fbr / bg;
     const DF = Math.sqrt(Math.max(0, muF * muF - lfx * lfx));
     const DR = Math.sqrt(Math.max(0, muR * muR - lrx * lrx));
     // Ganz langsam rollt das Auto einfach dorthin, wohin die Räder zeigen (siehe unten "leicht").

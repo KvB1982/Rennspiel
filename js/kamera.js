@@ -58,7 +58,7 @@ export class Kamera {
       cam.up.set(Math.cos(a.h) * roll * 0.5, 1, -Math.sin(a.h) * roll * 0.5);
       cam.lookAt(vorX + ch * ex, a.y + (ey - (a.auge ? 1.2 : 1.6) - nick * 20) * sc, vorZ - sh * ex);
       cam.up.set(0, 1, 0);
-      const fov = 60 + speed * 6;
+      const fov = 60 + speed * 10;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
       cam.fov += (fov - cam.fov) * Math.min(1, dt * 3); cam.near = modell ? 0.002 : 0.05;
       cam.updateProjectionMatrix();
       this.frisch = false;
@@ -76,7 +76,7 @@ export class Kamera {
     // nicht unter die Fahrbahn
     cam.position.copy(this.pos); cam.position.x += zit(); cam.position.y += zit();
     cam.lookAt(a.x + rs * 3.5 * sc, a.y + (weit ? 0.3 : 0.75) * sc, a.z + rc * 3.5 * sc);
-    const fov = (weit ? 46 : 48) + speed * 9;
+    const fov = (weit ? 46 : 48) + speed * 15;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
     cam.fov += (fov - cam.fov) * Math.min(1, dt * 3);
     cam.near = modell ? 0.005 : 0.1;
     cam.updateProjectionMatrix();
