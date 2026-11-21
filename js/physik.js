@@ -27,20 +27,33 @@ export const AUTOS = {
     leistung: 610000, schubMax: 10000, // Watt, größte Zugkraft
     bremse: 1.1, bremseVorn: 0.6,     // Bremse (Anteil der Haftung), Anteil vorn
     lenkMax: 0.42, lenkTempo: 32,     // größter Lenkeinschlag (rad); ab diesem Tempo (m/s) lenkt man weniger
-    gaenge: 8, drehzahlMax: 12500, vMax: 92,
+    gaenge: 8, drehzahlMax: 12500, vMax: 92, rueck: 14,
     schritte: 8, unten: 3,
   },
+  // Ferngesteuertes Auto im Maßstab 1:30. Das Tempo ist mit heruntergerechnet:
+  // 3 m/s beim kleinen Auto sehen so schnell aus wie 325 km/h beim großen.
   modell: {
-    name: 'Modellauto 1:24',
+    name: 'Ferngesteuertes Auto 1:30',
     masse: 0.32, traeg: 0.00075,
     a: 0.055, b: 0.065, hoehe: 0.02,
-    haft: 1.15, hinten: 1.1, B: 8, C: 1.4,
-    abtrieb: 0, abtriebVorn: 0.45, widerstand: 0.0015, rollen: 0.03,
-    leistung: 9, schubMax: 3.2,
-    bremse: 1.0, bremseVorn: 0.5,
-    lenkMax: 0.5, lenkTempo: 4.5,
-    gaenge: 1, drehzahlMax: 30000, vMax: 6.5,
+    haft: 1.0, hinten: 1.12, B: 8, C: 1.4,
+    abtrieb: 0, abtriebVorn: 0.45, widerstand: 0.0015,
+    rollen: 0.008, motorBremse: 0.22,   // rollt ohne Gas weich aus (Motorbremse wächst mit dem Tempo)
+    leistung: 2.2, schubMax: 0.9,
+    bremse: 0.55, bremseVorn: 0.55,
+    lenkMax: 0.5, lenkTempo: 2.6,
+    gaenge: 1, drehzahlMax: 30000, vMax: 2.3, abregeln: true, rueck: 0.7,
     schritte: 16, unten: 0.35,
+  },
+  // Slotcar: fährt im Schlitz der Bahn, gerechnet in slot.js. Hier stehen nur die Werte.
+  slot: {
+    name: 'Slotcar 1:30',
+    a: 0.055, b: 0.065, vMax: 3.0,
+    zug: 5.5,          // Beschleunigung bei Vollgas aus dem Stand (m/s²)
+    rollen: 1.6,       // so stark bremst das Auto von selbst, wenn man das Gas loslässt (m/s²)
+    bremse: 7,         // Bremse (m/s²)
+    haft: 8,           // so viel Kurvenkraft hält das Auto im Schlitz (m/s²) – darüber fliegt es raus
+    gaenge: 1, drehzahlMax: 30000,
   },
 };
 
@@ -52,9 +65,12 @@ const GRUND = {
   [BELAG.kies]: { haft: 0.42, zieh: 0.55 },
 };
 
-export function neuesAuto(art = 'f1') {
+// tempo: eigenes Höchsttempo (m/s) für die kleinen Autos (im Menü einstellbar)
+export function neuesAuto(art = 'f1', tempo = 0) {
+  const p = { ...AUTOS[art] };
+  if (tempo > 0) { if (p.leistung) p.leistung *= tempo / p.vMax; p.vMax = tempo; }
   return {
-    p: AUTOS[art], art,
+    p, art,
     x: 0, z: 0, y: 0, h: 0,      // Ort und Blickrichtung
     u: 0, v: 0, r: 0,             // Tempo vorwärts, seitwärts, Drehen
     lenk: 0,                       // Lenkeinschlag der Vorderräder (rad)
@@ -106,14 +122,19 @@ export function schritt(a, T, dt) {
 
     // Antrieb und Bremse
     let Fx = 0, Fbf = 0, Fbr = 0;
-    if (a.gas > 0 && u > -0.5) Fx = a.gas * Math.min(p.schubMax, p.leistung / Math.max(au, 1));
+    if (a.gas > 0 && u > -0.5) {
+      Fx = a.gas * Math.min(p.schubMax, p.leistung / Math.max(au, 1));
+      // kleine Autos: Der Motor dreht nicht höher, kurz vor dem Höchsttempo lässt der Schub nach
+      if (p.abregeln) Fx *= Math.max(0, Math.min(1, (p.vMax * 1.03 - u) / (p.vMax * 0.12)));
+    }
     const muF = mu * Fzf, muR = muH * Fzr;
     if (a.brems > 0) {
       if (u > 0.3) {
         const Fb = a.brems * p.bremse * (muF + muR);
         Fbf = Math.min(Fb * p.bremseVorn, muF * 0.98); Fbr = Math.min(Fb * (1 - p.bremseVorn), muR * 0.98);
       } else if (a.gas <= 0) {
-        Fx = -a.brems * p.schubMax * 0.35;   // fast stehend: Bremse = rückwärts fahren
+        // steht das Auto, heißt Bremse: Rückwärtsgang (bis zum Rückwärts-Tempo "rueck")
+        Fx = -a.brems * p.schubMax * 0.45 * Math.max(0, Math.min(1, (p.rueck + u) / (p.rueck * 0.25)));
       }
     }
     if (u < -0.3 && a.gas > 0) { Fbf = Math.min(a.gas * muF * 0.5, muF); Fbr = Math.min(a.gas * muR * 0.5, muR); }
@@ -138,7 +159,8 @@ export function schritt(a, T, dt) {
     maxRutschH = Math.max(maxRutschH, Math.abs(alR) * p.B / 1.6, lrx / (muR + 1e-9));
 
     // Luftwiderstand, Rollwiderstand, Untergrund
-    const Fd = 0.5 * LUFT * p.widerstand * u * au + p.rollen * p.masse * G * Math.sign(u) + gr.zieh * p.masse * G * Math.sign(u) * Math.min(1, au / 2);
+    const Fd = 0.5 * LUFT * p.widerstand * u * au + p.rollen * p.masse * G * Math.sign(u) + gr.zieh * p.masse * G * Math.sign(u) * Math.min(1, au / 6)
+      + (p.motorBremse || 0) * p.masse * u * (a.gas > 0 ? 0 : 1);
     const Fb = (Fbf + Fbr) * Math.sign(u) * Math.min(1, au / 0.3);
     const cs = Math.cos(a.lenk), sn = Math.sin(a.lenk);
     let du = (Fx - Fb - Fd - Fyf * sn) / p.masse + v * r;

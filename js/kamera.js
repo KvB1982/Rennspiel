@@ -5,6 +5,7 @@
 //   stand    = Modellauto: du stehst an einer Stelle neben der Bahn und drehst nur den Kopf
 
 import * as THREE from 'three';
+import { MASSSTAB } from './strecke.js';
 
 export const SICHTEN = { hinten: 'Hinter dem Auto', weit: 'Hinter dem Auto (weit)', cockpit: 'Im Cockpit', stand: 'Neben der Bahn stehen' };
 
@@ -21,7 +22,7 @@ export class Kamera {
   setze(modus) { this.modus = modus; this.frisch = true; }
 
   update(dt, a, { modell = false, standorte = [] } = {}) {
-    const cam = this.cam, sc = modell ? 0.12 / 3.6 : 1;
+    const cam = this.cam, sc = modell ? MASSSTAB : 1;
     const sh = Math.sin(a.h), ch = Math.cos(a.h);
     const speed = Math.abs(a.u) / a.p.vMax;
     // Wackeln auf Randsteinen und bei Stößen
@@ -37,7 +38,7 @@ export class Kamera {
       cam.lookAt(this.blick);
       // Je weiter das Auto weg ist, desto mehr "kneift man die Augen zusammen" (leicht heranholen)
       const ab = cam.position.distanceTo(ziel);
-      const fov = THREE.MathUtils.clamp(18 + ab * 7, 24, 46);
+      const fov = THREE.MathUtils.clamp(6 + ab * 4.2, 12, 34);
       cam.fov += (fov - cam.fov) * (this.frisch ? 1 : 1 - Math.exp(-dt * 2));
       cam.updateProjectionMatrix();
       this.frisch = false;

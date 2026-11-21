@@ -8,14 +8,15 @@
 // und wo man vorher bremsen muss. Danach richten sich die Computerfahrer – und die Bremshilfe für dich.
 
 import { lenkGrenze } from './physik.js';
+import { MASSSTAB } from './strecke.js';
 
 const G = 9.81, LUFT = 1.2;
 
 export function ideallinie(T, p) {
   const n = T.n;
-  const schritt = Math.max(1, Math.round((T.def.modell ? 0.1 : 10) / T.ds));
+  const schritt = Math.max(1, Math.round((T.def.modell ? 0.25 : 10) / T.ds));
   const m = Math.floor(n / schritt);
-  const rand = T.def.modell ? 0.035 : 1.6;
+  const rand = T.def.modell ? 0.06 : 1.6;
   const cx = [], cz = [], nx = [], nz = [], lim = [];
   for (let j = 0; j < m; j++) {
     const i = j * schritt;
@@ -88,8 +89,9 @@ export function neuerFahrer(staerke = 0.95, mut = 0.5) {
 
 // Lenkung zu einer Stelle auf der Ideallinie (auch für die Lenkhilfe des Spielers)
 export function lenkZurLinie(a, T, L, extra = 0, vorausMal = 1) {
-  const p = a.p, sc = T.def.modell ? 0.012 : 1;
-  const voraus = Math.max(7 * sc, (0.45 * Math.abs(a.u) + 4 * sc) * vorausMal);
+  const p = a.p, sc = T.def.modell ? MASSSTAB : 1;
+  // kleine Autos fahren (für ihre Größe) viel engere Kurven: sie schauen weniger weit voraus
+  const voraus = Math.max(7 * sc, ((T.def.modell ? 0.2 : 0.45) * Math.abs(a.u) + 4 * sc) * vorausMal);
   const i = T.index(a.s + voraus);
   const tx = L.lx[i] + T.tz[i] * extra, tz = L.lz[i] - T.tx[i] * extra;
   const dx = tx - a.x, dz = tz - a.z;
@@ -103,8 +105,8 @@ export function lenkZurLinie(a, T, L, extra = 0, vorausMal = 1) {
 
 // Fahrer entscheidet: lenken, Gas, Bremse. andere = alle Autos im Rennen (für Überholen)
 export function fahren(f, a, T, L, andere, dt) {
-  const p = a.p, sc = T.def.modell ? 0.012 : 1;
-  const hbRand = T.hb[Math.max(0, a.idx)] - (T.def.modell ? 0.04 : 2);
+  const p = a.p, sc = T.def.modell ? MASSSTAB : 1;
+  const hbRand = T.hb[Math.max(0, a.idx)] - (T.def.modell ? 0.06 : 2);
   // Überholen: Ist vorn jemand langsamer auf meiner Linie? Dann daneben vorbei.
   let bremsWegen = Infinity;
   f.extraZiel = 0;

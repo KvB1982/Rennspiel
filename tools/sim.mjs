@@ -10,8 +10,8 @@ let fehler = 0;
 for (const def of STRECKEN) {
   if (nur && def.id !== nur) continue;
   const T = baueStrecke(def);
-  const art = def.modell ? 'modell' : 'f1';
-  const R = new Rennen(T, { modus: 'rennen', runden: +runden, gegner: +gegner, staerke, art, mitSpieler: false });
+  const art = def.slot ? 'slot' : def.modell ? 'modell' : 'f1';
+  const R = new Rennen(T, { modus: 'rennen', runden: +runden, gegner: def.modell ? Math.min(3, +gegner) : +gegner, staerke, art, mitSpieler: false });
   const dt = 1 / 60;
   let wand = 0, neben = 0, maxV = 0, schritte = 0;
   const grenze = 60 * 60 * 15;
@@ -24,8 +24,9 @@ for (const def of STRECKEN) {
     }
     schritte++;
   }
-  const ideal = R.L.tempo.reduce((s, v) => s + T.ds / Math.max(v, 0.1), 0);
-  console.log(`\n${def.name} (${Math.round(T.laenge * 100) / 100} m) – Plan-Runde ${zeitText(ideal)}, Spitze ${Math.round(maxV * 3.6)} km/h, Wandkontakte ${wand}, Bilder neben der Strecke ${neben}, Zeit ${Math.round(schritte / 60)} s`);
+  const raus = R.autos.reduce((s, c) => s + (c.slot ? c.slot.zahl : 0), 0);
+  const ideal = (R.L ? R.L.tempo : R.plan[0]).reduce((s, v) => s + T.ds / Math.max(v, 0.1), 0);
+  console.log(`\n${def.name} (${Math.round(T.laenge * 100) / 100} m) – Plan-Runde ${zeitText(ideal)}, Spitze ${Math.round(maxV * 3.6)} km/h, Wandkontakte ${wand}, Bilder neben der Strecke ${neben}, Zeit ${Math.round(schritte / 60)} s${def.slot ? ', rausgeflogen ' + raus + '-mal' : ''}`);
   for (const c of R.reihenfolge) console.log(`  ${String(c.platz).padStart(2)}. ${c.name.padEnd(16)} Stärke ${c.fahrer.staerke.toFixed(3)}  Ziel ${zeitText(c.ziel)}  beste ${zeitText(c.beste)}  Runden ${c.zeiten.map(z => z.t.toFixed(2)).join(' ')}`);
   if (R.phase !== 'fertig') { console.log('  !! Rennen nicht fertig geworden'); fehler++; }
 }

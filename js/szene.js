@@ -5,6 +5,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { baueWelt, gummiAuftragen, stimmung } from './streckebau.js';
 import { baueAuto, autoStellen } from './autobau.js';
+import { MASSSTAB } from './strecke.js';
 
 export class Buehne {
   constructor(canvas, qualitaet = 'hoch') {
@@ -67,13 +68,13 @@ export class Buehne {
     licht.castShadow = r.shadowMap.enabled;
     const sm = this.qualitaet === 'hoch' ? 2048 : 1024;
     licht.shadow.mapSize.set(sm, sm);
-    const sc = modell ? 4.5 : 70;
+    const sc = modell ? 6 : 70;
     Object.assign(licht.shadow.camera, { left: -sc, right: sc, top: sc, bottom: -sc, near: modell ? 0.5 : 10, far: modell ? 30 : 600 });
     licht.shadow.bias = -0.0004; licht.shadow.normalBias = modell ? 0.002 : 0.05;
     s.add(licht, licht.target);
     if (modell) {
       // Deckenlampe
-      const pl = new THREE.PointLight(0xffe2b8, 6, 9, 1.5); pl.position.set(0, 2.5, 0); s.add(pl); this.decke = pl;
+      const pl = new THREE.PointLight(0xffe2b8, 8, 14, 1.4); pl.position.set(0, 2.5, 0); s.add(pl); this.decke = pl;
     }
 
     // Strecke und Landschaft
@@ -88,12 +89,12 @@ export class Buehne {
 
     // Autos
     this.autos = autos.map(c => {
-      const m = baueAuto({ farbe: c.farbe, zweit: c.zweit, num: c.nummer, massstab: modell ? 0.12 / 3.6 : 1 });
+      const m = baueAuto({ farbe: c.farbe, zweit: c.zweit, num: c.nummer, massstab: modell ? MASSSTAB : 1 });
       s.add(m.gruppe);
       return { c, m };
     });
     // Geist (durchsichtiges Auto der Bestrunde)
-    const g = this.geist = baueAuto({ farbe: 0x9fe8ff, zweit: 0xffffff, num: 0, massstab: modell ? 0.12 / 3.6 : 1 });
+    const g = this.geist = baueAuto({ farbe: 0x9fe8ff, zweit: 0xffffff, num: 0, massstab: modell ? MASSSTAB : 1 });
     g.gruppe.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.32; o.material.depthWrite = false; o.castShadow = false; } });
     g.gruppe.visible = false;
     s.add(g.gruppe);
@@ -107,6 +108,7 @@ export class Buehne {
       autoStellen(m, c.a, this.uhr);
       const imAuto = ichSicht === c;
       m.helm[0].visible = m.helm[1].visible = !imAuto;
+      for (const h of m.halo) h.visible = !imAuto;   // der Bügel wäre sonst genau vor den Augen
     }
     // Geist
     if (geistLage) {

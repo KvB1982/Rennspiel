@@ -2,6 +2,8 @@
 // (ohne three.js, auch in node testbar).
 
 import { neuesAuto, schritt, aufStrecke } from './physik.js';
+import { MASSSTAB } from './strecke.js';
+import { slotStellen, slotSchritt, slotStoesse, slotFahren, slotPlan } from './slot.js';
 import { ideallinie, neuerFahrer, fahren, bremsHilfe, lenkZurLinie } from './ki.js';
 
 // Ausgedachte Rennställe und Fahrer (keine echten Teams, Farben frei gewählt)
@@ -23,11 +25,14 @@ export const FAHRER = ['Tom Kessler', 'Rafa Moretti', 'Jun Takeda', 'Aiden Cole'
 export const STAERKE = { leicht: [0.8, 0.86], mittel: [0.87, 0.93], schwer: [0.93, 0.985] };
 
 export class Rennen {
-  // modus: 'zeit' (allein gegen die Uhr) oder 'rennen'. art: 'f1' oder 'modell'.
-  constructor(T, { modus = 'rennen', runden = 3, gegner = 7, staerke = 'mittel', art = 'f1', spielerFarbe = 0, name = 'Du', mitSpieler = true } = {}) {
+  // modus: 'zeit' (allein gegen die Uhr) oder 'rennen'. art: 'f1', 'modell' oder 'slot'. tempo: Höchsttempo der kleinen Autos (m/s).
+  constructor(T, { modus = 'rennen', runden = 3, gegner = 7, staerke = 'mittel', art = 'f1', spielerFarbe = 0, name = 'Du', mitSpieler = true, tempo = 0 } = {}) {
     this.T = T; this.modus = modus; this.runden = runden; this.art = art;
-    this.sc = T.def.modell ? 0.012 : 1;
-    this.L = ideallinie(T, neuesAuto(art).p);
+    this.sc = T.def.modell ? MASSSTAB : 1;
+    this.slot = art === 'slot';
+    const muster = neuesAuto(art, tempo).p;
+    this.L = this.slot ? null : ideallinie(T, muster);
+    this.plan = this.slot ? slotPlan(T, muster) : null;
     this.autos = [];
     this.zeit = 0;           // Sekunden seit dem Start (grünes Licht)
     this.uhr = 0;            // Sekunden seit dem Laden
@@ -43,16 +48,19 @@ export class Rennen {
     // Startaufstellung: hinter der Linie, versetzt links und rechts, alle 8 m (beim Modellauto passend kleiner)
     const reihe = 8 * this.sc, seite = Math.min(3, T.hb[0] * 0.45) * (this.sc === 1 ? 1 : 1 / 3);
     const slots = [];
-    for (let k = 0; k <= anzahl; k++) slots.push({ s: T.laenge - 6 * this.sc - k * reihe, d: (k % 2 ? -1 : 1) * (T.def.modell ? T.hb[0] * 0.45 : seite) });
+    for (let k = 0; k <= anzahl; k++) slots.push(this.slot
+      ? { s: T.laenge - 0.12 - Math.floor(k / 2) * 0.3, d: k % 2 ? -1 : 1 }      // Slotcar: zwei Spuren, immer zwei nebeneinander
+      : { s: T.laenge - 6 * this.sc - k * reihe, d: (k % 2 ? -1 : 1) * (T.def.modell ? T.hb[0] * 0.45 : seite) });
     // Spieler startet in der Mitte des Feldes (Rennen) oder ein Stück vor der Linie (Zeitfahren)
     const meinPlatz = modus === 'zeit' ? -1 : Math.min(anzahl, Math.floor(anzahl * 0.6));
     const teams = TEAMS.filter((_, i) => i !== spielerFarbe);
     let k = 0;
     for (let platz = 0; platz <= anzahl; platz++) {
       if (!mitSpieler && platz === meinPlatz) continue;
-      const a = neuesAuto(art);
+      const a = neuesAuto(art, tempo);
       const ich = platz === meinPlatz || (modus === 'zeit' && platz === 0);
-      if (modus === 'zeit') aufStrecke(a, T, T.laenge - 150 * this.sc, 0);
+      if (this.slot) { /* wird unten in die Spur gesetzt */ }
+      else if (modus === 'zeit') aufStrecke(a, T, T.laenge - (T.def.modell ? 1.5 : 150), 0);
       else aufStrecke(a, T, slots[platz].s, slots[platz].d);
       const team = ich ? TEAMS[spielerFarbe] : teams[k % teams.length];
       const st = lo + (hi - lo) * (anzahl > 1 ? (k / (anzahl - 1)) : 0.5);
@@ -62,9 +70,10 @@ export class Rennen {
         runde: 0, rundeStart: 0, letzte: null, beste: null, zeiten: [], ziel: null, gueltig: true, prevS: a.s || slots[platz]?.s || 0,
         fortschritt: 0, platz: 0, aus: 0,
       });
+      if (this.slot) slotStellen(this.autos[this.autos.length - 1], T, modus === 'zeit' ? T.laenge - 1.5 : slots[platz].s, modus === 'zeit' ? 1 : slots[platz].d);
       if (!ich) k++;
     }
-    for (const c of this.autos) { const f = T.finde(c.a.x, c.a.z, -1); c.a.idx = f.i; c.a.s = f.s; c.prevS = f.s; }
+    for (const c of this.autos) { if (!this.slot) { const f = T.finde(c.a.x, c.a.z, -1); c.a.idx = f.i; c.a.s = f.s; } c.prevS = c.a.s; }
     this.ich = this.autos.find(c => c.ich) || null;
     this.geist = { punkte: [], takt: 0 };   // laufende Runde (Spieler) für einen neuen Geist
     this.bestProS = null;                   // Zeit je Abschnitt der besten Runde (für die Plus/Minus-Anzeige)
@@ -83,6 +92,7 @@ export class Rennen {
     } else if (this.phase !== 'pause') this.zeit += dt;
 
     const steht = this.phase === 'ampel';
+    if (this.slot) { this.slotUpdate(dt, eingabe, steht); this.runden_zaehlen(); this.plaetze(); return; }
     for (const c of this.autos) {
       const a = c.a;
       if (c.ich) {
@@ -106,6 +116,25 @@ export class Rennen {
     this.zusammenstoesse();
     this.runden_zaehlen();
     this.plaetze();
+  }
+
+  // Slotcar-Rennen: nur Gas und Spurwechsel
+  slotUpdate(dt, eingabe, steht) {
+    const T = this.T;
+    for (const c of this.autos) {
+      const a = c.a;
+      if (c.ich && !(c.ziel !== null && this.modus === 'rennen')) {
+        a.gas = eingabe.gas; a.brems = eingabe.brems; a.lenkWunsch = eingabe.lenk; c.slot.wunsch = 0;
+      } else {
+        if (c.ich && !c.auslauf) c.auslauf = neuerFahrer(0.8);
+        slotFahren(c, T, this.plan, this.autos, dt);
+        if (c.ziel !== null) a.gas = Math.min(a.gas, 0.4);
+      }
+      if (steht) { a.u = 0; a.drehzahl = 2000 + a.gas * 9000; continue; }
+      if (slotSchritt(c, T, dt, this.autos) === 'raus' && c.ich) this.melden('Zu schnell – rausgeflogen!', 'warn');
+    }
+    const st = slotStoesse(this.autos, T);
+    if (st > 0.3) this.beruehrt = Math.max(this.beruehrt || 0, st * 4);
   }
 
   zusammenstoesse() {
@@ -145,7 +174,7 @@ export class Rennen {
       const vor = c.prevS > Lg * 0.75 && s < Lg * 0.25;
       const zurueckUeber = c.prevS < Lg * 0.25 && s > Lg * 0.75;
       // Strecke verlassen (alle vier Räder neben der Fahrbahn): Runde zählt im Zeitfahren nicht
-      if (c.ich && this.modus === 'zeit' && c.runde > 0 && Math.abs(c.a.d) > T.hb[c.a.idx] + 1.6 * this.sc + (T.kerbL[c.a.idx] || T.kerbR[c.a.idx] ? 1.2 * this.sc : 0)) {
+      if (!this.slot && c.ich && this.modus === 'zeit' && c.runde > 0 && Math.abs(c.a.d) > T.hb[c.a.idx] + 1.6 * this.sc + (T.kerbL[c.a.idx] || T.kerbR[c.a.idx] ? 1.2 * this.sc : 0)) {
         if (c.gueltig) this.melden('Strecke verlassen – Runde zählt nicht', 'warn');
         c.gueltig = false;
       }

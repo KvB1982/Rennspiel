@@ -42,13 +42,40 @@ export const STRECKEN = [
     welt: { art: 'hafen', zeit: 'abend' },
   },
   {
-    id: 'zimmer', name: 'Wohnzimmer-Bahn', ort: 'Modellauto auf dem Teppich',
-    text: 'Eine Kunststoff-Rennbahn auf dem Wohnzimmerboden. Du stehst daneben und lenkst das kleine Auto aus der Ferne.',
-    modell: true, ds: 0.02, breite: 0.24, glatt: 12, kerbAb: 1 / 0.6,
-    aus: 'asphalt', grasBreite: 0.07,
+    id: 'wohnzimmer', name: 'Wohnzimmer-Ring', ort: 'Ferngesteuertes Auto auf dem Teppich',
+    text: 'Eine Rennstrecke aus Matten quer durchs Wohnzimmer. Du stehst daneben und lenkst das kleine Auto aus der Ferne.',
+    modell: true, ds: 0.03, breite: 0.46, glatt: 10, kerbAb: 1 / 1.4,
+    aus: 'asphalt', grasBreite: 0.12,
     ecken: [
-      [1.2, 0, 0.3], [1.2, 0.9, 0.3], [0.5, 0.9, 0.22], [0.3, 0.5, 0.2], [-0.2, 0.5, 0.2], [-0.4, 1.1, 0.3], [-1.3, 1.1, 0.3], [-1.3, 0, 0.3],
+      [3.5, 0, 0.75], [3.5, 2.12, 0.69], [1.94, 2.5, 0.56], [1.44, 1.31, 0.5], [0.19, 1.31, 0.5], [-0.31, 2.81, 0.62], [-2, 2.94, 0.62], [-2.5, 1.56, 0.53], [-3.62, 1.44, 0.56], [-3.62, 0, 0.75],
     ],
+    hoehe: [[0, 0]],
+    welt: { art: 'zimmer', zeit: 'drinnen' },
+  },
+  // Slotcar-Bahnen: zwei Spuren mit Schlitz. spur = Abstand einer Spur von der Mitte.
+  // weichen = Stellen (Anteil der Runde), an denen man die Spur wechseln kann.
+  {
+    id: 'slot_oval', name: 'Kinderzimmer-Kurs', ort: 'Slotcar-Bahn, 2 Spuren',
+    text: 'Zwei lange Geraden, eine enge Kehre und eine Schikane. Fünf Weichen zum Spurwechseln.',
+    modell: true, slot: true, spur: 0.05, ds: 0.02, breite: 0.2, glatt: 8, kerbAb: 1 / 1.2,
+    aus: 'asphalt', grasBreite: 0.02,
+    ecken: [
+      [2.5, 0, 0.42], [2.5, 1.3, 0.36], [1.2, 1.3, 0.3], [0.8, 0.6, 0.3], [-0.3, 0.6, 0.3], [-0.7, 1.5, 0.34], [-2.5, 1.5, 0.4], [-2.5, 0, 0.42],
+    ],
+    weichen: [0.05, 0.34, 0.485, 0.65, 0.89],
+    hoehe: [[0, 0]],
+    welt: { art: 'zimmer', zeit: 'drinnen' },
+  },
+  {
+    id: 'slot_gross', name: 'Großer Preis vom Teppich', ort: 'Slotcar-Bahn, 2 Spuren',
+    text: 'Lange Bahn mit schneller Geraden, weiten Bögen und drei engen Kurven. Acht Weichen.',
+    modell: true, slot: true, spur: 0.05, ds: 0.02, breite: 0.2, glatt: 8, kerbAb: 1 / 1.2,
+    aus: 'asphalt', grasBreite: 0.02,
+    ecken: [
+      [3.3, 0, 0.5], [3.3, 1.2, 0.34], [2.0, 1.2, 0.3], [2.0, 2.5, 0.38], [0.4, 2.5, 0.6], [-0.1, 1.0, 0.32],
+      [-1.2, 1.0, 0.3], [-1.5, 2.5, 0.4], [-3.3, 2.5, 0.55], [-3.3, 0, 0.5],
+    ],
+    weichen: [0.04, 0.272, 0.4, 0.48, 0.6, 0.68, 0.78, 0.9],
     hoehe: [[0, 0]],
     welt: { art: 'zimmer', zeit: 'drinnen' },
   },
