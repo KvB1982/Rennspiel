@@ -21,9 +21,9 @@ export const AUTOS = {
     masse: 800, traeg: 1100,          // kg, Trägheit beim Drehen
     a: 1.6, b: 2.0,                   // Abstand Schwerpunkt → Vorderachse / Hinterachse (m)
     hoehe: 0.3,                       // Höhe des Schwerpunkts
-    haft: 1.65, hinten: 1.1,          // wie gut die Reifen haften (ohne Flügel); hinten etwas besser
+    haft: 2.1, hinten: 1.05,          // wie gut die Reifen haften (ohne Flügel); hinten etwas besser. Mit Absicht mehr als echt: Das Auto soll in die Kurve beißen
     B: 9, C: 1.45,                    // Form der Reifenkurve
-    abtrieb: 3.6, abtriebVorn: 0.44,  // Flügel: Abtrieb (Fläche mal Beiwert), Anteil vorn
+    abtrieb: 5.2, abtriebVorn: 0.44,  // Flügel: Abtrieb (Fläche mal Beiwert), Anteil vorn
     widerstand: 1.35,                 // Luftwiderstand (Fläche mal Beiwert)
     rollen: 0.015,
     leistung: 780000, schubMax: 15000, // Watt, größte Zugkraft (kräftiger als echt: soll nach vorn reißen)
@@ -32,7 +32,6 @@ export const AUTOS = {
     bremsGriff: 1.25,                 // beim Bremsen halten die Reifen längs mehr aus als zur Seite (Spiel-Wert: kräftigere Bremse)
     esp: { beta: 0.1, dreh: 6, quer: 0.4 },   // Schleuderschutz (siehe unten)
     lenkMax: 0.42, lenkTempo: 32,     // größter Lenkeinschlag (rad); ab diesem Tempo (m/s) lenkt man weniger
-    lenkGriff: 1.3, lenkDazu: 0.035,   // Schutz vor zu starkem Einlenken (siehe lenkSchutz)
     gaenge: 8, drehzahlMax: 12500, vMax: 96, rueck: 14,
     schritte: 8, unten: 3,
   },
@@ -100,15 +99,6 @@ const reifen = (al, D, B, C) => D * Math.sin(C * Math.atan(B * al));
 
 // Größter Lenkeinschlag bei diesem Tempo (bei hohem Tempo lenkt man feiner)
 export const lenkGrenze = (p, u) => p.lenkMax / (1 + (Math.abs(u) / p.lenkTempo) ** 2);
-// Schutz vor zu starkem Einlenken (große Autos, lenkGriff gesetzt): Mehr Lenkeinschlag als die engste Kurve, die die Reifen
-// bei diesem Tempo gerade noch schaffen (mal lenkGriff, plus lenkDazu für den Schräglauf), bringt nichts –
-// die Vorderräder würden nur rutschen und das Auto geradeaus von der Strecke schieben. Deshalb ist dort Schluss.
-// Bis dahin lenkt das Auto so direkt wie immer.
-export const lenkSchutz = (p, u) => {
-  if (!p.lenkGriff) return Infinity;
-  const quer = p.haft * (G + 0.5 * LUFT * p.abtrieb * u * u / p.masse);   // so viel Kurvenkraft geht höchstens (m/s²)
-  return p.lenkGriff * (p.a + p.b) * quer / Math.max(u * u, 1) + p.lenkDazu;
-};
 
 // Einen Zeitschritt rechnen. T = Strecke (für Untergrund, Höhe, Begrenzung).
 export function schritt(a, T, dt) {
@@ -125,8 +115,7 @@ export function schritt(a, T, dt) {
   const gr = GRUND[a.grund] || GRUND[BELAG.asphalt];
 
   // Lenkrad dreht nicht sofort: die Vorderräder folgen dem Wunsch schnell, aber weich
-  const schutz = lenkSchutz(p, a.u);
-  const ziel = Math.max(-schutz, Math.min(schutz, a.lenkWunsch * lenkGrenze(p, a.u)));
+  const ziel = a.lenkWunsch * lenkGrenze(p, a.u);
   a.lenk += (ziel - a.lenk) * Math.min(1, dt * 14);
 
   let maxRutschV = 0, maxRutschH = 0;

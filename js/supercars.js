@@ -14,7 +14,7 @@ const BASIS = {
   super: true,
   a: 1.25, b: 1.45,                 // Abstand Schwerpunkt → Vorderachse / Hinterachse (m), Radstand 2,7 m
   hoehe: 0.45,
-  haft: 1.16, hinten: 1.08,         // Straßenreifen haften weniger als Rennreifen
+  haft: 1.16, hinten: 1.0,          // Straßenreifen haften weniger als Rennreifen; hinten nicht besser als vorn: So kommt das Heck in der Kurve herum (Driften)
   B: 8, C: 1.5,
   abtrieb: 0.5, abtriebVorn: 0.45,
   widerstand: 0.75,                 // Luftwiderstand (Fläche mal Beiwert, m²)
@@ -22,9 +22,8 @@ const BASIS = {
   bremse: 1.0, bremseVorn: 0.68,
   zugGriff: 1.7, schub: 1.35,       // kräftiger Antritt: Reifen halten längs mehr aus, Motor zieht 1,35-mal so stark (Spiel-Werte)
   bremsGriff: 1.9,                 // kräftige Spiel-Bremse: längs halten die Reifen mehr aus als zur Seite
-  esp: { beta: 0.14, dreh: 9, quer: 0.5 },   // Schleuderschutz: bis etwa 8° Driften ist erlaubt, dann fängt er das Auto
+  esp: { beta: 0.4, dreh: 5, quer: 0.3 },   // Schleuderschutz: bis gut 20° Driften ist erlaubt, erst dann fängt er das Auto (Kristian will driften können)
   lenkMax: 0.5, lenkTempo: 22,
-  lenkGriff: 1.35, lenkDazu: 0.05,   // Schutz vor zu starkem Einlenken (siehe lenkSchutz in physik.js)
   gaenge: 7, drehzahlMax: 8500, rueck: 8, abregeln: true,
   schritte: 8, unten: 3,
   tcRest: 0.82,                     // Traktionskontrolle lässt mehr Haftung für die Kurve übrig als beim Rennwagen
@@ -36,7 +35,7 @@ export const SUPERCARS = [
   {
     id: 'falkner', name: 'Falkner 9 Turbo', vorbild: 'Porsche 911 Turbo',
     text: 'Motor hinten, runde Scheinwerfer, sehr gutmütig. Gut für den Anfang.',
-    p: { allrad: 0.4, masse: 1640, leistung: 478000, schubMax: 15500, vMax: 330 * KMH, haft: 1.2, hinten: 1.12, widerstand: 0.72, drehzahlMax: 7200 },
+    p: { allrad: 0.4, masse: 1640, leistung: 478000, schubMax: 15500, vMax: 330 * KMH, haft: 1.2, hinten: 1.03, widerstand: 0.72, drehzahlMax: 7200 },
     farbe: 0xf2f2ee, zweit: 0x1a1a1a,
   },
   {
@@ -74,7 +73,7 @@ export const SUPERCARS = [
     // Wappen, Schriftzug und Nummernschilder entfernt
     id: 'falkner_s', name: 'Falkner 9 S Allrad', vorbild: 'Porsche 911 Carrera 4S',
     text: 'Der kleine Bruder des Turbo: weniger Kraft, aber Allrad und sehr genau zu lenken.',
-    p: { allrad: 0.35, masse: 1565, leistung: 331000, schubMax: 13500, vMax: 306 * KMH, haft: 1.21, hinten: 1.13, widerstand: 0.7, drehzahlMax: 7500, lenkMax: 0.52 },
+    p: { allrad: 0.35, masse: 1565, leistung: 331000, schubMax: 13500, vMax: 306 * KMH, haft: 1.21, hinten: 1.04, widerstand: 0.7, drehzahlMax: 7500, lenkMax: 0.52 },
     farbe: 0x2a8fe0, zweit: 0x1a1a1a,
   },
 ];
