@@ -1,0 +1,17 @@
+{
+  "appId": "de.kvb1982.rennspiel",
+  "appName": "Rennspiel",
+  "webDir": "www",
+  "backgroundColor": "#0b0f17",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false,
+    "allowsLinkPreview": false,
+    "backgroundColor": "#0b0f17"
+  },
+  "plugins": {
+    "SystemBars": {
+      "hidden": true
+    }
+  }
+}

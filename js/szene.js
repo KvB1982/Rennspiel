@@ -14,7 +14,12 @@ export class Buehne {
   constructor(canvas, qualitaet = 'hoch') {
     this.qualitaet = qualitaet;
     const r = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: qualitaet !== 'niedrig', powerPreference: 'high-performance', preserveDrawingBuffer: false });
-    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, qualitaet === 'hoch' ? 2 : qualitaet === 'mittel' ? 1.5 : 1));
+    // Bildpunkte pro Bildschirm-Punkt: höchstens so viele, wie der Bildschirm hat
+    this.punkteMax = Math.min(window.devicePixelRatio || 1, qualitaet === 'hoch' ? 2 : qualitaet === 'mittel' ? 1.5 : 1);
+    this.punkteMin = Math.min(this.punkteMax, qualitaet === 'niedrig' ? 0.6 : 0.75);
+    this.punkte = this.punkteMax;
+    this.bildZeit = 1 / 60; this.pruefUhr = 0; this.ruhig = 0;
+    r.setPixelRatio(this.punkte);
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.shadowMap.enabled = qualitaet !== 'niedrig';
@@ -25,8 +30,33 @@ export class Buehne {
   }
 
   groesse(w, h) {
+    this.w = w; this.h = h;
     this.renderer.setSize(w, h, false);
     this.kamera.aspect = w / h; this.kamera.updateProjectionMatrix();
+  }
+
+  // Wie lange dauert ein Bild? Unter etwa 50 Bildern pro Sekunde werden die Bildpunkte weniger
+  // (das Bild wird etwas unschärfer, aber flüssig). Läuft es lange ruhig mit 60, gibt es wieder mehr.
+  // roh = echte Zeit seit dem letzten Bild in Sekunden
+  tempoPruefen(roh) {
+    if (!(roh > 0) || roh > 0.25) return;          // Tab war weg oder Strecke wurde gebaut: nicht mitzählen
+    this.bildZeit += (roh - this.bildZeit) * 0.05;
+    this.pruefUhr += roh;
+    if (this.pruefUhr < 1.5) return;
+    this.pruefUhr = 0;
+    let neu = this.punkte;
+    // grenze = so viele Bildpunkte waren schon einmal zu viel: dorthin nicht wieder zurück (sonst ginge es ewig hin und her)
+    if (this.bildZeit > 1 / 48 && this.punkte > this.punkteMin) { this.grenze = this.punkte; neu = Math.max(this.punkteMin, this.punkte - 0.25); this.ruhig = 0; }
+    else if (this.bildZeit < 1 / 57) {
+      const hoch = Math.min(this.punkteMax, this.punkte + 0.25);
+      if (++this.ruhig >= 4 && hoch > this.punkte && !(hoch >= this.grenze)) { neu = hoch; this.ruhig = 0; }
+    }
+    else this.ruhig = 0;
+    if (neu !== this.punkte) {
+      this.punkte = neu;
+      this.renderer.setPixelRatio(neu);
+      if (this.w) this.renderer.setSize(this.w, this.h, false);
+    }
   }
 
   // Strecke T laden und Autos (Liste aus dem Rennen) hinstellen

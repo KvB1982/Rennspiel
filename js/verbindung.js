@@ -7,8 +7,15 @@
 //   3. Ein Vermittler im Internet (PeerJS) stellt die beiden einander vor. Danach reden sie direkt miteinander,
 //      im selben WLAN meist ganz ohne Umweg. Pro Sekunde schickt das Handy 60-mal Lenkung, Gas und Bremse.
 // Zum Testen auf einem Rechner geht es auch ohne Internet zwischen zwei Fenstern desselben Browsers (BroadcastChannel).
+//
+// In der App (iPad und iPhone, Ordner ios/) gibt es zusätzlich den Weg ohne Internet: "NahLink" benutzt
+// Apples Multipeer wie Frontlinie 3. Das iPad wartet, das iPhone sucht und verbindet sich mit dem ersten
+// Rennspiel in der Nähe. Die Nachrichten sind dieselben wie über PeerJS.
 
-const PEERJS = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
+import { nahPlugin } from './native.js';
+
+// In der App liegt PeerJS auf dem Gerät (scripts/copy-web.mjs setzt RENNSPIEL_LIB), sonst kommt es aus dem Internet
+const PEERJS = window.RENNSPIEL_LIB ? window.RENNSPIEL_LIB + 'peerjs.min.js' : 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
 const VORSILBE = 'rennspiel-lenkrad-';
 const ZEICHEN = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
@@ -21,6 +28,36 @@ function peerLaden() {
     document.head.appendChild(s);
   });
   return ladend;
+}
+
+// ---------------------------------------------------------------- App: direkte Verbindung über Multipeer
+// Zustände vom Plugin: searching (sucht/wartet), connected, off, error. Es gibt nur einen NahLink (das Plugin auch nur einmal).
+class NahLink {
+  constructor(p) {
+    this.p = p; this.zustand = 'off'; this.gegenueber = '';
+    this.wennZustand = null; this.wennDaten = null;
+    p.addListener('state', e => {
+      this.zustand = e.state || 'off'; this.gegenueber = e.peer || '';
+      if (this.wennZustand) this.wennZustand(this.zustand, this.gegenueber);
+    });
+    p.addListener('data', e => {
+      let m = null;
+      try { m = JSON.parse(e.d); } catch (err) { return; }
+      if (m && typeof m === 'object' && this.wennDaten) this.wennDaten(m);
+    });
+  }
+  rufe(name, arg) { try { const r = this.p[name](arg); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
+  warten() { this.rufe('host'); }     // iPad: zeigt das Rennen
+  suchen() { this.rufe('join'); }     // iPhone: ist das Lenkrad
+  stop() { this.rufe('stop'); }
+  // sicher = kommt bestimmt an (für Knöpfe); Lenken und Gas schicken wir schnell und dürfen mal verloren gehen
+  senden(m, sicher = false) { if (this.zustand === 'connected') this.rufe('send', { d: JSON.stringify(m), reliable: sicher }); }
+}
+let nahEiner = null;
+export function nahLink() {
+  const p = nahPlugin();
+  if (!p) return null;
+  return nahEiner || (nahEiner = new NahLink(p));
 }
 
 export const neuerCode = () => Array.from({ length: 4 }, () => ZEICHEN[Math.floor(Math.random() * ZEICHEN.length)]).join('');
@@ -46,10 +83,30 @@ export class LenkradEmpfang {
     this.code = gemerkt && /^[A-Z0-9]{4}$/.test(gemerkt) ? gemerkt : neuerCode();
     this.setzeStatus('laden');
     this.kanalOeffnen();
+    this.nahStarten();
     try {
       const Peer = await peerLaden();
       this.peerStarten(Peer, 0);
-    } catch (e) { this.setzeStatus(this.verbindungen.size ? 'verbunden' : 'fehler'); }
+    } catch (e) { this.setzeStatus(this.verbindungen.size ? 'verbunden' : this.ohneNetz()); }
+  }
+
+  // Ohne Internet geht in der App trotzdem das iPhone in der Nähe
+  ohneNetz() { return this.nah ? 'bereit' : 'fehler'; }
+
+  // App: auf ein iPhone in der Nähe warten (Multipeer)
+  nahStarten() {
+    const nah = this.nah = nahLink();
+    if (!nah) return;
+    const conn = this.nahConn = { send: m => nah.senden(m, m.t !== 'i') };
+    nah.wennDaten = d => this.empfangen(d, conn);
+    nah.wennZustand = (z, wer) => {
+      this.nahVerbunden = z === 'connected';
+      if (this.nahVerbunden) this.geraet = String(wer || 'iPhone').slice(0, 30);
+      else if (this.antwort === conn) { this.antwort = null; this.setzeStatus('bereit'); }
+      if (this.wennStatus) this.wennStatus(this.status);
+    };
+    nah.warten();
+    if (this.status === 'laden') this.setzeStatus('bereit');
   }
 
   // Zum Testen: Lenkrad im zweiten Fenster desselben Browsers
@@ -74,7 +131,8 @@ export class LenkradEmpfang {
         peer.destroy(); this.code = neuerCode(); this.kanalOeffnen(); this.peerStarten(Peer, versuch + 1);
         if (this.wennStatus) this.wennStatus(this.status);
       } else if (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error') {
-        if (this.status !== 'verbunden') this.setzeStatus('fehler');
+        this.netzFehler = true;
+        if (this.status !== 'verbunden') this.setzeStatus(this.ohneNetz());
       }
     });
     // Verbindung zum Vermittler verloren: in Ruhe nochmal versuchen (immer länger warten)
@@ -83,13 +141,13 @@ export class LenkradEmpfang {
       clearTimeout(this.neuVersuch);
       this.neuVersuch = setTimeout(() => { if (!peer.destroyed) try { peer.reconnect(); } catch (e) {} }, this.warte);
     });
-    peer.on('open', () => { this.warte = 0; });
+    peer.on('open', () => { this.warte = 0; this.netzFehler = false; });
   }
 
   empfangen(d, conn) {
     if (!d || typeof d !== 'object' || d.an === 'handy') return;
     this.letzte = performance.now();
-    if (d.t === 'hallo') { this.geraet = String(d.name || 'Handy').slice(0, 30); this.antwort = conn; }
+    if (d.t === 'hallo' && conn !== this.nahConn) this.geraet = String(d.name || 'Handy').slice(0, 30);
     this.antwort = conn;
     this.setzeStatus('verbunden');
     if (this.wennDaten) this.wennDaten(d);
@@ -111,9 +169,11 @@ export class LenkradEmpfang {
 }
 
 // ---------------------------------------------------------------- Handy-Seite: verbindet sich mit dem Spiel
+// nah = true: in der App über Multipeer zum iPad in der Nähe (ohne Code und ohne Internet)
 export class LenkradSender {
-  constructor(code, lokal = false) {
-    this.code = code.toUpperCase(); this.lokal = lokal;
+  constructor(code, lokal = false, nah = false) {
+    this.code = (code || '').toUpperCase(); this.lokal = lokal; this.nah = nah ? nahLink() : null;
+    this.gegenueber = '';
     this.status = 'aus'; this.conn = null;
     this.wennDaten = null; this.wennStatus = null;
   }
@@ -121,6 +181,18 @@ export class LenkradSender {
 
   async verbinden() {
     this.setzeStatus('suchen');
+    if (this.nah) {
+      const nah = this.nah;
+      nah.wennDaten = d => { if (this.wennDaten) this.wennDaten(d); };
+      nah.wennZustand = (z, wer) => {
+        this.gegenueber = wer || '';
+        if (z === 'connected') { this.setzeStatus('verbunden'); this.senden({ t: 'hallo', name: geraeteName() }); }
+        else this.setzeStatus(z === 'error' ? 'nahFehler' : 'suchen');
+      };
+      this.conn = { send: m => nah.senden(m, m.t !== 's'), open: true };
+      nah.suchen();
+      return;
+    }
     if (this.lokal && 'BroadcastChannel' in window) {
       this.kanal = new BroadcastChannel(VORSILBE + this.code);
       this.kanal.onmessage = e => { if (e.data && e.data.an === 'handy') { this.setzeStatus('verbunden'); if (this.wennDaten) this.wennDaten(e.data); } };
@@ -147,6 +219,7 @@ export class LenkradSender {
     conn.on('close', () => { this.conn = null; this.setzeStatus('suchen'); setTimeout(() => this.anrufen(), 1500); });
   }
   senden(m) { if (this.conn && this.conn.open !== false) try { this.conn.send(m); } catch (e) {} }
+  trennen() { if (this.nah) this.nah.stop(); if (this.peer) this.peer.destroy(); }
 }
 
 function geraeteName() {

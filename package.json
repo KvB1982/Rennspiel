@@ -1,0 +1,22 @@
+{
+  "name": "rennspiel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Rennspiel als iPad- und iPhone-App (Capacitor)",
+  "scripts": {
+    "web": "node scripts/copy-web.mjs",
+    "sync": "node scripts/copy-web.mjs && cap sync ios",
+    "ios": "node scripts/copy-web.mjs && cap sync ios && cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.6.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
+    "peerjs": "1.5.4",
+    "qrcode-generator": "1.4.4",
+    "three": "0.160.0"
+  }
+}

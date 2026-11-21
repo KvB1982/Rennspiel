@@ -15,6 +15,7 @@ import { Eingabe } from './eingabe.js';
 import { LenkradEmpfang } from './verbindung.js';
 import { Klang } from './klang.js';
 import { SUPERCARS, LACKE, supercar } from './supercars.js';
+import { inApp, istApfelGeraet } from './native.js';
 
 const $ = id => document.getElementById(id);
 
@@ -32,6 +33,8 @@ const streckenFeld = () => E.fahrzeug === 'modell' ? 'strecke_modell' : E.fahrze
 const VERKEHR = { aus: 0, wenig: 0.5, normal: 1, viel: 1.6 };
 const istKlein = () => E.fahrzeug === 'modell' || E.fahrzeug === 'slot';   // die kleinen Autos (Maßstab 1:30)
 const E = Object.assign({}, STANDARD);
+// iPad und iPhone: zuerst "mittel" (weniger Bildpunkte, weniger Häuser und Bäume), bis man selbst etwas anderes wählt
+if (istApfelGeraet()) E.grafik = 'mittel';
 try { Object.assign(E, JSON.parse(localStorage.getItem('rennspiel.einst') || '{}')); } catch (e) {}
 const merken = () => { try { localStorage.setItem('rennspiel.einst', JSON.stringify(E)); } catch (e) {} };
 
@@ -158,6 +161,8 @@ export function starteSpiel() {
   $('mFahrzeug').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { E.fahrzeug = b.dataset.wert; merken(); menueBauen(); } });
   $('mModus').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { E.modus = b.dataset.wert; merken(); menueBauen(); } });
   $('mStart').addEventListener('click', () => { klang.wecken(); starten(); });
+  // App: Dieses Gerät wird zum Lenkrad für ein iPad in der Nähe
+  $('lbNahLenkrad').addEventListener('click', () => { location.href = location.pathname + '?nahlenkrad'; });
   $('lbNeigen').addEventListener('click', async () => {
     const ok = await eingabe.neigung.start();
     $('lbNeigen').textContent = ok ? 'dieses Gerät ist das Lenkrad ✓' : 'Neigen geht hier nicht (nur auf Tablet/Handy über https)';
@@ -172,7 +177,8 @@ export function starteSpiel() {
     $('lbAdresse').textContent = adr;
     const st = $('lbStatus');
     st.className = s === 'verbunden' ? 'verbunden' : '';
-    st.textContent = { laden: 'Verbindung wird vorbereitet …', bereit: 'Wartet auf dein Handy …', verbunden: '✅ ' + (empfang.geraet || 'Handy') + ' ist verbunden', fehler: 'Kein Internet: Handy-Lenkrad geht gerade nicht' }[s] || s;
+    st.textContent = { laden: 'Verbindung wird vorbereitet …', bereit: empfang.nah && empfang.netzFehler ? 'Kein Internet: QR-Code geht gerade nicht' : 'Wartet auf dein Handy …', verbunden: '✅ ' + (empfang.geraet || 'Handy') + ' ist verbunden', fehler: 'Kein Internet: Handy-Lenkrad geht gerade nicht' }[s] || s;
+    if (inApp) $('lbNahStatus').textContent = empfang.nahVerbunden ? '✅ ' + (empfang.geraet || 'iPhone') + ' ist verbunden' : 'Wartet auf ein iPhone in der Nähe …';
     if (adr && adr !== app.qrFuer) { app.qrFuer = adr; qrMalen($('qr'), adr); }
     const h = $('hHandy'); h.textContent = s === 'verbunden' ? '📱 Lenkrad' : '📱 –'; h.classList.toggle('an', s === 'verbunden');
   };
@@ -389,9 +395,13 @@ export function starteSpiel() {
   }
 
   function schleife(t) {
-    const dt = Math.min(0.05, (t - letzteZeit) / 1000 || 0.016);
+    // t von requestAnimationFrame kann etwas vor performance.now() liegen (nach Start oder Pause): nie rückwärts rechnen
+    const roh = (t - letzteZeit) / 1000 || 0.016;
+    const dt = Math.max(0, Math.min(0.05, roh));
     letzteZeit = t;
     if (!app.angehalten) bild(dt);
+    // Ruckelt es (z. B. auf dem iPad mit vielen Häusern), malt die Bühne mit weniger Bildpunkten
+    if (laeuft && !pausiert && !app.angehalten && buehne) buehne.tempoPruefen(roh);
     requestAnimationFrame(schleife);
   }
   requestAnimationFrame(schleife);
@@ -442,13 +452,13 @@ function karteMalen(cv, T, farbe, dicke) {
   return { x, y };
 }
 
-// ---------------------------------------------------------------- QR-Code (Bibliothek qrcode-generator von jsDelivr)
+// ---------------------------------------------------------------- QR-Code (Bibliothek qrcode-generator von jsDelivr, in der App vom Gerät)
 let qrLib = null;
 async function qrMalen(cv, text) {
   try {
     if (!qrLib) qrLib = await new Promise((ok, nein) => {
       if (window.qrcode) return ok(window.qrcode);
-      const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js';
+      const s = document.createElement('script'); s.src = window.RENNSPIEL_LIB ? window.RENNSPIEL_LIB + 'qrcode.js' : 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js';
       s.onload = () => ok(window.qrcode); s.onerror = nein; document.head.appendChild(s);
     });
     const q = qrLib(0, 'M'); q.addData(text); q.make();
