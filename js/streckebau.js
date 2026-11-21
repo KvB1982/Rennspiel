@@ -652,7 +652,7 @@ function baueZimmer(T, gruppe, welt, r) {
   const lehne = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 0.22), stoff); lehne.position.set(0, 0.62, 0.34); sofa.add(lehne);
   for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.6, 0.9), stoff); arm.position.set(s * 1.1, 0.3, 0); sofa.add(arm); }
   for (let k = -1; k <= 1; k += 2) { const kissen = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.14, 0.75), new THREE.MeshStandardMaterial({ color: 0x4a6b8a, roughness: 1 })); kissen.position.set(k * 0.5, 0.48, -0.02); sofa.add(kissen); }
-  sofa.position.set(mx, 0, mz + D / 2 - 0.7); sofa.rotation.y = Math.PI;
+  sofa.position.set(mx, 0, mz + D / 2 - 0.55);   // Lehne an der Wand, Sitz zeigt ins Zimmer
   gruppe.add(sofa);
   // Fernseh-Schrank und Fernseher
   const holz = new THREE.MeshStandardMaterial({ color: 0x7a5232, roughness: 0.6 });

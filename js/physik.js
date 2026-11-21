@@ -42,7 +42,7 @@ export const AUTOS = {
     rollen: 0.008, motorBremse: 0.22,   // rollt ohne Gas weich aus (Motorbremse wächst mit dem Tempo)
     leistung: 2.2, schubMax: 0.9,
     bremse: 0.55, bremseVorn: 0.55,
-    lenkMax: 0.5, lenkTempo: 2.6,
+    lenkMax: 0.4, lenkTempo: 2.6,
     gaenge: 1, drehzahlMax: 30000, vMax: 2.3, abregeln: true, rueck: 0.7,
     prall: 0.55,                        // so stark springt es von der Bande zurück (0 = gar nicht, 1 = wie ein Flummi)
     schritte: 16, unten: 0.35,
@@ -136,7 +136,7 @@ export function schritt(a, T, dt) {
         Fbf = Math.min(Fb * p.bremseVorn, muF * 0.98); Fbr = Math.min(Fb * (1 - p.bremseVorn), muR * 0.98);
       } else if (a.gas <= 0) {
         // steht das Auto, heißt Bremse: Rückwärtsgang (bis zum Rückwärts-Tempo "rueck")
-        Fx = -a.brems * p.schubMax * 0.45 * Math.max(0, Math.min(1, (p.rueck + u) / (p.rueck * 0.25)));
+        Fx = -a.brems * p.schubMax * 0.7 * Math.max(0, Math.min(1, (p.rueck + u) / (p.rueck * 0.25)));
       }
     }
     if (u < -0.3 && a.gas > 0) { Fbf = Math.min(a.gas * muF * 0.5, muF); Fbr = Math.min(a.gas * muR * 0.5, muR); }
@@ -155,7 +155,10 @@ export function schritt(a, T, dt) {
     const lfx = Fbf, lrx = Math.abs(Fx) + Fbr;
     const DF = Math.sqrt(Math.max(0, muF * muF - lfx * lfx));
     const DR = Math.sqrt(Math.max(0, muR * muR - lrx * lrx));
-    let Fyf = reifen(alF, DF, p.B, p.C), Fyr = reifen(alR, DR, p.B, p.C);
+    // Ganz langsam rollt das Auto einfach dorthin, wohin die Räder zeigen (siehe unten "leicht").
+    // Die Reifenkräfte zur Seite zählen dann nicht – sonst würden eingeschlagene Vorderräder das Auto festhalten.
+    const kriech = Math.min(1, Math.max(0, (au - p.unten * 0.3) / p.unten));
+    let Fyf = reifen(alF, DF, p.B, p.C) * kriech, Fyr = reifen(alR, DR, p.B, p.C) * kriech;
     a.Fyr = Fyr;
     maxRutschV = Math.max(maxRutschV, Math.abs(alF) * p.B / 1.6, lfx / (muF + 1e-9));
     maxRutschH = Math.max(maxRutschH, Math.abs(alR) * p.B / 1.6, lrx / (muR + 1e-9));
