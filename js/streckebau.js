@@ -11,11 +11,12 @@ import * as TX from './texturen.js';
 import { BELAG, MASSSTAB } from './strecke.js';
 import { weichen, WEICHE_LANG } from './slot.js';
 import { boxLage } from './box.js';
+import { baueStrassenWelt } from './stadtbau.js';
 
 // ---------------------------------------------------------------- Hilfen
 
 // Abschnitte, in denen pruef(i) wahr ist: [[von, bis], …] (bis einschließlich, kann über das Ende der Runde gehen)
-function abschnitte(n, pruef) {
+export function abschnitte(n, pruef) {
   const out = [];
   let start = -1;
   for (let i = 0; i < n; i++) {
@@ -29,7 +30,7 @@ function abschnitte(n, pruef) {
 }
 
 // Ein Band entlang der Strecke. lat(i, j) = seitlicher Abstand (plus = links) der Spalte j, hoch(i, j) = Höhe darüber.
-function band(T, von, bis, spalten, lat, hoch, { uv = null, farbe = null, schritt = 1 } = {}) {
+export function band(T, von, bis, spalten, lat, hoch, { uv = null, farbe = null, schritt = 1 } = {}) {
   const n = T.n, pos = [], uvs = [], cols = [], idx = [];
   let reihen = 0;
   for (let k = von; ; k += schritt) {
@@ -67,7 +68,7 @@ function band(T, von, bis, spalten, lat, hoch, { uv = null, farbe = null, schrit
   return g;
 }
 
-const mesh = (g, m, schatten = true, empfangen = true) => { const o = new THREE.Mesh(g, m); o.castShadow = schatten; o.receiveShadow = empfangen; return o; };
+export const mesh = (g, m, schatten = true, empfangen = true) => { const o = new THREE.Mesh(g, m); o.castShadow = schatten; o.receiveShadow = empfangen; return o; };
 
 // Was neben der Strecke liegt (Breite der Randsteine)
 const kerbBreite = T => T.def.modell ? T.hb[0] * 0.12 : 1.4;
@@ -83,7 +84,7 @@ const STIMMUNG = {
 export const stimmung = def => STIMMUNG[def.welt.zeit] || STIMMUNG.mittag;
 
 // Räumliches Gitter für "wie weit ist der nächste Streckenpunkt?" (für Gelände und Bäume)
-function naeheGitter(T, zelle) {
+export function naeheGitter(T, zelle) {
   const g = new Map(), key = (a, b) => a * 100003 + b;
   const schritt = Math.max(1, Math.round(4 / T.ds));
   for (let i = 0; i < T.n; i += schritt) {
@@ -221,13 +222,14 @@ export function baueWelt(T, szene, { qualitaet = 'hoch' } = {}) {
   if (modell && T.box) baueBox(T, gruppe);
 
   // ---------------------------------------------------------------- Begrenzung: Leitplanke, Reifen, Mauer
-  baueBegrenzung(T, gruppe, viel, modell);
+  if (!T.strasse) baueBegrenzung(T, gruppe, viel, modell);
 
   // ---------------------------------------------------------------- Startampel über der Strecke
   baueAmpel(T, gruppe, welt, modell);
 
   // ---------------------------------------------------------------- Umgebung
   if (modell) baueZimmer(T, gruppe, welt, r);
+  else if (T.strasse) baueStrassenWelt(T, gruppe, welt, viel, r);
   else {
     baueGelaende(T, gruppe, welt, art, viel, r);
     baueTribuenen(T, gruppe, welt, viel, r);

@@ -9,6 +9,7 @@
 // u = Tempo nach vorn, v = Tempo nach links (beides im Auto gemessen), r = Drehtempo (plus = nach links drehen).
 
 import { BELAG } from './strecke.js';
+import { SUPER_AUTOS } from './supercars.js';
 
 const G = 9.81, LUFT = 1.2;
 const MASSSTAB_G = 0.25;   // kleine Autos: Kurvenkräfte sind kleiner, die Neigung soll trotzdem zu sehen sein
@@ -60,6 +61,9 @@ export const AUTOS = {
     gaenge: 1, drehzahlMax: 30000,
   },
 };
+
+// Die Supercars (Werte in supercars.js)
+Object.assign(AUTOS, SUPER_AUTOS);
 
 // Was der Untergrund mit dem Auto macht: Haftung (mal) und Bremswirkung (in g)
 const GRUND = {
@@ -120,6 +124,8 @@ export function schritt(a, T, dt) {
     const down = 0.5 * LUFT * p.abtrieb * u * u;
     let Fzf = p.masse * G * p.b / L + down * p.abtriebVorn;
     let Fzr = p.masse * G * p.a / L + down * (1 - p.abtriebVorn);
+    // Straßenautos: Beim Beschleunigen drückt das Gewicht auf die Hinterräder, beim Bremsen auf die Vorderräder
+    if (p.super) { const um = Math.max(-0.35, Math.min(0.35, (a.ax || 0) * p.hoehe / (L * G))) * p.masse * G; Fzf -= um; Fzr += um; }
     const mu = p.haft * gr.haft;
     // Die Hinterreifen sind breiter und haften etwas besser (das macht das Auto gutmütiger)
     const muH = mu * (p.hinten || 1);
@@ -135,7 +141,8 @@ export function schritt(a, T, dt) {
     if (a.brems > 0) {
       if (u > 0.3) {
         const Fb = a.brems * p.bremse * (muF + muR);
-        Fbf = Math.min(Fb * p.bremseVorn, muF * 0.98); Fbr = Math.min(Fb * (1 - p.bremseVorn), muR * 0.98);
+        // Straßenautos haben ein Antiblockiersystem: Die Hinterräder bremsen nie bis an die Grenze (sonst bricht das Heck aus)
+        Fbf = Math.min(Fb * p.bremseVorn, muF * 0.98); Fbr = Math.min(Fb * (1 - p.bremseVorn), muR * (p.super ? 0.7 : 0.98));
       } else if (a.gas <= 0) {
         // steht das Auto, heißt Bremse: Rückwärtsgang (bis zum Rückwärts-Tempo "rueck")
         Fx = -a.brems * p.schubMax * 0.7 * Math.max(0, Math.min(1, (p.rueck + u) / (p.rueck * 0.25)));
@@ -145,8 +152,16 @@ export function schritt(a, T, dt) {
     // Hinterrad kann nicht mehr ziehen, als es Haftung hat. Die Traktionskontrolle (tc) lässt dazu noch Haftung
     // für die Kurve übrig: 0,7 = sicher, 0,95 = fast alles fürs Beschleunigen (dann bricht das Heck leicht aus)
     // Mit Traktionskontrolle (a.tc = true) zieht das Hinterrad nur so stark, wie neben der Kurvenkraft noch Haftung übrig ist.
-    const zugGrenze = a.tc === false ? muR * 0.97 : Math.sqrt(Math.max(0, (muR * 0.93) ** 2 - (a.Fyr || 0) ** 2));
+    // Allradantrieb (p.allrad = Anteil der Kraft vorn): Dann ziehen auch die Vorderräder.
+    const rest = p.tcRest || 0.93;
+    const vz = p.allrad || 0;
+    let Fxf = Fx * vz; Fx *= 1 - vz;
+    const zugGrenze = a.tc === false ? muR * 0.97 : Math.sqrt(Math.max(0, (muR * rest) ** 2 - (a.Fyr || 0) ** 2));
     if (Math.abs(Fx) > zugGrenze) Fx = Math.sign(Fx) * zugGrenze;
+    if (vz) {
+      const zugVorn = a.tc === false ? muF * 0.97 : Math.sqrt(Math.max(0, (muF * rest) ** 2 - (a.Fyf || 0) ** 2));
+      if (Math.abs(Fxf) > zugVorn) Fxf = Math.sign(Fxf) * zugVorn;
+    }
 
     // Schräglauf (bei sehr langsamer Fahrt wird es wackelig, deshalb mindestens "unten")
     const us = Math.max(au, p.unten);
@@ -154,14 +169,14 @@ export function schritt(a, T, dt) {
     const alF = a.lenk * sgn - Math.atan2(v + p.a * r, us);
     const alR = -Math.atan2(v - p.b * r, us);
     // Haftkreis: was zum Bremsen/Ziehen gebraucht wird, fehlt für die Kurve
-    const lfx = Fbf, lrx = Math.abs(Fx) + Fbr;
+    const lfx = Fbf + Math.abs(Fxf), lrx = Math.abs(Fx) + Fbr;
     const DF = Math.sqrt(Math.max(0, muF * muF - lfx * lfx));
     const DR = Math.sqrt(Math.max(0, muR * muR - lrx * lrx));
     // Ganz langsam rollt das Auto einfach dorthin, wohin die Räder zeigen (siehe unten "leicht").
     // Die Reifenkräfte zur Seite zählen dann nicht – sonst würden eingeschlagene Vorderräder das Auto festhalten.
     const kriech = Math.min(1, Math.max(0, (au - p.unten * 0.3) / p.unten));
     let Fyf = reifen(alF, DF, p.B, p.C) * kriech, Fyr = reifen(alR, DR, p.B, p.C) * kriech;
-    a.Fyr = Fyr;
+    a.Fyr = Fyr; a.Fyf = Fyf;
     maxRutschV = Math.max(maxRutschV, Math.abs(alF) * p.B / 1.6, lfx / (muF + 1e-9));
     maxRutschH = Math.max(maxRutschH, Math.abs(alR) * p.B / 1.6, lrx / (muR + 1e-9));
 
@@ -170,9 +185,10 @@ export function schritt(a, T, dt) {
       + (p.motorBremse || 0) * p.masse * u * (a.gas > 0 ? 0 : 1);
     const Fb = (Fbf + Fbr) * Math.sign(u) * Math.min(1, au / 0.3);
     const cs = Math.cos(a.lenk), sn = Math.sin(a.lenk);
-    let du = (Fx - Fb - Fd - Fyf * sn) / p.masse + v * r;
-    let dv = (Fyf * cs + Fyr) / p.masse - u * r;
-    let dr = (p.a * Fyf * cs - p.b * Fyr) / p.traeg;
+    let du = (Fx + Fxf * cs - Fb - Fd - Fyf * sn) / p.masse + v * r;
+    let dv = (Fyf * cs + Fxf * sn + Fyr) / p.masse - u * r;
+    let dr = (p.a * (Fyf * cs + Fxf * sn) - p.b * Fyr) / p.traeg;
+    a.ax = du - v * r;
 
     a.u += du * h; a.v += dv * h; a.r += dr * h;
     // ganz langsam: wie ein Spielzeug auf Schienen rollen (kein Zittern im Stand)

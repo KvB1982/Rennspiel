@@ -11,6 +11,25 @@
 // wie breit sie ist und was neben der Strecke kommt (Gras, Kies, Mauer).
 
 export const BELAG = { asphalt: 0, kerb: 1, gras: 2, kies: 3, mauer: 4 };
+
+// Straßen-Strecken der Supercars: Jede Stelle liegt in einer "Zone". Die Zone sagt, wie breit die Straße ist,
+// was daneben kommt, wie viele Fahrspuren es gibt und wie schnell der Verkehr dort fährt.
+//   breite = Breite der Fahrbahn (m), l/r = was links/rechts liegt, al/ar = wie breit (bis zur Begrenzung)
+//   spuren = Fahrspuren in deine Richtung (rechts) und im Gegenverkehr (links), tempo = Tempo des Verkehrs (m/s),
+//   dicht = Autos pro Meter und Spur, getrennt = Gegenverkehr fährt hinter einer Mauer auf einer eigenen Fahrbahn
+export const ZONEN = {
+  stadt: { nr: 0, breite: 16, l: 'mauer', r: 'mauer', al: 5, ar: 5, spuren: 2, tempo: 14, dicht: 1 / 160 },
+  dorf: { nr: 1, breite: 9, l: 'mauer', r: 'mauer', al: 3, ar: 3, spuren: 1, tempo: 13, dicht: 1 / 160 },
+  land: { nr: 2, breite: 9, l: 'gras', r: 'gras', al: 9, ar: 9, spuren: 1, tempo: 23, dicht: 1 / 260 },
+  autobahn: { nr: 3, breite: 13.5, l: 'mauer', r: 'gras', al: 1.2, ar: 8, spuren: 3, tempo: 32, dicht: 1 / 220, getrennt: true },
+};
+export const ZONEN_LISTE = Object.keys(ZONEN).sort((a, b) => ZONEN[a].nr - ZONEN[b].nr);
+// In welcher Zone liegt der Anteil f (0…1) der Runde? zonen = [[von, bis, 'name'], …], sonst die erste Angabe
+export function zoneBei(def, f) {
+  const z = def.zonen; if (!z) return null;
+  for (const [a, b, name] of z) if (a <= b ? f >= a && f < b : f >= a || f < b) return name;
+  return z[0][2];
+}
 const AUS_CODE = { gras: 2, kies: 3, mauer: 4, asphalt: 0 };
 
 // Ein Stück der Strecke ablaufen: liefert Punkte im Abstand ds
@@ -191,8 +210,22 @@ export function baueStrecke(def) {
 
   // Breite und Auslauf je Streckenteil, weich ineinander übergehend
   const hbRoh = [], aL = [], aR = [];
+  T.zone = new Uint8Array(n);
+  // Zonen können auch an den Ecken stehen ({ zone: 'land' }): Sie gelten dann bis zur nächsten Angabe.
+  const zoneVon = new Map();
+  { let akt = def.zone || null; for (const t of [...teile, ...teile]) { if (t.zone) akt = t.zone; zoneVon.set(t, akt); } }
+  T.strasse = !!(def.zonen || def.zone || teile.some(t => t.zone));
   for (let i = 0; i < n; i++) {
     const t = roh[i].teil;
+    const zn = def.zonen ? zoneBei(def, i / n) : zoneVon.get(t);
+    if (zn) {
+      // Straße: Breite und Rand kommen aus der Zone
+      const Z = ZONEN[zn]; T.zone[i] = Z.nr;
+      hbRoh.push(Z.breite / 2);
+      T.artL[i] = AUS_CODE[Z.l]; T.artR[i] = AUS_CODE[Z.r];
+      aL.push(Z.al); aR.push(Z.ar);
+      continue;
+    }
     hbRoh.push((t.breite || def.breite || 12) / 2);
     let l = t.aus || def.aus || null, r = l;
     if (typeof l === 'object' && l) { r = l.r; l = l.l; }
