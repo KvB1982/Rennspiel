@@ -25,6 +25,7 @@ const STANDARD = {
   supercar: 'falkner', lack: 0, verkehr: 'normal', runden_super: 1, gegner_super: 5,
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
   bremshilfe: true, lenkhilfe: false, traktion: true, autogas: false, grafik: 'hoch', linie: true, boxen: true,
+  neigen: false,   // dieses Gerät selbst neigen (Gas und Bremse auf dem Bildschirm), wenn kein Handy-Lenkrad verbunden ist
 };
 // Höchsttempo der kleinen Autos in Metern pro Sekunde. 3 m/s sehen beim Maßstab 1:30 aus wie 325 km/h.
 const TEMPO = { modell: { langsam: 1.6, mittel: 2.3, schnell: 3.0 }, slot: { langsam: 2.6, mittel: 3.5, schnell: 4.5 } };
@@ -34,7 +35,7 @@ const VERKEHR = { aus: 0, wenig: 0.5, normal: 1, viel: 1.6 };
 const istKlein = () => E.fahrzeug === 'modell' || E.fahrzeug === 'slot';   // die kleinen Autos (Maßstab 1:30)
 const E = Object.assign({}, STANDARD);
 // iPad und iPhone: zuerst "mittel" (weniger Bildpunkte, weniger Häuser und Bäume), bis man selbst etwas anderes wählt
-if (istApfelGeraet()) E.grafik = 'mittel';
+if (istApfelGeraet()) { E.grafik = 'mittel'; E.neigen = true; }   // und zuerst durch Neigen steuern
 try { Object.assign(E, JSON.parse(localStorage.getItem('rennspiel.einst') || '{}')); } catch (e) {}
 const merken = () => { try { localStorage.setItem('rennspiel.einst', JSON.stringify(E)); } catch (e) {} };
 
@@ -119,6 +120,7 @@ export function starteSpiel() {
     zeile('Lenkhilfe', 'lenkhilfe', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Traktionskontrolle', 'traktion', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Gas von allein', 'autogas', [[true, 'an'], [false, 'aus']], !slot);
+    zeile('Dieses Gerät neigen', 'neigen', [[true, 'an'], [false, 'aus']], neigenGeht);
     zeile('Grafik', 'grafik', [['hoch', 'schön'], ['mittel', 'mittel'], ['niedrig', 'schnell']]);
     // Farbe des eigenen Autos (Supercar: Lackfarbe, sonst Rennstall)
     const z = document.createElement('div'); z.className = 'zeile'; z.innerHTML = `<span>${sup ? 'Lackfarbe' : 'Dein Rennstall'}</span><div class="wahl"></div>`;
@@ -160,11 +162,21 @@ export function starteSpiel() {
   }
   $('mFahrzeug').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { E.fahrzeug = b.dataset.wert; merken(); menueBauen(); } });
   $('mModus').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { E.modus = b.dataset.wert; merken(); menueBauen(); } });
-  $('mStart').addEventListener('click', () => { klang.wecken(); starten(); });
+  // Steuern durch Neigen dieses Geräts: nur wo es einen Bewegungssensor und einen Bildschirm zum Antippen gibt
+  const neigenGeht = !!window.DeviceOrientationEvent && (navigator.maxTouchPoints > 0 || inApp);
+  // Der Sensor darf nur direkt nach einem Fingertipp eingeschaltet werden (im Browser fragt das iPhone dann um Erlaubnis)
+  const neigenAn = async () => {
+    if (!E.neigen || !neigenGeht) { eingabe.neigung.stop(); return false; }
+    if (eingabe.neigung.an) return true;
+    return await eingabe.neigung.start();
+  };
+  $('mEinst').addEventListener('click', () => { neigenAn(); });   // Einstellung „an“ getippt: gleich einschalten
+  $('mStart').addEventListener('click', async () => { klang.wecken(); await neigenAn(); starten(); });
   // App: Dieses Gerät wird zum Lenkrad für ein iPad in der Nähe
   $('lbNahLenkrad').addEventListener('click', () => { location.href = location.pathname + '?nahlenkrad'; });
   $('lbNeigen').addEventListener('click', async () => {
     const ok = await eingabe.neigung.start();
+    if (ok) { E.neigen = true; merken(); menueBauen(); }
     $('lbNeigen').textContent = ok ? 'dieses Gerät ist das Lenkrad ✓' : 'Neigen geht hier nicht (nur auf Tablet/Handy über https)';
   });
   menueBauen();
@@ -222,8 +234,11 @@ export function starteSpiel() {
       kamera.setze(modell ? 'stand' : E.kamera);
       groesse();
       zeige('menue', false); zeige('laden', false); zeige('ergebnis', false); zeige('pause', false); zeige('hud', true);
-      zeige('pedale', !empfang.verbunden && eingabe.neigung.an);
+      eingabe.neigung.kalibrieren();   // so wie man das Gerät beim Start hält, ist „geradeaus“
+      pedaleZeigen();
       $('hHilfe').textContent = eingabe.quelle === 'handy' || empfang.verbunden ? (slot ? 'Spur wechseln: an einer gelben Weiche nach links oder rechts lenken' : '')
+        : eingabe.neigung.an ? (slot ? 'Gerät neigen = Spur wechseln (an einer gelben Weiche)   Gas rechts, Bremse links' : 'Gerät wie ein Lenkrad drehen   Gas rechts, Bremse links (im Stand: rückwärts)   Mitte neu setzen: Pause ⏸')
+        : E.neigen && neigenGeht ? 'Der Bewegungssensor ist nicht erlaubt – Seite neu laden und „Erlauben“ tippen'
         : slot ? 'Gas ↑   Bremse ↓   Spur wechseln ← → (an einer gelben Weiche)   Standort C   Pause P'
         : sup ? 'Lenken ← →   Gas ↑   Bremse ↓ (im Stand: rückwärts)   Kamera C   Pause P   Zurück auf die Straße R'
         : 'Lenken ← →   Gas ↑   Bremse ↓ (im Stand: rückwärts)   Kamera C   Pause P   Zurück auf die Strecke R';
@@ -264,6 +279,14 @@ export function starteSpiel() {
   $('hKamera').addEventListener('click', kameraWeiter);
   // Pedale auf dem Bildschirm (wenn dieses Gerät selbst das Lenkrad ist)
   const pf = new Map();
+  // Die Pedale gibt es nur, solange dieses Gerät selbst das Lenkrad ist. Verbindet sich ein Handy, verschwinden sie.
+  let pedaleDa = null;
+  const pedaleZeigen = () => {
+    const an = !empfang.verbunden && eingabe.neigung.an;
+    if (an === pedaleDa) return;
+    pedaleDa = an; zeige('pedale', an);
+    if (!an) { pf.clear(); eingabe.pedal.gas = eingabe.pedal.brems = 0; $('pGas').classList.remove('an'); $('pBremse').classList.remove('an'); }
+  };
   const pedalNeu = () => { const v = [...pf.values()]; eingabe.pedal.gas = v.includes('g') ? 1 : 0; eingabe.pedal.brems = v.includes('b') ? 1 : 0; $('pGas').classList.toggle('an', !!eingabe.pedal.gas); $('pBremse').classList.toggle('an', !!eingabe.pedal.brems); };
   $('pedale').addEventListener('pointerdown', e => { pf.set(e.pointerId, e.clientX > innerWidth / 2 ? 'g' : 'b'); pedalNeu(); });
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) $('pedale').addEventListener(ev, e => { pf.delete(e.pointerId); pedalNeu(); });
@@ -359,6 +382,7 @@ export function starteSpiel() {
       else if (b === 'zurueck') zurueckAufStrecke();
     }
     if (!laeuft) return;
+    pedaleZeigen();
     const R = rennen;
     if (!pausiert) {
       R.update(dt, { lenk: eingabe.lenk, gas: eingabe.gas, brems: eingabe.brems });

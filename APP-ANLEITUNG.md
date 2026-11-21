@@ -63,6 +63,10 @@ Das iPhone merkt sich, dass es das Lenkrad ist, und startet beim nächsten Mal g
 
 Ein Handy **ohne** App (zum Beispiel ein Android-Handy) geht weiter über den QR-Code im Menü – das braucht Internet, auch in der App.
 
+## Ohne iPhone: das Gerät selbst neigen
+
+Ist kein Handy-Lenkrad verbunden, steuerst du mit dem iPad oder iPhone selbst: Gerät wie ein Lenkrad drehen, rechts unten Gas, links unten Bremse. Das ist auf iPad und iPhone von Anfang an eingeschaltet (Einstellung „Dieses Gerät neigen“ im Menü). So wie du das Gerät beim Start hältst, ist geradeaus; neu setzen geht in der Pause mit „Lenkrad: Mitte neu setzen“. Verbindet sich ein iPhone als Lenkrad, verschwinden die Pedale.
+
 ## TestFlight
 
 1. Einmalig auf https://appstoreconnect.apple.com unter **Apps → „+“ → Neue App** anlegen: Plattform iOS, Name „Rennspiel“ (falls vergeben, etwas anhängen), Bundle-ID `de.kvb1982.rennspiel`.
@@ -70,7 +74,7 @@ Ein Handy **ohne** App (zum Beispiel ein Android-Handy) geht weiter über den QR
 3. Im Fenster „Organizer“: **Distribute App → TestFlight & App Store → Upload**.
 4. In App Store Connect unter **TestFlight** die Tester eintragen.
 
-Bei jedem neuen Upload muss die Build-Nummer steigen: Ziel **App → General → Build** (im Projekt `CURRENT_PROJECT_VERSION`, im Moment 1).
+Bei jedem neuen Upload muss die Build-Nummer steigen: Ziel **App → General → Build** (im Projekt `CURRENT_PROJECT_VERSION`, im Moment 2).
 
 ## Nach Änderungen am Spiel
 
