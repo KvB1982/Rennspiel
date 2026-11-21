@@ -25,6 +25,7 @@ export const TEAMS = [
 export const FAHRER = ['Tom Kessler', 'Rafa Moretti', 'Jun Takeda', 'Aiden Cole', 'Luca Bernardi', 'Noah Lindqvist',
   'Emil Varga', 'Sami Okafor', 'Paul Renard', 'Ivo Petrov', 'Leo Hartmann'];
 
+const DRIFT_AB = 12;   // ab so viel Grad Drift-Winkel zählt es als Drift
 export const STAERKE = { leicht: [0.8, 0.86], mittel: [0.87, 0.93], schwer: [0.93, 0.985] };
 
 export class Rennen {
@@ -38,8 +39,9 @@ export class Rennen {
     // Welches Fahrzeug fährt wer? Bei den Supercars fahren die Gegner die anderen Modelle (reihum).
     const andereSuper = SUPERCARS.filter(s => s.id !== auto);
     const artVon = (ich, k) => !this.super ? art : ich ? supercar(auto).id : andereSuper[k % andereSuper.length].id;
-    this.sc = T.def.modell ? MASSSTAB : 1;
+    this.sc = T.sc;
     this.slot = art === 'slot';
+    this.drift = art === 'drift';   // Drift-Rallye: es gibt Drift-Punkte (siehe driftZaehlen)
     // Tanken und Reifenwechsel: nur bei den kleinen Autos, nur im Rennen, nur wenn die Strecke eine Boxengasse hat
     this.boxen = !!(boxen && T.box && modus === 'rennen');
     const muster = neuesAuto(this.super ? supercar(auto).id : art, tempo).p;
@@ -73,6 +75,8 @@ export class Rennen {
       if (!mitSpieler && platz === meinPlatz) continue;
       const ich = platz === meinPlatz || (modus === 'zeit' && platz === 0);
       const a = neuesAuto(artVon(ich, k), tempo);
+      // Drift-Rallye: Die Computerfahrer fahren sauber auf Haftung (sie würden sich sonst dauernd drehen) – driften tust nur du
+      if (this.drift && !ich) { a.p.hinten = 1; a.p.esp = { ...a.p.esp, beta: 0.15, nurWinkel: false }; }
       if (this.slot) { /* wird unten in die Spur gesetzt */ }
       else if (modus === 'zeit') aufStrecke(a, T, T.laenge - (T.def.modell ? 1.5 : 150), 0);
       else aufStrecke(a, T, slots[platz].s, slots[platz].d);
@@ -124,6 +128,9 @@ export class Rennen {
       }
       if (c.ich) {
         a.lenkWunsch = eingabe.lenk; a.gas = eingabe.gas; a.brems = eingabe.brems;
+        // Handbremse: eigene Taste, oder Gas und Bremse gleichzeitig (so geht es auch mit dem Handy-Lenkrad und den Pedalen)
+        a.handbremse = !!(this.drift && (eingabe.hand || (eingabe.gas > 0.5 && eingabe.brems > 0.5)));
+        if (a.handbremse) a.brems = 0;
         if (this.hilfe.lenken) a.lenkWunsch = Math.max(-1, Math.min(1, eingabe.lenk * 0.6 + lenkZurLinie(a, T, this.L) * 0.55));
         c.hilfeBremst = this.hilfe.bremsen ? bremsHilfe(a, T, this.L) : false;
         if (c.ziel !== null && this.modus === 'rennen') { fahren(c.auslauf || (c.auslauf = neuerFahrer(0.7)), a, T, this.L, andere, dt); }
@@ -135,6 +142,7 @@ export class Rennen {
       // vor dem Start stehen alle still (der Motor darf aber schon heulen)
       if (steht) { a.u = 0; a.v = 0; a.r = 0; a.drehzahl = 5000 + a.gas * 6000; continue; }
       schritt(a, T, dt);
+      if (this.drift && c.ich && this.phase === 'los') this.driftZaehlen(c, dt);
       // Computerfahrer, die festhängen (an der Mauer, im Kies), setzt ein Streckenposten zurück auf die Strecke
       if (c.fahrer && this.phase === 'los') {
         c.steckt = Math.abs(a.u) < 2 * this.sc ? (c.steckt || 0) + dt : 0;
@@ -153,6 +161,39 @@ export class Rennen {
     }
     this.runden_zaehlen();
     this.plaetze();
+  }
+
+  // Drift-Punkte (wie beim Gymkhana): Solange das Auto quer rutscht, gibt es Punkte – je schräger und je schneller, desto mehr.
+  // Hängt man Drifts ohne Pause aneinander, steigt der Faktor (x2, x3 … bis x5). Wer dabei in die Bande fährt, verliert den laufenden Drift.
+  driftZaehlen(c, dt) {
+    const a = c.a, D = c.drift || (c.drift = { laufend: 0, gesamt: 0, faktor: 1, bester: 0, ruhe: 0, winkel: 0, an: false, kette: 0 });
+    const au = Math.abs(a.u);
+    const winkel = au > 0.02 ? Math.abs(Math.atan2(a.v, au)) * 180 / Math.PI : 0;   // Drift-Winkel in Grad
+    D.winkel = winkel;
+    const kmhM = au * 3.6 / this.sc;                                                 // Tempo im Maßstab (km/h)
+    const aufMatte = Math.abs(a.d) < this.T.hb[Math.max(0, a.idx)] + 0.02;
+    if (a.stoss > 0.15 && D.an) {
+      this.melden('Bande! Drift verloren', 'warn');
+      D.laufend = 0; D.an = false; D.faktor = 1; D.ruhe = 0; D.kette = 0;
+      return;
+    }
+    if (winkel > DRIFT_AB && kmhM > 40 && aufMatte && a.u > 0) {
+      if (!D.an) { D.an = true; if (D.kette > 0) D.faktor = Math.min(5, D.faktor + 1); }
+      D.ruhe = 0;
+      D.laufend += dt * Math.min(winkel, 60) * kmhM / 20;
+    } else if (D.an) {
+      D.ruhe += dt;
+      if (D.ruhe > 0.35) {
+        // Drift vorbei: Punkte gutschreiben
+        const p = Math.round(D.laufend * D.faktor);
+        if (p >= 20) {
+          D.gesamt += p; D.bester = Math.max(D.bester, p);
+          this.melden('Drift +' + p + (D.faktor > 1 ? '  (x' + D.faktor + ')' : ''), p > 600 ? 'beste' : 'runde');
+          D.kette = 1.2;   // so viele Sekunden hat man Zeit für den nächsten Drift, damit der Faktor steigt
+        } else D.kette = 0;
+        D.laufend = 0; D.an = false;
+      }
+    } else if (D.kette > 0) { D.kette -= dt; if (D.kette <= 0) D.faktor = 1; }
   }
 
   // Tank und Reifen eines Autos: verbrauchen, in der Box auffüllen, Computerfahrer entscheidet sich für einen Stopp
@@ -225,7 +266,8 @@ export class Rennen {
       const vor = c.prevS > Lg * 0.75 && s < Lg * 0.25;
       const zurueckUeber = c.prevS < Lg * 0.25 && s > Lg * 0.75;
       // Strecke verlassen (alle vier Räder neben der Fahrbahn): Runde zählt im Zeitfahren nicht
-      if (!this.slot && !T.strasse && c.ich && this.modus === 'zeit' && c.runde > 0 && Math.abs(c.a.d) > T.hb[c.a.idx] + 1.6 * this.sc + (T.kerbL[c.a.idx] || T.kerbR[c.a.idx] ? 1.2 * this.sc : 0)) {
+      // (Drift-Matte: Wer quer rutscht, kommt weiter hinaus – erst ab der Mitte des Rand-Streifens zählt es)
+      if (!this.slot && !T.strasse && c.ich && this.modus === 'zeit' && c.runde > 0 && Math.abs(c.a.d) > T.hb[c.a.idx] + (this.drift ? 0.07 : 1.6 * this.sc + (T.kerbL[c.a.idx] || T.kerbR[c.a.idx] ? 1.2 * this.sc : 0))) {
         if (c.gueltig) this.melden('Strecke verlassen – Runde zählt nicht', 'warn');
         c.gueltig = false;
       }

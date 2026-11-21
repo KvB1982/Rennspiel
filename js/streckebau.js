@@ -126,7 +126,7 @@ export function baueWelt(T, szene, { qualitaet = 'hoch' } = {}) {
   const as = TX.asphalt();
   const asMat = new THREE.MeshStandardMaterial({
     map: as.map, normalMap: as.normalMap, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.88, metalness: 0,
-    vertexColors: true, color: def.slot ? 0x4a4c50 : modell ? 0x7c7f84 : 0xffffff,
+    vertexColors: true, color: def.slot ? 0x4a4c50 : def.drift ? 0x33363c : modell ? 0x7c7f84 : 0xffffff,   // Drift-Matte: dunkelgrau bedruckt
   });
   if (modell) { asMat.map = null; asMat.normalMap = null; asMat.roughness = 0.45; }
   const SP = modell ? 6 : 10;
@@ -201,7 +201,7 @@ export function baueWelt(T, szene, { qualitaet = 'hoch' } = {}) {
   // ---------------------------------------------------------------- Auslauf (Gras, Kies, Gehweg)
   const grasT = TX.rasenStreifen(), kiesT = TX.kies(), betonT = TX.beton();
   // kleine Bahnen: grüner Filz statt Gras, heller Auslauf-Streifen statt Kies (einfarbig, die großen Bilder wären dort unscharf)
-  const grasMat = modell ? new THREE.MeshStandardMaterial({ color: 0x3f8a4a, roughness: 1 })
+  const grasMat = modell ? new THREE.MeshStandardMaterial({ color: def.drift ? 0x8d9097 : 0x3f8a4a, roughness: 1 })   // Drift-Matte: heller Rand
     : new THREE.MeshStandardMaterial({ map: grasT.map, roughness: 0.95, color: art === 'kueste' ? 0xd6e0a8 : 0xffffff });
   const kiesMat = modell ? new THREE.MeshStandardMaterial({ color: def.slot ? 0xb8bcc2 : 0xd8c79a, roughness: 1 })
     : new THREE.MeshStandardMaterial({ map: kiesT.map, normalMap: kiesT.normalMap, roughness: 1 });
@@ -392,7 +392,7 @@ function baueBegrenzung(T, gruppe, viel, modell) {
 const r01 = k => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 
 function baueAmpel(T, gruppe, welt, modell) {
-  const sc = modell ? MASSSTAB : 1;
+  const sc = T.sc;
   const i = T.index(T.laenge - 2 * sc);
   const breite = (T.hb[i] * 2 + (T.def.slot ? 0.06 : modell ? 0.3 : 4)) / sc;
   const g = new THREE.Group();
@@ -787,7 +787,7 @@ function baueZimmer(T, gruppe, welt, r) {
   }
   // Schachtel der Rennbahn
   const box = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.12, 0.4), new THREE.MeshStandardMaterial({ color: 0xd8262a, roughness: 0.6 }));
-  box.position.set(maxx + 0.55, 0.06, minz - 0.05); box.rotation.y = 0.3; gruppe.add(box);
+  box.position.set(maxx + T.hb[0] + T.ausL[0] + 0.45, 0.06, minz - 0.05); box.rotation.y = 0.3; gruppe.add(box);   // neben der Bahn, nicht auf der Bande
   gruppe.traverse(o => { if (o.isMesh) { o.receiveShadow = true; if (o !== raum && o !== boden && o !== tep) o.castShadow = true; } });
 
   // Wo man stehen kann (Augenhöhe 1,5 m): drei Stellen rund um die Bahn

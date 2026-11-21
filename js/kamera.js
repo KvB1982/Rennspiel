@@ -21,8 +21,8 @@ export class Kamera {
   }
   setze(modus) { this.modus = modus; this.frisch = true; }
 
-  update(dt, a, { modell = false, standorte = [] } = {}) {
-    const cam = this.cam, sc = modell ? MASSSTAB : 1;
+  update(dt, a, { modell = false, standorte = [], massstab = MASSSTAB } = {}) {
+    const cam = this.cam, sc = modell ? massstab : 1;
     const sh = Math.sin(a.h), ch = Math.cos(a.h);
     const speed = Math.abs(a.u) / a.p.vMax;
     // Wackeln auf Randsteinen und bei Stößen
@@ -38,7 +38,9 @@ export class Kamera {
       cam.lookAt(this.blick);
       // Je weiter das Auto weg ist, desto mehr "kneift man die Augen zusammen" (leicht heranholen)
       const ab = cam.position.distanceTo(ziel);
-      const fov = THREE.MathUtils.clamp(6 + ab * 4.2, 12, 34);
+      // (kleinere Autos wie die Drift-Rallyeautos 1:43: noch etwas näher heranholen)
+      const k = Math.min(1, massstab / MASSSTAB);
+      const fov = THREE.MathUtils.clamp((6 + ab * 4.2) * k, 12 * k, 34);
       cam.fov += (fov - cam.fov) * (this.frisch ? 1 : 1 - Math.exp(-dt * 2));
       cam.updateProjectionMatrix();
       this.frisch = false;

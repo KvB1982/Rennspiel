@@ -80,6 +80,33 @@ export const STRECKEN = [
     hoehe: [[0, 0]],
     welt: { art: 'zimmer', zeit: 'drinnen' },
   },
+  // Drift-Matten für die kleinen Rallyeautos (Maßstab 1:43). Vorbild: Driftautos, die man mit dem Handy steuert und die
+  // auf jedem glatten Boden fahren – oft auf einer großen bedruckten Matte. Die Strecken sind mit Absicht breit und offen
+  // (60 bzw. 54 cm, das sind im Maßstab 26 bzw. 23 Meter), damit man quer durch die Kurven rutschen kann.
+  // Außen herum liegt ein Streifen Matte als Auslauf, dahinter eine weiche Schaumstoff-Bande.
+  {
+    id: 'drift_matte', name: 'Gymkhana-Matte', ort: 'Drift-Matte im Wohnzimmer, 1:43',
+    text: 'Kurze, breite Matte mit zwei Kehren und einem Haken in der Mitte. Hier lernst du driften: Gas in der Kurve, gegenlenken!',
+    modell: true, drift: true, massstab: 1 / 43, ds: 0.02, breite: 0.6, glatt: 8, kerbAb: 1 / 0.6,
+    aus: 'gras', grasBreite: 0.12,
+    ecken: [
+      [1.9, 0, 0.5], [1.9, 1.9, 0.5], [0.75, 1.9, 0.38], [0.25, 1.05, 0.36], [-0.35, 1.9, 0.38], [-1.9, 1.9, 0.5], [-1.9, 0, 0.5],
+    ],
+    hoehe: [[0, 0]],
+    welt: { art: 'zimmer', zeit: 'drinnen' },
+  },
+  {
+    id: 'drift_rallye', name: 'Rallye-Teppich', ort: 'Große Drift-Strecke, 1:43',
+    text: 'Lange, offene Strecke mit schnellen Bögen, einer Wechselkurven-Schlange und zwei engen Kehren zum Querstellen.',
+    modell: true, drift: true, massstab: 1 / 43, ds: 0.02, breite: 0.54, glatt: 8, kerbAb: 1 / 0.6,
+    aus: 'gras', grasBreite: 0.12,
+    ecken: [
+      [3.1, 0, 0.55], [3.1, 2.2, 0.6], [1.7, 2.9, 0.5], [0.9, 2.0, 0.42], [0.1, 2.9, 0.42], [-0.7, 2.0, 0.42], [-1.6, 3.0, 0.5],
+      [-3.1, 2.6, 0.45], [-2.3, 1.2, 0.4], [-3.1, 0, 0.5],
+    ],
+    hoehe: [[0, 0]],
+    welt: { art: 'zimmer', zeit: 'drinnen' },
+  },
   // ---------------------------------------------------------------- Straßen-Strecken für die Supercars
   // Hier fährt man auf normalen Straßen: durch die Stadt, über Land, auf der Autobahn – mit Verkehr.
   // Die Zone (stadt, dorf, land, autobahn) steht an der Geraden nach einer Ecke ({ zone: … } als 5. Angabe)
