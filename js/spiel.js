@@ -308,8 +308,17 @@ export function starteSpiel() {
     const R = rennen;
     if (!pausiert) {
       R.update(dt, { lenk: eingabe.lenk, gas: eingabe.gas, brems: eingabe.brems });
-      if (R.beruehrt) { klang.rumms(R.beruehrt * 0.08); R.beruehrt = 0; }
-      if (R.ich.a.stoss > (T.def.modell ? 0.1 : 3)) klang.rumms(Math.min(1, R.ich.a.stoss / (T.def.modell ? 1 : 25)));
+      const klein = !!T.def.modell;
+      if (R.beruehrt) { klang.rumms(R.beruehrt * 0.08, klein); R.beruehrt = 0; }
+      if (R.ich.a.stoss > (klein ? 0.1 : 3)) klang.rumms(Math.min(1, R.ich.a.stoss / (klein ? 1 : 25)), klein);
+      // Slotcar fliegt raus: lauter Plastik-Knall
+      const raus = !!(R.ich.slot && R.ich.slot.raus > 0);
+      if (raus && !app.warRaus) klang.rumms(1, true);
+      app.warRaus = raus;
+      // Boxenstopp fängt an: Schlagschrauber
+      const dienst = (R.ich.dienst || 0) > 0;
+      if (dienst && !app.warDienst) klang.box(klein);
+      app.warDienst = dienst;
       // Ampel piept
       if (R.phase === 'ampel' && R.ampel !== app.letzteAmpel) { if (R.ampel > 0) klang.piep(440, 0.15, 0.2); app.letzteAmpel = R.ampel; }
       if (R.phase === 'fertig' && !fertigGezeigt) { fertigGezeigt = true; setTimeout(ergebnisZeigen, 1200); }
