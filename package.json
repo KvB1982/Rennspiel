@@ -2,6 +2,7 @@
   "name": "rennspiel",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Rennspiel als iPad- und iPhone-App (Capacitor)",
   "scripts": {
     "web": "node scripts/copy-web.mjs",

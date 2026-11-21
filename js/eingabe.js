@@ -13,7 +13,7 @@ export class Eingabe {
     this.tasten = new Set();
     this.lenk = 0; this.gas = 0; this.brems = 0;
     this.quelle = 'tastatur';
-    this.handy = { l: 0, g: 0, b: 0 };
+    this.handy = { l: 0, g: 0, b: 0 }; this.handyNr = 0;
     this.befehle = [];            // Knöpfe: kamera, pause, zurueck
     this.neigung = new Neigung();
     this.pedal = { gas: 0, brems: 0 };   // Pedale auf dem Bildschirm
@@ -37,6 +37,8 @@ export class Eingabe {
 
   vomHandy(d) {
     if (d.t === 's') {
+      // Über Funk kann eine ältere Nachricht eine neuere überholen. Die alte würde das Lenkrad kurz zurückzucken lassen: weg damit.
+      if (typeof d.n === 'number') { const zurueck = this.handyNr - d.n; if (zurueck > 0 && zurueck < 200 && d.n > 30) return; this.handyNr = d.n; }
       this.handy.l = clamp(+d.l || 0, -1, 1); this.handy.g = clamp(+d.g || 0, 0, 1); this.handy.b = clamp(+d.b || 0, 0, 1);
     } else if (d.t === 'k' && typeof d.k === 'string') this.befehle.push(d.k);
   }

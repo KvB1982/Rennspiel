@@ -134,11 +134,12 @@ export function lenkradStarten(code, lokal, nah = false) {
   };
   requestAnimationFrame(schleife);
   // Geschickt wird, wenn sich etwas ändert, sonst zur Sicherheit alle 0,1 Sekunden (ein verlorenes Paket stört dann nicht lange)
-  let zuletzt = '', zuletztZeit = 0;
+  let zuletzt = '', zuletztZeit = 0, nr = 0;   // nr zählt die Nachrichten, damit das Spiel veraltete erkennt
   setInterval(() => {
     const m = { t: 's', l: +neig.lenk.toFixed(3), g: zustand.gas, b: zustand.brems }, text = m.l + '|' + m.g + '|' + m.b, jetzt = performance.now();
     if (text === zuletzt && jetzt - zuletztZeit < 100) return;
     zuletzt = text; zuletztZeit = jetzt;
+    m.n = ++nr;
     sender.senden(m);
   }, 16);
 

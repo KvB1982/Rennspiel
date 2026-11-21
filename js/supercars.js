@@ -23,6 +23,7 @@ const BASIS = {
   bremsGriff: 1.9,                 // kräftige Spiel-Bremse: längs halten die Reifen mehr aus als zur Seite
   esp: { beta: 0.14, dreh: 9, quer: 0.5 },   // Schleuderschutz: bis etwa 8° Driften ist erlaubt, dann fängt er das Auto
   lenkMax: 0.5, lenkTempo: 22,
+  lenkGriff: 1.35, lenkDazu: 0.012,   // Übersetzung des Lenkrads (siehe lenkGrenze in physik.js)
   gaenge: 7, drehzahlMax: 8500, rueck: 8, abregeln: true,
   schritte: 8, unten: 3,
   tcRest: 0.82,                     // Traktionskontrolle lässt mehr Haftung für die Kurve übrig als beim Rennwagen
