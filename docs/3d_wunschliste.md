@@ -32,3 +32,9 @@ Nur freie Modelle mit Lizenz **CC0** (oder CC-BY mit Namen im Spiel). Keine Mark
 - Palmen und Pinien für den Küstenring (Kenney Nature Kit hat `tree_palm`; in `tools/modelle.mjs` eintragen)
 - Eingebaut (21.11.2026): echte Wohnzimmer-Möbel von Poly Haven (Sofa, Sessel, Beistelltisch, Konsolentisch, Regal, Pflanze)
 - Offen: Bücher fürs Regal, ein flacher Fernseher und eine Stehlampe im selben Stil, Kleinteile für die Stadt (Mülltonne `metal_trash_can`, Stromkasten `utility_box_01`, Laterne `street_lamp_02` – die Laterne hat 20.000 Dreiecke und müsste stark vereinfacht werden), alter Reifen `old_tyre` für Reifenstapel. Bäume von Poly Haven sind fürs iPad viel zu schwer
+
+## Nachtrag 21.11.2026: Supercars, Boden, Bäume
+
+- Eingebaut: sechs Supercars aus 3D AI Studio (Räder drehen und lenken, Lackfarbe wählbar), Gras- und Asphalt-Foto von Poly Haven, Bäume als flache Bilder der Powershot-Baum-Modelle.
+- In den anderen Spielen gefunden: Powershot hat Bäume, Häuser je Land, Laternen, Bodenbilder und fünf Alltagsautos (die Autos sind unscharf und tragen eine marken-typische Front, deshalb nicht übernommen). Frontline hat nur Militär-Modelle. Reitturnier hat Pferd und Hindernisse.
+- Offen: Verkehrsautos im selben Stil wie die Supercars (jetzt noch Kenney), Formel-Rennwagen als Modell, Häuser aus Powershot für Dörfer und Stadt, Bremslichter an den neuen Supercars, Cockpit passend zum neuen Modell.
