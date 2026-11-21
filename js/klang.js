@@ -6,14 +6,15 @@
 //
 // Ein Motorgeräusch klingt höher, wenn der Motor schneller dreht. Deshalb spielen wir die Aufnahme
 // schneller oder langsamer ab (playbackRate). Für den Rennwagen gibt es zwei Aufnahmen:
-// Leerlauf und hohe Drehzahl. Dazwischen wird weich überblendet.
+// niedrige und hohe Drehzahl (ein Straßenauto, schneller abgespielt). Dazwischen wird weich überblendet,
+// und ein wenig vom selbst erzeugten Motor kommt dazu.
 // Selbst erzeugt: Ein Formel-Motor mit 6 Zylindern zündet 3-mal pro Umdrehung,
 // bei 12.000 U/min sind das 600 Zündungen pro Sekunde.
 
 // Welche Datei wofür? (alle: Mono, 32.000 Messungen pro Sekunde)
 const DATEIEN = {
-  leerlauf: 'sounds/f1_leerlauf.wav',        // Schleife: Rennwagen im Stand
-  hoch: 'sounds/f1_hoch.wav',                // Schleife: Rennwagen bei hoher Drehzahl
+  leerlauf: 'sounds/f1_leerlauf.wav',        // Schleife: Motor bei niedriger Drehzahl
+  hoch: 'sounds/f1_hoch.wav',                // Schleife: Motor bei hoher Drehzahl
   elektro: 'sounds/elektromotor.wav',        // Schleife: kleiner Elektromotor (Modellauto, Slotcar)
   quietschen: 'sounds/reifen_quietschen.wav', // Schleife: rutschende Reifen
   rummsGross: 'sounds/aufprall_gross.wav',   // harter Einschlag
@@ -23,11 +24,13 @@ const DATEIEN = {
 };
 
 // Zahlen zum Einstellen
-const DZ_LEER = 4200;     // bei dieser Drehzahl klingt die Leerlauf-Aufnahme "richtig" (Tempo 1)
-const DZ_HOCH = 10500;    // bei dieser Drehzahl klingt die Hochdrehzahl-Aufnahme "richtig"
+const DZ_LEER = 2600;     // bei dieser Drehzahl klingt die Leerlauf-Aufnahme "richtig" (Tempo 1)
+const DZ_HOCH = 5200;     // bei dieser Drehzahl klingt die Hochdrehzahl-Aufnahme "richtig" (die Aufnahme ist ein Straßenauto,
+                          // der Rennwagen dreht viel höher – deshalb wird sie bis gut doppelt so schnell abgespielt)
 const UEBERGANG = [5000, 8000];   // zwischen diesen Drehzahlen wird von Leerlauf nach hoch überblendet
 const LAUT_AUFNAHME = 0.9;        // Lautstärke der Motor-Aufnahmen (Rennwagen)
 const LAUT_ELEKTRO = 0.55;        // Lautstärke des Elektromotors
+const SYNTH_DAZU = 0.35;          // so viel vom selbst erzeugten Motor kommt beim Rennwagen dazu (macht ihn "kreischender")
 
 export class Klang {
   constructor() {
@@ -132,8 +135,8 @@ export class Klang {
     }
     const dz = a.drehzahl, gas = a.gas || 0;
     const w = Math.min(1, Math.max(0, (dz - UEBERGANG[0]) / (UEBERGANG[1] - UEBERGANG[0])));
-    m.leer.s.playbackRate.setTargetAtTime(Math.min(1.8, Math.max(0.8, dz / DZ_LEER)), t, glatt);
-    m.hoch.s.playbackRate.setTargetAtTime(Math.min(1.35, Math.max(0.45, dz / DZ_HOCH)), t, glatt);
+    m.leer.s.playbackRate.setTargetAtTime(Math.min(2.4, Math.max(0.8, dz / DZ_LEER)), t, glatt);
+    m.hoch.s.playbackRate.setTargetAtTime(Math.min(2.6, Math.max(0.6, dz / DZ_HOCH)), t, glatt);
     // Gas gibt den hellen, lauten Klang; vom Gas gehen klingt dumpfer und leiser
     m.f.frequency.setTargetAtTime(900 + gas * 7000 + dz * 0.25, t, glatt);
     const druck = 0.35 + 0.65 * gas;
@@ -148,10 +151,13 @@ export class Klang {
     const t = this.ctx.currentTime, glatt = 0.05;
     const dz = a.drehzahl, gas = a.gas;
     const m = this.motor;
-    const aufnahme = !!this.motorA;     // Aufnahmen da? Dann schweigt der selbst erzeugte Motor
+    const aufnahme = !!this.motorA;     // Aufnahmen da? Dann ist der selbst erzeugte Motor nur noch leise dabei (Rennwagen) oder still (kleine Autos)
     if (aufnahme) {
       this.stelleAufnahme(this.motorA, a, modell, modell ? (laeuft ? 0.35 + gas * 0.65 : 0) : (laeuft ? 1 : 0.15));
-      m.g.gain.setTargetAtTime(0, t, 0.1);
+      if (modell) m.g.gain.setTargetAtTime(0, t, 0.1);
+    }
+    if (aufnahme && modell) {
+      // nichts weiter: der Elektromotor kommt nur aus der Aufnahme
     } else if (modell) {
       // Elektromotor: hohes Surren
       const f = 120 + Math.abs(a.u) / a.p.vMax * 1500;
@@ -162,7 +168,7 @@ export class Klang {
       const f = dz / 60 * 3 / 4;   // Grundton (eine Oktave tiefer klingt voller)
       m.o1.frequency.setTargetAtTime(f, t, glatt); m.o2.frequency.setTargetAtTime(f * 2.01, t, glatt); m.o3.frequency.setTargetAtTime(f * 0.5, t, glatt);
       m.f.frequency.setTargetAtTime(600 + gas * 2600 + dz * 0.1, t, glatt);
-      m.g.gain.setTargetAtTime(laeuft ? 0.13 + gas * 0.2 : 0.05, t, 0.08);
+      m.g.gain.setTargetAtTime((laeuft ? 0.13 + gas * 0.2 : 0.05) * (aufnahme ? SYNTH_DAZU : 1), t, 0.08);
     }
     // Gegner: der nächste Wagen, leiser je weiter weg
     const gm = this.gegner;
