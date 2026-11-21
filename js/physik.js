@@ -308,10 +308,12 @@ export function schritt(a, T, dt) {
   a.radDreh += a.u * dt / (T.def.modell ? 0.012 : 0.33);
   // Karosserie nickt beim Bremsen und neigt sich in der Kurve (nur Bild)
   const quer = a.u * a.r;
-  // In der Kurve drückt die Fliehkraft das Auto nach außen: Es neigt sich ganz leicht von der Kurve weg
-  // (ein Rennwagen ist hart gefedert: höchstens gut 1 Grad).
+  // In der Kurve drückt die Fliehkraft das Auto nach außen: Es neigt sich sichtbar von der Kurve weg.
+  // Straßenautos sind weich gefedert (bis etwa 4 Grad), der Rennwagen ist hart (bis etwa 2 Grad).
+  // Das ist etwas mehr als in echt, damit man es im Spiel auch sieht.
   const querG = quer / (T.def.modell ? G * MASSSTAB_G : G);
-  a.kippen += (Math.max(-0.022, Math.min(0.022, querG * 0.0055)) - a.kippen) * Math.min(1, dt * 6);
+  const [jeG, hoechstens] = p.super ? [0.045, 0.07] : [0.014, 0.038];
+  a.kippen += (Math.max(-hoechstens, Math.min(hoechstens, querG * jeG)) - a.kippen) * Math.min(1, dt * 6);
   a.neigung += (((a.brems > 0 && a.u > 1 ? 1 : 0) * 0.012 - a.gas * 0.006) - a.neigung) * Math.min(1, dt * 5);
 }
 

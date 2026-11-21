@@ -74,7 +74,7 @@ Ist kein Handy-Lenkrad verbunden, steuerst du mit dem iPad oder iPhone selbst: G
 3. Im Fenster „Organizer“: **Distribute App → TestFlight & App Store → Upload**.
 4. In App Store Connect unter **TestFlight** die Tester eintragen.
 
-Bei jedem neuen Upload muss die Build-Nummer steigen: Ziel **App → General → Build** (im Projekt `CURRENT_PROJECT_VERSION`, im Moment 4).
+Bei jedem neuen Upload muss die Build-Nummer steigen: Ziel **App → General → Build** (im Projekt `CURRENT_PROJECT_VERSION`, im Moment 5).
 
 ## Nach Änderungen am Spiel
 

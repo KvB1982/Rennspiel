@@ -49,13 +49,13 @@ export class Kamera {
       // Augen des Fahrers: hinter dem Lenkrad, knapp über dem Rand
       // Supercar: Augen links im Auto, höher (a.auge kommt vom 3D-Modell)
       const [ex, ey, ez] = a.auge ? [a.auge[0], a.auge[1], a.auge[2]] : [0, 0.92, -0.12];
-      // Der Kopf des Fahrers neigt sich ein wenig in die Kurve hinein (das Auto selbst bleibt fast gerade)
-      const nick = a.neigung, roll = Math.max(-0.1, Math.min(0.1, a.u * a.r / 9.81 * 0.025));
+      // Der Kopf des Fahrers neigt sich in die Kurve hinein (bis etwa 7 Grad) – so spürt man die Kurve im Cockpit
+      const nick = a.neigung, roll = Math.max(-0.13, Math.min(0.13, a.u * a.r / 9.81 * (a.p.super ? 0.09 : 0.045)));
       cam.position.set(a.x + sh * ez + ch * ex, a.y + ey, a.z + ch * ez - sh * ex).multiplyScalar(1);
       if (modell) { cam.position.set(a.x + sh * ez * sc, a.y + ey * sc, a.z + ch * ez * sc); }
       cam.position.x += zit(); cam.position.y += zit();
       const vorX = a.x + sh * 30 * sc, vorZ = a.z + ch * 30 * sc;
-      cam.up.set(Math.cos(a.h) * roll * 0.5, 1, -Math.sin(a.h) * roll * 0.5);
+      cam.up.set(Math.cos(a.h) * roll, 1, -Math.sin(a.h) * roll);
       cam.lookAt(vorX + ch * ex, a.y + (ey - (a.auge ? 1.2 : 1.6) - nick * 20) * sc, vorZ - sh * ex);
       cam.up.set(0, 1, 0);
       const fov = 60 + speed * 10;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
