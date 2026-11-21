@@ -62,6 +62,20 @@ herausgeschnitten und den Lack umfärbbar gemacht. Die Formen sind an bekannte S
 keinen echten Namen. Vor einer bezahlten Veröffentlichung die Nutzungsbedingungen von 3D AI Studio und die Ähnlichkeit zu den
 Vorbildern prüfen – das Spiel ist für den Privatgebrauch.
 
+### Formel-Rennwagen und Verkehr aus 3D AI Studio
+
+Ebenfalls am 21.11.2026 mit 3D AI Studio erzeugt (Bild mit Nano Banana 2.1, Modell mit Prism 3.1) und mit `tools/supercars.mjs`
+verkleinert: der Formel-Rennwagen `modelle/formel/formel.glb` (Räder einzeln, auch für das ferngesteuerte Auto und das Slotcar)
+und sechs Autos für den Verkehr in `modelle/verkehr/` (Kleinwagen, Limousine, Geländewagen, Transporter, Lastwagen, Bus).
+Alle ohne Logo und ohne Schrift. Die Bilder waren als „ausgedachtes Auto“ bestellt; die Limousine hat trotzdem eine Front,
+die an eine bekannte Marke erinnert. Es gilt dasselbe wie bei den Supercars: vor einer Veröffentlichung prüfen.
+
+### Bilder für das Menü
+
+`bilder/menue/` (zusammen etwa 300 KB) sind Bilder aus dem Spiel selbst: `strecke_<id>.webp` und `fahrzeug_<art>.webp` sind
+Bildschirmfotos, `auto_<id>.webp` zeigt die Auto-Modelle mit blauem Lack (gemalt mit `tools/autobilder.html`; das Menü tauscht
+das Blau gegen die gewählte Lackfarbe).
+
 ### Bilder für Boden und Bäume
 
 | Datei | Wofür | Quelle | Lizenz |

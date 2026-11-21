@@ -2,6 +2,8 @@
 //
 //   PAKETE=~/modell-werkzeug node tools/supercars.mjs            alle sechs
 //   PAKETE=~/modell-werkzeug node tools/supercars.mjs falkner    nur eins
+//   PAKETE=~/modell-werkzeug node tools/supercars.mjs formel     der Formel-Rennwagen (Vorlage: quellen_modelle/formel/formel.glb)
+//   PAKETE=~/modell-werkzeug node tools/supercars.mjs verkehr    die sechs Autos für den Verkehr (Vorlagen: quellen_modelle/verkehr/)
 //
 // Die Vorlagen (je etwa 45 MB und 1,4 Millionen Dreiecke) liegen in quellen_modelle/supercars/<id>.glb
 // (kommt nicht ins Repository). Heraus kommt modelle/supercars/<id>.glb mit etwa 20.000 Dreiecken.
@@ -22,8 +24,7 @@ import path from 'node:path';
 
 const req = createRequire(process.env.PAKETE ? path.resolve(process.env.PAKETE, 'x.js') : import.meta.url);
 const HIER = path.dirname(new URL(import.meta.url).pathname);
-const QUELLE = path.resolve(HIER, '../quellen_modelle/supercars');
-const ZIEL = path.resolve(HIER, '../modelle/supercars');
+const ORDNER = art => [path.resolve(HIER, '../quellen_modelle', art), path.resolve(HIER, '../modelle', art)];
 
 // lang = Länge des Autos in Metern (wie in FORMEN in js/supercarbau.js: zF − zR), mitte = Mitte in z,
 // vornIst = in welche Richtung die Vorlage schaut, dreiecke = so viele bleiben für die Karosserie
@@ -34,6 +35,18 @@ export const AUTOS = {
   aurelion: { lang: 4.6, mitte: 0, vornIst: '+x', dreiecke: 16000 },
   nordvind: { lang: 4.6, mitte: 0, vornIst: '+x', dreiecke: 18000 },
   vento: { lang: 4.55, mitte: 0.025, vornIst: '+x', dreiecke: 16000 },
+  // Der Formel-Rennwagen (Vorlage in quellen_modelle/formel/): Räder werden auch herausgeschnitten
+  formel: { art: 'formel', lang: 5.47, mitte: -0.035, vornIst: '+x', dreiecke: 12000, radDreiecke: 1000, rad: [0.31, 0.37], tief: 0.42 },
+  // Die Autos im Verkehr (Vorlagen in quellen_modelle/verkehr/): ein Stück ohne einzelne Räder, kleines Farbbild.
+  // Die Längen sind die aus ARTEN in js/verkehr.js.
+  kompakt: { art: 'verkehr', lang: 4.0, vornIst: '+x', dreiecke: 5000, bild: 512 },
+  limousine: { art: 'verkehr', lang: 4.8, vornIst: '+z', dreiecke: 5000, bild: 512 },
+  gelaende: { art: 'verkehr', lang: 4.7, vornIst: '+x', dreiecke: 5000, bild: 512 },
+  transporter: { art: 'verkehr', lang: 5.6, vornIst: '+x', dreiecke: 5000, bild: 512 },
+  lkw: { art: 'verkehr', lang: 10, vornIst: '-z', dreiecke: 5000, bild: 512 },
+  // kern: Der Bus hat keine Scheiben (man schaut durch Löcher). Ein dunkler Kasten innen sieht aus wie getöntes Glas:
+  //       [Breite, unten, oben, Länge] als Anteil der Maße des Busses
+  bus: { art: 'verkehr', lang: 12, vornIst: '+x', dreiecke: 5000, bild: 512, kern: [0.8, 0.3, 0.8, 0.9] },
 };
 const RAD_DREIECKE = 1400;
 const LACK_MITTE = 0.5;      // so stark ist das genormte Blau bei mittlerer Helligkeit
@@ -46,7 +59,9 @@ await MeshoptSimplifier.ready;
 const io = new NodeIO();
 
 async function bauen(id) {
-  const A = AUTOS[id];
+  const A = { art: 'supercars', mitte: 0, radDreiecke: RAD_DREIECKE, rad: [0.3, 0.39], tief: 0.34, bild: 1024, ...AUTOS[id] };
+  const [QUELLE, ZIEL] = ORDNER(A.art);
+  const ohneRaeder = A.art === 'verkehr';
   const doc = await io.read(path.join(QUELLE, id + '.glb'));
   const prim = doc.getRoot().listMeshes()[0].listPrimitives()[0];
   const P = prim.getAttribute('POSITION').getArray(), UV = prim.getAttribute('TEXCOORD_0').getArray(), I = prim.getIndices().getArray();
@@ -73,7 +88,7 @@ async function bauen(id) {
 
   // 2. Räder finden: Die Ecken ganz unten (am Boden) gehören zu den Reifen
   const raeder = [];
-  for (const [name, sx, sz] of [['rad_vl', 1, 1], ['rad_vr', -1, 1], ['rad_hl', 1, -1], ['rad_hr', -1, -1]]) {
+  for (const [name, sx, sz] of ohneRaeder ? [] : [['rad_vl', 1, 1], ['rad_vr', -1, 1], ['rad_hl', 1, -1], ['rad_hr', -1, -1]]) {
     let zs = 0, anz = 0, aussen = 0;
     for (let k = 0; k < n; k++) {
       const x = pos[k * 3], y = pos[k * 3 + 1], z = pos[k * 3 + 2];
@@ -94,12 +109,12 @@ async function bauen(id) {
     raeder.push({ name, sx, zc, aussen, r: oben / 2 });
   }
   // gleiche Achse = gleicher Halbmesser und gleiche Stelle (links und rechts mitteln)
-  for (const [a, b] of [[0, 1], [2, 3]]) {
-    const r = Math.min(Math.max(raeder[a].r, raeder[b].r, 0.3), 0.39), zc = (raeder[a].zc + raeder[b].zc) / 2, au = (raeder[a].aussen + raeder[b].aussen) / 2;
+  for (const [a, b] of ohneRaeder ? [] : [[0, 1], [2, 3]]) {
+    const r = Math.min(Math.max(raeder[a].r, raeder[b].r, A.rad[0]), A.rad[1]), zc = (raeder[a].zc + raeder[b].zc) / 2, au = (raeder[a].aussen + raeder[b].aussen) / 2;
     for (const k of [a, b]) Object.assign(raeder[k], { r, zc, aussen: au });
   }
   // Dreiecke verteilen: 0 = Karosserie, 1…4 = Rad
-  const TIEF = 0.34;
+  const TIEF = A.tief;
   const teile = [[], [], [], [], []];
   for (let t = 0; t < I.length; t += 3) {
     const a = I[t], b = I[t + 1], c = I[t + 2];
@@ -115,7 +130,7 @@ async function bauen(id) {
   // 3. neue Datei: Karosserie und vier Räder, jedes Teil vereinfacht
   const neu = new Document(); const puffer = neu.createBuffer();
   const szene = neu.createScene();
-  const bild = await lackBild(doc.getRoot().listMaterials()[0].getBaseColorTexture().getImage());
+  const bild = await lackBild(doc.getRoot().listMaterials()[0].getBaseColorTexture().getImage(), A.bild);
   const tex = neu.createTexture('farbe').setImage(bild).setMimeType('image/jpeg');
   const mat = neu.createMaterial('auto').setBaseColorTexture(tex).setMetallicFactor(0).setRoughnessFactor(0.6);
   const teil = (name, idx, mitte) => {
@@ -134,7 +149,7 @@ async function bauen(id) {
     return pr;
   };
   const prims = [[teil('koerper', teile[0], [0, 0, 0]), A.dreiecke, teile[0].length / 3]];
-  raeder.forEach((R, k) => prims.push([teil(R.name, teile[k + 1], [R.sx * (R.aussen - 0.15), R.r, R.zc]), RAD_DREIECKE, teile[k + 1].length / 3]));
+  raeder.forEach((R, k) => prims.push([teil(R.name, teile[k + 1], [R.sx * (R.aussen - (A.radMitte || 0.15)), R.r, R.zc]), A.radDreiecke, teile[k + 1].length / 3]));
   await neu.transform(weld());
   for (const [pr, soll] of prims) {
     const ix = pr.getIndices().getArray(), pp = pr.getAttribute('POSITION').getArray(), uu = pr.getAttribute('TEXCOORD_0').getArray();
@@ -149,20 +164,35 @@ async function bauen(id) {
     const ix = pr.getIndices().getArray(), pp = pr.getAttribute('POSITION').getArray(), uu = pr.getAttribute('TEXCOORD_0').getArray();
     const nr = new Map(), p = [], uv = [], i2 = new Uint32Array(ix.length);
     ix.forEach((k, j) => { if (!nr.has(k)) { nr.set(k, p.length / 3); p.push(pp[k * 3], pp[k * 3 + 1], pp[k * 3 + 2]); uv.push(uu[k * 2], uu[k * 2 + 1]); } i2[j] = nr.get(k); });
+    let i3 = Array.from(i2);
+    if (A.kern && me.getName() === 'koerper') {
+      // dunkler Kasten innen: acht Ecken, alle zeigen im Farbbild auf die dunkelste Stelle
+      const [kb, ku, ko, kl] = A.kern, [du, dv] = await dunkelsteStelle(bild), n0 = p.length / 3;
+      for (const x of [-1, 1]) for (const y of [ku, ko]) for (const z of [-1, 1]) { p.push(x * breit * kb / 2, y * hoch, z * A.lang * kl / 2 + A.mitte); uv.push(du, dv); }
+      for (const [a, b, c, d] of [[0, 1, 3, 2], [4, 6, 7, 5], [0, 4, 5, 1], [2, 3, 7, 6], [0, 2, 6, 4], [1, 5, 7, 3]]) i3.push(n0 + a, n0 + b, n0 + c, n0 + a, n0 + c, n0 + d);
+    }
     pr.getAttribute('POSITION').setArray(new Float32Array(p)); pr.getAttribute('TEXCOORD_0').setArray(new Float32Array(uv));
-    pr.getIndices().setArray(p.length / 3 < 65536 ? new Uint16Array(i2) : i2);
+    pr.getIndices().setArray(p.length / 3 < 65536 ? new Uint16Array(i3) : new Uint32Array(i3));
   }
   fs.mkdirSync(ZIEL, { recursive: true });
   const datei = path.join(ZIEL, id + '.glb');
   await io.write(datei, neu);
   const zahl = neu.getRoot().listMeshes().map(me => me.listPrimitives()[0].getIndices().getCount() / 3);
-  console.log(raeder.map(R => R.r.toFixed(3)).join(' '));
+  if (ohneRaeder) return console.log(`${id.padEnd(11)} ${breit.toFixed(2)} m breit, ${hoch.toFixed(2)} m hoch · Dreiecke ${zahl.join(' + ')} · ${Math.round(fs.statSync(datei).size / 1024)} KB`);
   console.log(`${id.padEnd(9)} ${breit.toFixed(2)} m breit, ${hoch.toFixed(2)} m hoch · Räder r=${raeder[0].r.toFixed(2)}/${raeder[2].r.toFixed(2)} bei z=${raeder[0].zc.toFixed(2)}/${raeder[2].zc.toFixed(2)}, außen ${raeder[0].aussen.toFixed(2)}/${raeder[2].aussen.toFixed(2)} · Dreiecke ${zahl.join(' + ')} · ${Math.round(fs.statSync(datei).size / 1024)} KB`);
 }
 
+// Wo im Farbbild ist es am dunkelsten? (Bild-Koordinaten 0…1)
+async function dunkelsteStelle(jpg) {
+  const { data, info } = await sharp(Buffer.from(jpg)).resize(64, 64).raw().toBuffer({ resolveWithObject: true });
+  let best = 1e9, wo = 0;
+  for (let k = 0; k < info.width * info.height; k++) { const h = data[k * 3] + data[k * 3 + 1] + data[k * 3 + 2]; if (h < best) { best = h; wo = k; } }
+  return [(wo % info.width + 0.5) / info.width, (Math.floor(wo / info.width) + 0.5) / info.height];
+}
+
 // Farbbild verkleinern und den blauen Lack genormt speichern
-async function lackBild(daten) {
-  const { data, info } = await sharp(daten).resize(1024, 1024).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+async function lackBild(daten, gross = 1024) {
+  const { data, info } = await sharp(daten).resize(gross, gross).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const N = info.width * info.height, staerken = [];
   const lack = new Uint8Array(N);
   for (let k = 0; k < N; k++) {
@@ -185,4 +215,6 @@ async function lackBild(daten) {
   return new Uint8Array(await sharp(data, { raw: { width: info.width, height: info.height, channels: 3 } }).jpeg({ quality: 86, chromaSubsampling: '4:4:4' }).toBuffer());
 }
 
-for (const id of process.argv[2] ? [process.argv[2]] : Object.keys(AUTOS)) await bauen(id);
+// ohne Angabe: die sechs Supercars. Sonst ein Name (falkner, formel, bus …) oder eine Gruppe (supercars, verkehr, formel)
+const was = process.argv[2] || 'supercars';
+for (const id of Object.keys(AUTOS)) if (id === was || (AUTOS[id].art || 'supercars') === was) await bauen(id);

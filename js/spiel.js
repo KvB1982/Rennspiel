@@ -8,6 +8,8 @@ import { Buehne } from './szene.js';
 import { ladeModelle } from './modelle.js';
 import { ladeBilder } from './texturen.js';
 import { ladeSupercars } from './supercarbau.js';
+import { ladeFormel, ladeVerkehr } from './automodelle.js';
+import { ARTEN } from './verkehr.js';
 import { Kamera, SICHTEN } from './kamera.js';
 import { Eingabe } from './eingabe.js';
 import { LenkradEmpfang } from './verbindung.js';
@@ -70,7 +72,10 @@ export function starteSpiel() {
       const g = ladeGeist(def.id, E.fahrzeug + geistArt());
       const laenge = def.modell ? (T0.laenge).toFixed(1) + ' m' : (T0.laenge / 1000).toFixed(2) + ' km';
       b.innerHTML = `<canvas width="300" height="150"></canvas><b>${def.name}</b><small>${def.ort} · ${laenge}</small><small>${def.text}</small>${g ? `<span class="best">⏱ Bestzeit ${zeitText(g.zeit)}</span>` : ''}`;
-      karteMalen(b.querySelector('canvas'), T0, '#e8edf3', 6);
+      const cv = b.querySelector('canvas');
+      // hinter dem Streckenplan: ein Bild aus dem Spiel, etwas abgedunkelt, damit man die Linie gut sieht
+      cv.style.backgroundImage = `linear-gradient(rgba(8,12,20,.3), rgba(8,12,20,.55)), url(bilder/menue/strecke_${def.id}.webp)`;
+      karteMalen(cv, T0, '#ffffff', 6);
       b.addEventListener('click', () => { E[feld] = def.id; merken(); menueBauen(); });
       box.appendChild(b);
     }
@@ -137,14 +142,14 @@ export function starteSpiel() {
       : modell ? 'Ferngesteuertes Auto: Du stehst neben der Bahn. Tanken und Reifen wechseln: in der Boxengasse rechts neben der Startgeraden im blauen Feld anhalten. Mit 🎥 wechselst du die Stelle, an der du stehst.'
       : sup ? 'Supercar: Rechts fährt der Verkehr in deine Richtung, links kommt dir Gegenverkehr entgegen. Auf der Autobahn ist der Gegenverkehr hinter der Mittelmauer. Überhol vorsichtig!' : '';
   };
-  // Karten der Supercars: kleines Bild (Seitenansicht als Umriss), Name, Vorbild, Leistung
+  // Karten der Supercars: Bild des Autos in der gewählten Lackfarbe, Name, Vorbild, Leistung
   function autosBauen() {
     const box = $('mAutos'); box.innerHTML = '';
     for (const S of SUPERCARS) {
       const b = document.createElement('button'); b.dataset.wert = S.id;
       const ps = Math.round(S.p.leistung / 735.5), kmhMax = Math.round(S.p.vMax * 3.6);
-      b.innerHTML = `<canvas width="300" height="120"></canvas><b>${S.name}</b><small>Vorbild: ${S.vorbild}</small><small>${S.text}</small><span class="werte">${ps} PS · ${kmhMax} km/h · ${S.p.masse} kg</span>`;
-      umriss(b.querySelector('canvas'), S, E.supercar === S.id && LACKE[E.lack] && LACKE[E.lack].farbe !== null ? LACKE[E.lack].farbe : S.farbe);
+      b.innerHTML = `<canvas width="600" height="240"></canvas><b>${S.name}</b><small>Vorbild: ${S.vorbild}</small><small>${S.text}</small><span class="werte">${ps} PS · ${kmhMax} km/h · ${S.p.masse} kg</span>`;
+      autoBild(b.querySelector('canvas'), S, E.supercar === S.id && LACKE[E.lack] && LACKE[E.lack].farbe !== null ? LACKE[E.lack].farbe : S.farbe);
       b.classList.toggle('an', S.id === E.supercar);
       b.addEventListener('click', () => { E.supercar = S.id; merken(); menueBauen(); });
       box.appendChild(b);
@@ -184,7 +189,7 @@ export function starteSpiel() {
   function starten() {
     zeige('laden', true);
     setTimeout(async () => {
-      await Promise.all([ladeModelle(), ladeBilder(), E.fahrzeug === 'super' ? ladeSupercars() : null]);   // fertige 3D-Modelle (nur beim ersten Start; ohne Internet geht es nach ein paar Sekunden mit Kisten weiter)
+      await Promise.all([ladeModelle(), ladeBilder(), ...(E.fahrzeug === 'super' ? [ladeSupercars(), ladeVerkehr(Object.keys(ARTEN))] : [ladeFormel()])]);   // fertige 3D-Modelle (nur beim ersten Start; ohne Internet geht es nach ein paar Sekunden mit Kisten weiter)
       const modell = istKlein(), slot = E.fahrzeug === 'slot', sup = E.fahrzeug === 'super';
       const id = E[streckenFeld()];
       T = holeStrecke(id);
@@ -455,7 +460,27 @@ async function qrMalen(cv, text) {
   }
 }
 
-// ---------------------------------------------------------------- Umriss eines Supercars für die Karte im Menü (Seitenansicht)
+// ---------------------------------------------------------------- Bild eines Supercars für die Karte im Menü
+// Die Bilder in bilder/menue/auto_<id>.webp zeigen das Auto mit blauem Lack (gemalt mit tools/autobilder.html).
+// Hier wird das Blau Punkt für Punkt gegen die gewählte Lackfarbe getauscht – dieselbe Idee wie beim Auto im Spiel.
+const autoBilder = new Map();   // id → Versprechen auf das geladene Bild
+function autoBild(cv, S, farbe) {
+  if (!autoBilder.has(S.id)) autoBilder.set(S.id, new Promise((ok, fehler) => { const b = new Image(); b.onload = () => ok(b); b.onerror = fehler; b.src = `bilder/menue/auto_${S.id}.webp`; }));
+  autoBilder.get(S.id).then(bild => {
+    const ctx = cv.getContext('2d', { willReadFrequently: true }), W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H); ctx.drawImage(bild, 0, 0, W, H);
+    const d = ctx.getImageData(0, 0, W, H), p = d.data;
+    const lr = (farbe >> 16 & 255) / 255, lg = (farbe >> 8 & 255) / 255, lb = (farbe & 255) / 255;
+    for (let k = 0; k < p.length; k += 4) {
+      const grau = Math.min(p[k], p[k + 1]), blau = p[k + 2] - grau;   // grau = Glanzlicht, blau = so viel Lack ist hier
+      if (blau < 6) continue;
+      p[k] = Math.min(255, grau + lr * blau); p[k + 1] = Math.min(255, grau + lg * blau); p[k + 2] = Math.min(255, grau + lb * blau);
+    }
+    ctx.putImageData(d, 0, 0);
+  }).catch(() => umriss(cv, S, farbe));   // kein Bild da: der gezeichnete Umriss von früher
+}
+
+// ---------------------------------------------------------------- Umriss eines Supercars (Seitenansicht, nur als Rückfall)
 function umriss(cv, S, farbe) {
   const ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
   ctx.clearRect(0, 0, W, H);

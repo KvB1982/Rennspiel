@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import { nummer } from './texturen.js';
+import { echtesAuto, lackMaterial } from './automodelle.js';
 
 const VORN = 1.6, HINTEN = -2.0;   // Achsen (wie in physik.js: a = 1,6 m, b = 2,0 m)
 // Das ganze Auto ist 5,6 m lang und 1,95 m breit (wie ein echter Formel-Wagen).
@@ -178,10 +179,10 @@ export function baueAuto({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massstab
   nr.rotation.x = -Math.PI / 2 + 0.13; nr.rotation.z = Math.PI; nr.position.set(0, 0.55, nz(2.05)); add(nr);
 
   // Räder und Aufhängung (die Räder federn nicht mit dem Körper)
-  const raeder = [], lenkVorn = [];
+  const raeder = [], lenkVorn = [], alteHalter = [];
   const ecken = [[0.8, VORN, 0.33, 0.3], [-0.8, VORN, 0.33, 0.3], [0.78, HINTEN, 0.36, 0.4], [-0.78, HINTEN, 0.36, 0.4]];
   ecken.forEach(([x, z, r, b], k) => {
-    const halter = new THREE.Group(); halter.position.set(x, r, z); auto.add(halter);
+    const halter = new THREE.Group(); halter.position.set(x, r, z); auto.add(halter); alteHalter.push(halter);
     const rd = rad(r, b, mats); halter.add(rd);
     raeder.push(rd); if (k < 2) lenkVorn.push(halter);
     // Querlenker vom Rumpf zum Rad
@@ -190,9 +191,29 @@ export function baueAuto({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massstab
     koerper.add(stange([inn, 0.3, z - 0.15], [x - Math.sign(x) * b * 0.4, r - 0.08, z], 0.016, karbon));
   });
 
+  // Gibt es das fertige Modell (modelle/formel/formel.glb)? Dann kommt alles bisher Gebaute in eine Gruppe "alt".
+  // Die sieht man nur noch im Cockpit (dort braucht man Lenkrad und Nase direkt vor den Augen), samt den alten Rädern.
+  const E = echtesAuto('formel');
+  let sicht = null;
+  if (E) {
+    const alt = new THREE.Group();
+    for (const kind of [...koerper.children]) alt.add(kind);
+    koerper.add(alt, licht);   // das Rücklicht bleibt immer zu sehen (es sitzt auch beim neuen Auto mitten am Heck)
+    const neu = new THREE.Group(); auto.add(neu);
+    const karosse = new THREE.Mesh(E.koerper, lackMaterial(E.bild, farbe)); koerper.add(karosse);
+    const radMat = lackMaterial(E.bild, 0x26272b);
+    E.raeder.forEach((R, k) => {
+      const halter = new THREE.Group(); halter.position.copy(R.ort); neu.add(halter);
+      const rd = new THREE.Mesh(R.form, radMat); halter.add(rd); raeder.push(rd);
+      if (k < 2) lenkVorn.push(halter);
+    });
+    sicht = imAuto => { alt.visible = imAuto; for (const h of alteHalter) h.visible = imAuto; karosse.visible = neu.visible = !imAuto; };
+    sicht(false);
+  }
+
   auto.scale.setScalar(massstab);
   auto.traverse(o => { if (o.isMesh) o.castShadow = true; });
-  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, licht, helm: [helm, visier], halo, massstab };
+  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, licht, helm: [helm, visier], halo, massstab, sicht };
 }
 
 // Das Auto im Bild auf den Stand der Physik bringen
