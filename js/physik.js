@@ -31,6 +31,7 @@ export const AUTOS = {
     bremsGriff: 1.25,                 // beim Bremsen halten die Reifen längs mehr aus als zur Seite (Spiel-Wert: kräftigere Bremse)
     esp: { beta: 0.1, dreh: 6, quer: 0.4 },   // Schleuderschutz (siehe unten)
     lenkMax: 0.42, lenkTempo: 32,     // größter Lenkeinschlag (rad); ab diesem Tempo (m/s) lenkt man weniger
+    lenkGriff: 1.3, lenkDazu: 0.035,   // Übersetzung des Lenkrads (siehe lenkGrenze)
     gaenge: 8, drehzahlMax: 12500, vMax: 92, rueck: 14,
     schritte: 8, unten: 3,
   },
@@ -97,7 +98,15 @@ export function neuesAuto(art = 'f1', tempo = 0) {
 const reifen = (al, D, B, C) => D * Math.sin(C * Math.atan(B * al));
 
 // Größter Lenkeinschlag bei diesem Tempo (bei hohem Tempo lenkt man feiner)
-export const lenkGrenze = (p, u) => p.lenkMax / (1 + (Math.abs(u) / p.lenkTempo) ** 2);
+// Große Autos (lenkGriff gesetzt): Das Lenkrad ist bei jedem Tempo so übersetzt, dass voller Ausschlag
+// ungefähr die engste Kurve ergibt, die die Reifen bei diesem Tempo gerade noch schaffen (mal lenkGriff, plus lenkDazu
+// für den Schräglauf der Reifen). So nutzt man den ganzen Weg des Lenkrads, und eine kleine Bewegung
+// wirft das Auto bei hohem Tempo nicht gleich von der Strecke.
+export const lenkGrenze = (p, u) => {
+  if (!p.lenkGriff) return p.lenkMax / (1 + (Math.abs(u) / p.lenkTempo) ** 2);
+  const quer = p.haft * (G + 0.5 * LUFT * p.abtrieb * u * u / p.masse);   // so viel Kurvenkraft geht höchstens (m/s²)
+  return Math.min(p.lenkMax, p.lenkGriff * (p.a + p.b) * quer / Math.max(u * u, 1) + p.lenkDazu);
+};
 
 // Einen Zeitschritt rechnen. T = Strecke (für Untergrund, Höhe, Begrenzung).
 export function schritt(a, T, dt) {

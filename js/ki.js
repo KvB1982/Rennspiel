@@ -1,8 +1,10 @@
 // Rennspiel – die Computerfahrer und die Ideallinie (ohne three.js, auch in node testbar).
 //
 // Ideallinie: Rennfahrer fahren Kurven außen an, innen am Scheitelpunkt vorbei und wieder nach außen.
-// So wird die Kurve weniger eng und man ist schneller. Das Programm findet diese Linie, indem es jeden Punkt
-// immer wieder ein Stück in die Mitte seiner Nachbarn schiebt (dann wird die Linie so gerade wie möglich).
+// So wird der Bogen so weit wie möglich – und je weiter der Bogen, desto schneller kann man fahren
+// (Tempo² = Haftung × Kurvenradius). Bei langsamen Kurven vor einer Geraden liegt der Scheitelpunkt etwas
+// später: Man lenkt später ein, ist am Ausgang früher gerade und kann früher Gas geben.
+// Folgen zwei Kurven direkt aufeinander (S-Kurve, Schikane), opfert die Linie die erste für die letzte.
 //
 // Tempo-Plan: Für jede Stelle der Linie wird ausgerechnet, wie schnell man dort höchstens sein kann
 // und wo man vorher bremsen muss. Danach richten sich die Computerfahrer – und die Bremshilfe für dich.
@@ -12,47 +14,112 @@ import { MASSSTAB } from './strecke.js';
 
 const G = 9.81, LUFT = 1.2;
 
-// rechts = true: auf Straßen mit Gegenverkehr bleibt die Linie auf der rechten Straßenhälfte
-export function ideallinie(T, p, { rechts = false } = {}) {
-  const n = T.n;
-  const schritt = Math.max(1, Math.round((T.def.modell ? 0.25 : 10) / T.ds));
-  const m = Math.floor(n / schritt);
-  const rand = T.def.modell ? 0.06 : 1.6;
-  const cx = [], cz = [], nx = [], nz = [], lim = [], oben = [];
-  for (let j = 0; j < m; j++) {
-    const i = j * schritt;
-    cx.push(T.x[i]); cz.push(T.z[i]); nx.push(T.tz[i]); nz.push(-T.tx[i]);
-    lim.push(Math.max(0, T.hb[i] - rand));
-    // Gegenverkehr links: höchstens bis kurz über die Mittellinie (nicht auf der Autobahn, dort ist die ganze Breite deine)
-    oben.push(rechts && T.zone && T.zone[i] !== 3 ? Math.min(lim[j], T.hb[i] * 0.06) : lim[j]);
-  }
-  const o = new Float64Array(m);
-  for (let it = 0; it < 900; it++) {
+// So findet das Programm die Linie ("kleinste Krümmung", wie bei selbstfahrenden Rennautos):
+//   1. Die Strecke wird in Punkte geteilt. Jeder Punkt darf nur quer zur Fahrbahn rutschen, von Rand zu Rand.
+//   2. Jeder Punkt wird immer wieder so verschoben, dass die Linie dort möglichst wenig "knickt".
+//      Ein Knick ist: der Punkt liegt nicht in der Mitte zwischen seinen Nachbarn (zweite Differenz).
+//      Gesucht ist die Linie, bei der die Summe aller Knicke im Quadrat am kleinsten ist.
+//      (Früher wurde jeder Punkt nur in die Mitte seiner Nachbarn geschoben. Das ergibt den KÜRZESTEN Weg:
+//      der klebt die ganze Kurve lang am Innenrand und ist viel zu eng – also langsam.)
+//   3. Erst grob (alle 20 m), dann feiner (10 m, 5 m): so stimmen lange Bögen und kleine Ecken.
+//   4. Später Scheitelpunkt: Wo man aus der Kurve heraus beschleunigt, zählt ein Knick mehr (SPAET).
+//      Dann wird die Linie am Kurveneingang etwas enger und am Ausgang weiter – man kann früher Gas geben.
+const SPAET = 1.2;     // 0 = genau gleichmäßiger Bogen, größer = späterer Scheitelpunkt
+const STUFEN = [[20, 500], [10, 700], [5, 900]];   // [Abstand der Punkte in Metern, Durchgänge]
+
+// Ein Durchgang-Paket auf einer Stufe. o = seitliche Verschiebung je Punkt (wird verändert), g = Gewicht je Punkt
+function glaetten(cx, cz, nx, nz, unten, oben, o, g, runden) {
+  const m = o.length;
+  if (m < 6) return;
+  const px = new Float64Array(m), pz = new Float64Array(m);
+  for (let j = 0; j < m; j++) { px[j] = cx[j] + nx[j] * o[j]; pz[j] = cz[j] + nz[j] * o[j]; }
+  for (let it = 0; it < runden; it++) {
     for (let j = 0; j < m; j++) {
-      const a = (j + m - 1) % m, b = (j + 1) % m;
-      const px = (cx[a] + nx[a] * o[a] + cx[b] + nx[b] * o[b]) / 2;
-      const pz = (cz[a] + nz[a] * o[a] + cz[b] + nz[b] * o[b]) / 2;
-      let w = (px - cx[j]) * nx[j] + (pz - cz[j]) * nz[j];
-      o[j] = Math.max(-lim[j], Math.min(oben[j], o[j] + (w - o[j]) * 0.8));
+      const a2 = (j + m - 2) % m, a1 = (j + m - 1) % m, b1 = (j + 1) % m, b2 = (j + 2) % m;
+      const wa = g[a1], w0 = g[j], wb = g[b1], sum = wa + 4 * w0 + wb;
+      // bester Platz für Punkt j, wenn die Nachbarn bleiben, wo sie sind
+      const zx = (wa * (2 * px[a1] - px[a2]) + 2 * w0 * (px[a1] + px[b1]) + wb * (2 * px[b1] - px[b2])) / sum;
+      const zz = (wa * (2 * pz[a1] - pz[a2]) + 2 * w0 * (pz[a1] + pz[b1]) + wb * (2 * pz[b1] - pz[b2])) / sum;
+      // nur quer zur Fahrbahn verschieben und auf der Fahrbahn bleiben
+      const w = (zx - cx[j]) * nx[j] + (zz - cz[j]) * nz[j];
+      o[j] = Math.max(unten[j], Math.min(oben[j], w));
+      px[j] = cx[j] + nx[j] * o[j]; pz[j] = cz[j] + nz[j] * o[j];
     }
   }
-  // zurück auf alle Messpunkte verteilen
-  const off = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const j = Math.floor(i / schritt) % m, f = (i % schritt) / schritt, j2 = (j + 1) % m;
-    off[i] = o[j] * (1 - f) + o[j2] * f;
+}
+
+// seitliche Verschiebung der Linie an jedem Messpunkt ausrechnen. gewicht(i) = wie wichtig ist ein kleiner Knick dort
+function linieSuchen(T, rechts, gewicht) {
+  const n = T.n, sc = T.def.modell ? MASSSTAB : 1;
+  const rand = T.def.modell ? 0.06 : 2.5;
+  let off = new Float32Array(n);
+  for (const [abstand, runden] of STUFEN) {
+    const schritt = Math.max(1, Math.round(abstand * sc / T.ds));
+    const m = Math.floor(n / schritt);
+    if (m < 8) continue;
+    const cx = [], cz = [], nx = [], nz = [], unten = [], oben = [], g = [];
+    const o = new Float64Array(m);
+    for (let j = 0; j < m; j++) {
+      const i = j * schritt;
+      cx.push(T.x[i]); cz.push(T.z[i]); nx.push(T.tz[i]); nz.push(-T.tx[i]);
+      const lim = Math.max(0, T.hb[i] - rand);
+      unten.push(-lim);
+      // Gegenverkehr links: höchstens bis kurz über die Mittellinie (nicht auf der Autobahn, dort ist die ganze Breite deine)
+      oben.push(rechts && T.zone && T.zone[i] !== 3 ? Math.min(lim, T.hb[i] * 0.06) : lim);
+      o[j] = Math.max(unten[j], Math.min(oben[j], off[i]));
+      g.push(gewicht ? gewicht(i) : 1);
+    }
+    glaetten(cx, cz, nx, nz, unten, oben, o, g, runden);
+    // zurück auf alle Messpunkte verteilen (weich von Punkt zu Punkt)
+    const neu = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const j = Math.min(m - 1, Math.floor(i / schritt)), j2 = (j + 1) % m;
+      // das letzte Stück vor dem Start kann etwas länger sein als die anderen
+      const lang = j === m - 1 ? n - j * schritt : schritt;
+      const f = (i - j * schritt) / lang;
+      neu[i] = o[j] * (1 - f) + o[j2] * f;
+    }
+    off = neu;
   }
-  // Punkte der Linie und ihre Krümmung
+  return off;
+}
+
+// Punkte und Krümmung einer Linie aus der seitlichen Verschiebung
+function linieAus(T, off) {
+  const n = T.n, sc = T.def.modell ? MASSSTAB : 1;
   const lx = new Float32Array(n), lz = new Float32Array(n), kr = new Float32Array(n);
   for (let i = 0; i < n; i++) { lx[i] = T.x[i] + T.tz[i] * off[i]; lz[i] = T.z[i] - T.tx[i] * off[i]; }
-  const w = schritt;
+  const w = Math.max(1, Math.round(8 * sc / T.ds));
   for (let i = 0; i < n; i++) {
     const a = (i + n - w) % n, b = (i + w) % n;
     const ax = lx[i] - lx[a], az = lz[i] - lz[a], bx = lx[b] - lx[i], bz = lz[b] - lz[i];
     const kreuz = ax * bz - az * bx, la = Math.hypot(ax, az), lb = Math.hypot(bx, bz), lc = Math.hypot(lx[b] - lx[a], lz[b] - lz[a]);
     kr[i] = la * lb * lc > 1e-9 ? Math.abs(2 * kreuz / (la * lb * lc)) : 0;
   }
-  return { off, lx, lz, kr, tempo: tempoPlan(T, kr, p) };
+  return { off, lx, lz, kr };
+}
+
+// rechts = true: auf Straßen mit Gegenverkehr bleibt die Linie auf der rechten Straßenhälfte
+export function ideallinie(T, p, { rechts = false } = {}) {
+  const n = T.n, sc = T.def.modell ? MASSSTAB : 1;
+  // 1. Durchgang: überall gleich wichtig = gleichmäßiger, möglichst weiter Bogen
+  let L = linieAus(T, linieSuchen(T, rechts, null));
+  if (SPAET > 0 && p && p.leistung) {
+    // 2. Durchgang: Wo das Tempo nach der Kurve wieder steigt (Kurvenausgang), zählt ein Knick mehr.
+    const v = tempoPlan(T, L.kr, p);
+    const d = Math.max(1, Math.round(30 * sc / T.ds));
+    const g = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const vor = v[(i + d) % n], hier = v[i];
+      // nur in der Kurve (deutlich unter Höchsttempo) und nur, wenn es dahinter schneller wird
+      const steigt = Math.max(0, Math.min(1, (vor - hier) / (0.12 * p.vMax)));
+      const kurve = Math.max(0, Math.min(1, (0.95 * p.vMax - hier) / (0.3 * p.vMax)));
+      g[i] = 1 + SPAET * steigt * kurve;
+    }
+    L = linieAus(T, linieSuchen(T, rechts, i => g[i]));
+  }
+  L.tempo = tempoPlan(T, L.kr, p);
+  return L;
 }
 
 // Höchsttempo an jeder Stelle (m/s), mit Bremszonen davor
@@ -90,6 +157,7 @@ export function neuerFahrer(staerke = 0.95, mut = 0.5) {
   return { staerke, mut, extra: 0, extraZiel: 0, fehlerZeit: 0, fehler: 0 };
 }
 
+const NACHLENK = 3;   // so viel mehr lenken die Computerfahrer bei Höchsttempo (ausprobiert mit tools/sim.mjs)
 // Lenkung zu einer Stelle auf der Ideallinie (auch für die Lenkhilfe des Spielers)
 export function lenkZurLinie(a, T, L, extra = 0, vorausMal = 1) {
   const p = a.p, sc = T.def.modell ? MASSSTAB : 1;
@@ -102,7 +170,9 @@ export function lenkZurLinie(a, T, L, extra = 0, vorausMal = 1) {
   const vor = dx * sh + dz * ch, links = dx * ch - dz * sh;
   const al = Math.atan2(links, Math.max(vor, 0.1 * sc));
   const ld = Math.hypot(dx, dz);
-  const delta = Math.atan(2 * (p.a + p.b) * Math.sin(al) / Math.max(ld, 1e-3));
+  // Bei hohem Tempo rutschen die Reifen etwas zur Seite, das Auto braucht mehr Lenkeinschlag als auf dem Papier (NACHLENK)
+  const mehr = 1 + NACHLENK * (a.u / p.vMax) ** 2;
+  const delta = Math.atan(2 * (p.a + p.b) * Math.sin(al) / Math.max(ld, 1e-3)) * mehr;
   return Math.max(-1, Math.min(1, delta / lenkGrenze(p, a.u)));
 }
 

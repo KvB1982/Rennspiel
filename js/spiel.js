@@ -25,6 +25,7 @@ const STANDARD = {
   supercar: 'falkner', lack: 0, verkehr: 'normal', runden_super: 1, gegner_super: 5,
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
   bremshilfe: true, lenkhilfe: false, traktion: true, autogas: false, grafik: 'hoch', linie: true, boxen: true,
+  neigStufe: 3,    // wie weit man das Gerät dafür neigen muss (2 = weit, 3 = normal, 4 = wenig; Grad stehen in VOLL in neigung.js)
   neigen: false,   // dieses Gerät selbst neigen (Gas und Bremse auf dem Bildschirm), wenn kein Handy-Lenkrad verbunden ist
 };
 // Höchsttempo der kleinen Autos in Metern pro Sekunde. 3 m/s sehen beim Maßstab 1:30 aus wie 325 km/h.
@@ -121,6 +122,7 @@ export function starteSpiel() {
     zeile('Traktionskontrolle', 'traktion', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Gas von allein', 'autogas', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Dieses Gerät neigen', 'neigen', [[true, 'an'], [false, 'aus']], neigenGeht);
+    zeile('Lenken beim Neigen', 'neigStufe', [[2, 'ruhig'], [3, 'normal'], [4, 'direkt']], neigenGeht && E.neigen);
     zeile('Grafik', 'grafik', [['hoch', 'schön'], ['mittel', 'mittel'], ['niedrig', 'schnell']]);
     // Farbe des eigenen Autos (Supercar: Lackfarbe, sonst Rennstall)
     const z = document.createElement('div'); z.className = 'zeile'; z.innerHTML = `<span>${sup ? 'Lackfarbe' : 'Dein Rennstall'}</span><div class="wahl"></div>`;
@@ -167,6 +169,7 @@ export function starteSpiel() {
   // Der Sensor darf nur direkt nach einem Fingertipp eingeschaltet werden (im Browser fragt das iPhone dann um Erlaubnis)
   const neigenAn = async () => {
     if (!E.neigen || !neigenGeht) { eingabe.neigung.stop(); return false; }
+    eingabe.neigung.stufe = E.neigStufe;
     if (eingabe.neigung.an) return true;
     return await eingabe.neigung.start();
   };
