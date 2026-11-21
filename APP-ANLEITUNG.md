@@ -74,7 +74,13 @@ Ist kein Handy-Lenkrad verbunden, steuerst du mit dem iPad oder iPhone selbst: G
 3. Im Fenster „Organizer“: **Distribute App → TestFlight & App Store → Upload**.
 4. In App Store Connect unter **TestFlight** die Tester eintragen.
 
-Bei jedem neuen Upload muss die Build-Nummer steigen: Ziel **App → General → Build** (im Projekt `CURRENT_PROJECT_VERSION`, im Moment 5).
+**Schneller, ohne Xcode zu öffnen:** im Terminal im Ordner des Spiels
+
+```bash
+npm run testflight
+```
+
+Das holt den neuesten Stand, baut die App und lädt sie hoch (`scripts/testflight.sh`). Die Build-Nummer ist dabei die Uhrzeit (zum Beispiel 2611212115) und steigt so von selbst. Wer von Hand über Xcode hochlädt, muss die Build-Nummer selbst erhöhen: Ziel **App → General → Build**.
 
 ## Nach Änderungen am Spiel
 
