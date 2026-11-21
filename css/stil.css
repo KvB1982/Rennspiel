@@ -1,0 +1,115 @@
+/* Rennspiel – Aussehen von Menü, Anzeige und Handy-Lenkrad */
+:root { --grund: #0b0f17; --karte: #151c28; --rand: #2a3546; --text: #eef2f7; --leise: #9aa7b8; --rot: #e3342f; --gruen: #2fd06a; --gelb: #ffd24a; --blau: #3aa0ff; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--grund); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+button { font: inherit; color: inherit; cursor: pointer; }
+#bild { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+[hidden] { display: none !important; }
+
+/* ---------------- Menü */
+#menue { position: fixed; inset: 0; overflow-y: auto; background: radial-gradient(ellipse at 70% 0%, #1b2b45 0%, var(--grund) 60%); padding: max(16px, env(safe-area-inset-top)) 16px 24px; }
+#menue header { text-align: center; margin: 4px 0 10px; }
+#menue h1 { margin: 0; font-size: clamp(28px, 4vw, 44px); letter-spacing: 1px; font-style: italic; }
+#menue header p { margin: 4px 0 0; color: var(--leise); }
+#mSpalten { display: grid; grid-template-columns: 1fr 360px; gap: 20px; max-width: 1300px; margin: 0 auto; }
+@media (max-width: 900px) { #mSpalten { grid-template-columns: 1fr; } }
+h2 { font-size: 16px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--leise); margin: 18px 0 8px; }
+.karten { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.karten button { text-align: left; background: var(--karte); border: 2px solid var(--rand); border-radius: 14px; padding: 12px 14px; display: grid; gap: 3px; transition: border-color .15s, transform .15s; }
+.karten button:hover { border-color: #4b5d78; }
+.karten button.an { border-color: var(--rot); box-shadow: 0 0 0 1px var(--rot) inset, 0 6px 20px rgba(227,52,47,.25); }
+.karten .gross { font-size: 30px; }
+.karten small { color: var(--leise); }
+.strecken button canvas { width: 100%; height: 110px; background: #0e141e; border-radius: 8px; }
+.strecken .best { color: var(--gelb); font-size: 13px; }
+#mEinst { display: grid; gap: 8px; }
+.zeile { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.zeile > span:first-child { width: 150px; color: var(--leise); }
+.wahl { display: flex; flex-wrap: wrap; gap: 6px; }
+.wahl button { background: var(--karte); border: 1px solid var(--rand); border-radius: 999px; padding: 6px 12px; }
+.wahl button.an { background: var(--rot); border-color: var(--rot); }
+.farbe { width: 30px; height: 30px; border-radius: 50%; border: 3px solid transparent !important; padding: 0 !important; }
+.farbe.an { border-color: #fff !important; background-clip: padding-box; }
+#lenkradBox { background: var(--karte); border: 2px solid var(--rand); border-radius: 16px; padding: 4px 16px 12px; }
+#lbInhalt { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: center; }
+#qr { width: 150px; height: 150px; background: #fff; border-radius: 10px; image-rendering: pixelated; }
+#lbAdresse { word-break: break-all; font-family: monospace; font-size: 12px; color: var(--blau); }
+#lbCode { font-size: 22px; letter-spacing: 3px; color: var(--gelb); }
+#lbStatus.verbunden { color: var(--gruen); font-weight: bold; }
+.klein { font-size: 13px; color: var(--leise); }
+.link { background: none; border: none; color: var(--blau); text-decoration: underline; padding: 0; }
+#mStart { width: 100%; margin-top: 16px; padding: 18px; font-size: 24px; font-weight: bold; border: none; border-radius: 16px; background: linear-gradient(180deg, #ff4b3f, #c9221c); box-shadow: 0 8px 24px rgba(227,52,47,.35); }
+
+/* ---------------- Anzeige während der Fahrt */
+#hud { position: fixed; inset: 0; pointer-events: none; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+#hud button { pointer-events: auto; }
+#hOben { position: absolute; left: max(14px, env(safe-area-inset-left)); top: 12px; display: flex; gap: 10px; align-items: baseline; }
+#hPlatz { font-size: 44px; font-weight: 900; font-style: italic; }
+#hPlatz small { font-size: 20px; opacity: .8; }
+#hRunde { font-size: 20px; font-weight: bold; background: rgba(0,0,0,.45); padding: 4px 10px; border-radius: 8px; }
+#hListe { position: absolute; left: max(14px, env(safe-area-inset-left)); top: 72px; font-size: 14px; display: grid; gap: 2px; }
+#hListe div { background: rgba(10,14,22,.7); padding: 2px 8px; border-radius: 4px; display: flex; gap: 8px; min-width: 170px; }
+#hListe div.ich { background: rgba(227,52,47,.85); }
+#hListe i { display: inline-block; width: 4px; border-radius: 2px; }
+#hListe b { width: 18px; text-align: right; }
+#hZeiten { position: absolute; right: max(14px, env(safe-area-inset-right)); top: 60px; text-align: right; font-size: 18px; display: grid; gap: 3px; }
+#hZeiten .gross { font-size: 30px; font-weight: bold; }
+#hZeiten .gut { color: var(--gruen); } #hZeiten .schlecht { color: #ff6b5e; } #hZeiten .ungueltig { color: #ff6b5e; text-decoration: line-through; }
+#hAmpel { position: absolute; left: 50%; top: 14%; transform: translateX(-50%); display: none; gap: 14px; background: #111; padding: 12px 16px; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.6); }
+#hAmpel.an { display: flex; }
+#hAmpel i { width: 44px; height: 44px; border-radius: 50%; background: #3a0b0b; box-shadow: inset 0 0 10px #000; }
+#hAmpel i.an { background: radial-gradient(circle at 40% 35%, #ff8a80, #ff1a1a 60%, #a00000); box-shadow: 0 0 22px #ff2a2a; }
+#hMeldung { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); font-size: clamp(26px, 4vw, 48px); font-weight: 900; font-style: italic; text-align: center; opacity: 0; transition: opacity .3s; white-space: nowrap; }
+#hMeldung.an { opacity: 1; }
+#hMeldung.beste { color: #c38bff; } #hMeldung.warn { color: #ffb44a; font-size: clamp(18px, 2.4vw, 28px); } #hMeldung.ziel { color: var(--gelb); }
+#hTacho { position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); width: 180px; text-align: right; }
+#hKmh { font-size: 64px; font-weight: 900; font-style: italic; line-height: 1; }
+#hEinheit { font-size: 14px; opacity: .8; }
+#hGang { position: absolute; right: 0; top: -44px; font-size: 34px; font-weight: 900; color: var(--gelb); }
+#hDz { height: 8px; background: rgba(0,0,0,.5); border-radius: 4px; overflow: hidden; margin-bottom: 6px; }
+#hDz i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #2fd06a 0%, #ffd24a 60%, #ff3b30 85%, #6a7dff 100%); background-size: 180px 100%; }
+#hKarte { position: absolute; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); width: 190px; height: 190px; opacity: .92; }
+#hKnoepfe { position: absolute; right: max(14px, env(safe-area-inset-right)); top: 10px; display: flex; gap: 8px; align-items: center; }
+#hKnoepfe button { width: 42px; height: 42px; border-radius: 50%; border: none; background: rgba(0,0,0,.5); font-size: 18px; }
+#hHandy { font-size: 13px; background: rgba(0,0,0,.5); padding: 4px 10px; border-radius: 999px; }
+#hHandy.an { background: rgba(47,208,106,.75); }
+#hHilfe { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); font-size: 13px; opacity: .75; text-align: center; }
+#pedale { position: absolute; inset: auto 0 0 0; height: 45%; display: flex; justify-content: space-between; pointer-events: auto; }
+#pedale div { width: 30%; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 30px; font-weight: bold; color: rgba(255,255,255,.55); }
+#pBremse.an { background: linear-gradient(0deg, rgba(227,52,47,.45), transparent); }
+#pGas.an { background: linear-gradient(0deg, rgba(47,208,106,.45), transparent); }
+
+/* ---------------- Fenster (Pause, Ergebnis) */
+.fenster { position: fixed; inset: 0; background: rgba(5,8,14,.7); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+.fenster > div { background: var(--karte); border: 2px solid var(--rand); border-radius: 18px; padding: 18px 24px; min-width: 300px; display: grid; gap: 10px; max-height: 90vh; overflow: auto; }
+.fenster h2 { color: var(--text); font-size: 26px; text-transform: none; letter-spacing: 0; margin: 4px 0; text-align: center; }
+.fenster button { padding: 12px; border-radius: 12px; border: 1px solid var(--rand); background: #1e2838; font-size: 18px; }
+.fenster button:first-of-type { background: var(--rot); border-color: var(--rot); }
+#eTabelle { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+#eTabelle td { padding: 4px 10px; border-bottom: 1px solid var(--rand); }
+#eTabelle tr.ich td { color: var(--gelb); font-weight: bold; }
+
+/* ---------------- Handy als Lenkrad */
+body.handy { touch-action: none; user-select: none; -webkit-user-select: none; background: #101319; }
+#hl { position: fixed; inset: 0; display: grid; grid-template-columns: 1fr 1.25fr 1fr; grid-template-rows: auto 1fr; }
+#hlOben { grid-column: 1 / 4; display: flex; align-items: center; gap: 10px; padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 4px max(10px, env(safe-area-inset-left)); font-size: 14px; }
+#hlStatus { color: #ffb44a; }
+body.verbunden #hlStatus { color: var(--gruen); }
+#hlInfo { flex: 1; text-align: center; font-weight: bold; }
+.hlKnoepfe { display: flex; gap: 6px; }
+.hlKnoepfe button { background: #232a35; border: 1px solid #344052; border-radius: 10px; padding: 7px 9px; font-size: 13px; }
+.pedal { display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 8px; border-radius: 22px; border: 3px solid #2b3240; background: #181d25; }
+.pedal b { font-size: 26px; letter-spacing: 2px; }
+.pedal small { color: var(--leise); }
+#hlBremse.an { background: #5a1513; border-color: var(--rot); }
+#hlGas.an { background: #123f24; border-color: var(--gruen); }
+#hlMitteBox { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+#hlRad { width: 100%; max-height: 62vh; }
+#hlZeiger { width: 80%; height: 10px; background: #232a35; border-radius: 5px; position: relative; }
+#hlZeiger i { position: absolute; top: -4px; width: 6px; height: 18px; margin-left: -3px; background: var(--gelb); border-radius: 3px; left: 50%; }
+#hlHinweis { color: var(--leise); font-size: 13px; text-align: center; }
+#hlStart { position: fixed; inset: 0; background: rgba(5,8,14,.92); display: flex; align-items: center; justify-content: center; text-align: center; z-index: 5; }
+#hlStart button { font-size: 22px; padding: 14px 30px; border-radius: 14px; border: none; background: var(--rot); }
+#hlStart #hlCode { color: var(--gelb); letter-spacing: 3px; }
+#hlQuer { display: none; position: fixed; inset: 0; background: #101319; align-items: center; justify-content: center; font-size: 22px; z-index: 4; }
+@media (orientation: portrait) { body.handy #hlQuer { display: flex; } }

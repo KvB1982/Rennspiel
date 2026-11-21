@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0b0f17">
+  <meta name="apple-mobile-web-app-title" content="Rennspiel">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <title>Rennspiel</title>
+  <link rel="stylesheet" href="css/stil.css">
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <canvas id="bild"></canvas>
+
+  <!-- Anzeige während der Fahrt -->
+  <div id="hud" hidden>
+    <div id="hOben">
+      <div id="hPlatz"></div>
+      <div id="hRunde"></div>
+    </div>
+    <div id="hListe"></div>
+    <div id="hZeiten"></div>
+    <div id="hAmpel"><i></i><i></i><i></i><i></i><i></i></div>
+    <div id="hMeldung"></div>
+    <div id="hTacho"><div id="hDz"><i></i></div><div id="hKmh">0</div><div id="hEinheit">km/h</div><div id="hGang">N</div></div>
+    <canvas id="hKarte" width="240" height="240"></canvas>
+    <div id="hKnoepfe">
+      <span id="hHandy" title="Handy-Lenkrad"></span>
+      <button id="hKamera" title="Kamera wechseln (C)">🎥</button>
+      <button id="hPause" title="Pause (P)">⏸</button>
+    </div>
+    <div id="hHilfe"></div>
+    <div id="pedale" hidden><div id="pBremse">BREMSE</div><div id="pGas">GAS</div></div>
+  </div>
+
+  <!-- Hauptmenü -->
+  <div id="menue">
+    <header><h1>🏁 Rennspiel</h1><p>Formel-Rennen und Modellautos – mit dem Handy als Lenkrad</p></header>
+    <div id="mSpalten">
+      <section id="mLinks">
+        <h2>1 · Fahrzeug</h2>
+        <div class="karten" id="mFahrzeug">
+          <button data-wert="f1"><span class="gross">🏎️</span><b>Formel-Rennwagen</b><small>Du sitzt im Auto oder fährst mit der Kamera hinterher</small></button>
+          <button data-wert="modell"><span class="gross">🚗</span><b>Modellauto</b><small>Kleine Bahn im Wohnzimmer – du stehst daneben und lenkst aus der Ferne</small></button>
+        </div>
+        <h2>2 · Rennart</h2>
+        <div class="karten" id="mModus">
+          <button data-wert="zeit"><span class="gross">⏱️</span><b>Zeitfahren</b><small>Allein gegen die Uhr, mit Geist-Auto deiner besten Runde</small></button>
+          <button data-wert="rennen"><span class="gross">🏆</span><b>Rennen</b><small>Gegen Computerfahrer, mit Startampel</small></button>
+        </div>
+        <h2>3 · Strecke</h2>
+        <div class="karten strecken" id="mStrecke"></div>
+        <h2>4 · Einstellungen</h2>
+        <div id="mEinst"></div>
+      </section>
+      <section id="mRechts">
+        <div id="lenkradBox">
+          <h2>📱 Handy als Lenkrad</h2>
+          <div id="lbInhalt">
+            <canvas id="qr" width="220" height="220"></canvas>
+            <div>
+              <p>Mit der Handy-Kamera den Code scannen, oder diese Adresse öffnen:</p>
+              <p id="lbAdresse"></p>
+              <p>Code: <b id="lbCode">…</b></p>
+              <p id="lbStatus">Starte …</p>
+            </div>
+          </div>
+          <p class="klein">Handy quer halten und wie ein Lenkrad drehen. Rechter Daumen = Gas, linker Daumen = Bremse.</p>
+          <p class="klein">Ohne Handy: Pfeiltasten ← → ↑ ↓ (oder W A S D), Controller, oder <button id="lbNeigen" class="link">dieses Gerät als Lenkrad</button>.</p>
+        </div>
+        <button id="mStart">Los geht's ▶</button>
+        <p class="klein" id="mBest"></p>
+      </section>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="fenster" hidden>
+    <div><h2>Pause</h2>
+      <button data-a="weiter">Weiterfahren</button>
+      <button data-a="neu">Neu starten</button>
+      <button data-a="kamera">Kamera wechseln</button>
+      <button data-a="mitte">Lenkrad: Mitte neu setzen</button>
+      <button data-a="menue">Zurück zum Menü</button>
+    </div>
+  </div>
+
+  <!-- Ergebnis -->
+  <div id="ergebnis" class="fenster" hidden><div><h2 id="eTitel"></h2><table id="eTabelle"></table>
+    <button data-a="neu">Nochmal</button><button data-a="menue">Zum Menü</button></div></div>
+
+  <div id="laden" class="fenster" hidden><div><h2>Strecke wird gebaut …</h2></div></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
