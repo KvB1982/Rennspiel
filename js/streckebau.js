@@ -12,6 +12,7 @@ import { BELAG, MASSSTAB } from './strecke.js';
 import { weichen, WEICHE_LANG } from './slot.js';
 import { boxLage } from './box.js';
 import { baueStrassenWelt } from './stadtbau.js';
+import { modell, alsGruppe, baumModell } from './modelle.js';
 
 // ---------------------------------------------------------------- Hilfen
 
@@ -520,10 +521,13 @@ function baueBaeume(T, gruppe, art, viel, nah, hoehe, x0, x1, z0, z1, r, meer) {
   const stammHoehe = { nadel: 3, laub: 4, pinie: 7.4, zypresse: 1.5 };
   const kroneMat = new THREE.MeshStandardMaterial({ roughness: 0.95, flatShading: true });
   const stammMat = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 1 });
+  // fertige Baum-Modelle (Kenney Nature Kit, CC0), wenn geladen; die Pinie bleibt selbst gebaut
+  const MODELL = { nadel: ['baum_tanne', 11.5], laub: ['baum_laub', 8.5], zypresse: ['baum_zypresse', 10.2] };
   for (const [name, farbe, anteil, groesse] of arten) {
     const zahl = Math.round(anzahl * anteil);
-    const krone = new THREE.InstancedMesh(formen[name](), kroneMat, zahl);
-    const st = new THREE.InstancedMesh(stamm, stammMat, zahl);
+    const bm = MODELL[name] ? baumModell(...MODELL[name]) : null;
+    const krone = new THREE.InstancedMesh(bm ? bm.krone : formen[name](), bm ? bm.kroneMat : kroneMat, zahl);
+    const st = new THREE.InstancedMesh(bm ? bm.stamm : stamm, bm ? bm.stammMat : stammMat, zahl);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color();
     let k = 0, versuche = 0;
     while (k < zahl && versuche < zahl * 30) {
@@ -540,7 +544,7 @@ function baueBaeume(T, gruppe, art, viel, nah, hoehe, x0, x1, z0, z1, r, meer) {
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * 6.28);
       m4.compose(new THREE.Vector3(x, hh.h - 0.2, z), q, new THREE.Vector3(s, s, s));
       krone.setMatrixAt(k, m4);
-      m4.compose(new THREE.Vector3(x, hh.h - 0.2, z), q, new THREE.Vector3(s, s * stammHoehe[name], s));
+      if (!bm) m4.compose(new THREE.Vector3(x, hh.h - 0.2, z), q, new THREE.Vector3(s, s * stammHoehe[name], s));
       st.setMatrixAt(k, m4);
       c.setHex(farbe).offsetHSL((r() - 0.5) * 0.04, (r() - 0.5) * 0.1, (r() - 0.5) * 0.08);
       krone.setColorAt(k, c);
@@ -564,7 +568,7 @@ function baueTribuenen(T, gruppe, welt, viel, r) {
   // Wo steht man? Innen oder außen an der Start-Ziel-Geraden
   let cx = 0, cz = 0; for (let i = 0; i < n; i++) { cx += T.x[i]; cz += T.z[i]; } cx /= n; cz /= n;
   const innen = ((cx - T.x[0]) * T.tz[0] - (cz - T.z[0]) * T.tx[0]) > 0 ? 1 : -1;   // +1 = Mitte liegt links
-  const tribuene = (i, seite, laenge, reihen = 10) => {
+  const tribuene = (i, seite, laenge, reihen = 10, deko = null) => {
     const ab = T.hb[i] + (seite > 0 ? T.ausL[i] : T.ausR[i]) + 0.6 + 6;
     const g = new THREE.Group();
     const tiefe = reihen * 0.9, hoehe = reihen * 0.55;
@@ -582,6 +586,7 @@ function baueTribuenen(T, gruppe, welt, viel, r) {
     // Dach
     const d = new THREE.Mesh(new THREE.BoxGeometry(laenge + 2, 0.25, tiefe + 3), dach); d.position.set(0, hoehe + 4.6, tiefe / 2 - 1); d.rotation.x = -0.06; g.add(d);
     for (let k = -laenge / 2; k <= laenge / 2; k += 12) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.3, hoehe + 4.6, 0.3), grau); st.position.set(k, (hoehe + 4.6) / 2, tiefe - 0.2); g.add(st); }
+    if (deko) deko(g, laenge, tiefe);
     // aufstellen: Rücken weg von der Strecke
     const nx = T.tz[i] * seite, nz = -T.tx[i] * seite;
     g.position.set(T.x[i] + nx * ab, T.y[i] - 0.2, T.z[i] + nz * ab);
@@ -592,7 +597,34 @@ function baueTribuenen(T, gruppe, welt, viel, r) {
   // Haupttribüne gegenüber der Box, Boxengebäude innen
   const lang = Math.min(240, T.laenge * 0.06);
   const iStart = T.index(-lang * 0.3);
-  tribuene(iStart, -innen, lang, 14);
+  // Haupttribüne mit Fan-Zelten dahinter, Flutlicht und Fahnentürmen (fertige Modelle, Kenney Racing Kit, CC0)
+  tribuene(iStart, -innen, lang, 14, (g, laenge, tiefe) => {
+    const stoffe = [0xd8352a, 0xf2f2f2, 0x2f6fc0, 0xf0c020, 0x3c9a4a];
+    // Fan-Zelte links und rechts neben der Tribüne, offen zur Strecke
+    let k = 0;
+    for (const sx of [-1, 1]) for (let d = 12; d < 46; d += 11, k++) {
+      const z = alsGruppe(k % 3 === 1 ? 'zelt_lang' : 'zelt', { breit: k % 3 === 1 ? 9 : 5.5 }, { stoff: stoffe[Math.floor(r() * stoffe.length)] });
+      if (z) { z.position.set(sx * (laenge / 2 + d), 0, 3 + r() * 2); g.add(z); }
+    }
+    for (const x of [-laenge / 2 - 4, laenge / 2 + 4]) {
+      const f = alsGruppe('fahnenturm', { hoch: 9 }, { stoff: 0xd8352a });
+      if (f) { f.position.set(x, 0, 2); g.add(f); }
+    }
+    for (let x = -laenge / 2 + 10; x <= laenge / 2 - 10; x += laenge / 3) {
+      const l = alsGruppe('flutlicht', { hoch: 22 });
+      if (l) { l.position.set(x, 0, tiefe + 3); l.rotation.y = Math.PI; g.add(l); }
+    }
+  });
+  // Zielflagge am Rand der Start-Ziel-Linie
+  {
+    const f = alsGruppe('fahne_ziel', { hoch: 4.5 }), sd = -innen;
+    if (f) {
+      const ab = T.hb[0] + (sd > 0 ? T.ausL[0] : T.ausR[0]) + 1.5;
+      f.position.set(T.x[0] + T.tz[0] * sd * ab, T.y[0], T.z[0] - T.tx[0] * sd * ab);
+      f.rotation.y = Math.atan2(T.tx[0], T.tz[0]) + Math.PI / 2;
+      gruppe.add(f);
+    }
+  }
   // Boxengebäude
   {
     const i = T.index(-lang * 0.4), seite = innen;
@@ -618,7 +650,9 @@ function baueTribuenen(T, gruppe, welt, viel, r) {
   // kleinere Tribünen an engen Kurven (außen)
   const enge = [];
   for (let i = 0; i < n; i += 5) if (Math.abs(T.k[i]) > 1 / 45 && !enge.some(j => Math.abs(T.s[j] - T.s[i]) < 300)) enge.push(i);
-  enge.slice(0, Math.round(5 * Math.max(0.4, viel))).forEach(i => tribuene(i, T.k[i] > 0 ? -1 : 1, 50, 9));
+  // … mit einer Fernsehkamera davor
+  const kameraDeko = (g, laenge) => { const k = alsGruppe('tv_kamera', { hoch: 2.2 }); if (k) { k.position.set(laenge / 2 + 2, 0, -2.5); k.rotation.y = Math.PI; g.add(k); } };
+  enge.slice(0, Math.round(5 * Math.max(0.4, viel))).forEach(i => tribuene(i, T.k[i] > 0 ? -1 : 1, 50, 9, kameraDeko));
 }
 
 // ---------------------------------------------------------------- Stadt am Hafen (Häuser zwischen den Straßen)
@@ -716,34 +750,37 @@ function baueZimmer(T, gruppe, welt, r) {
     const rahmen = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.6, 0.04), leiste); rahmen.position.set(mx + x, 1.5, mz - D / 2 + 0.005); gruppe.add(rahmen);
     rahmen.scale.z = 0.5;
   }
-  // Sofa
-  const stoff = new THREE.MeshStandardMaterial({ color: 0x3f5d7a, roughness: 0.95 });
-  const sofa = new THREE.Group();
-  const sitz = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.42, 0.9), stoff); sitz.position.y = 0.21; sofa.add(sitz);
-  const lehne = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 0.22), stoff); lehne.position.set(0, 0.62, 0.34); sofa.add(lehne);
-  for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.6, 0.9), stoff); arm.position.set(s * 1.1, 0.3, 0); sofa.add(arm); }
-  for (let k = -1; k <= 1; k += 2) { const kissen = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.14, 0.75), new THREE.MeshStandardMaterial({ color: 0x4a6b8a, roughness: 1 })); kissen.position.set(k * 0.5, 0.48, -0.02); sofa.add(kissen); }
-  sofa.position.set(mx, 0, mz + D / 2 - 0.55);   // Lehne an der Wand, Sitz zeigt ins Zimmer
-  gruppe.add(sofa);
-  // Fernseh-Schrank und Fernseher
-  const holz = new THREE.MeshStandardMaterial({ color: 0x7a5232, roughness: 0.6 });
-  const schrank = new THREE.Mesh(new THREE.BoxGeometry(2, 0.5, 0.45), holz); schrank.position.set(mx, 0.25, mz - D / 2 + 0.3); gruppe.add(schrank);
-  const tv = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.85, 0.05), new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.2, metalness: 0.4 }));
-  tv.position.set(mx, 0.95, mz - D / 2 + 0.25); gruppe.add(tv);
-  welt.fernseher = tv;
-  // Pflanze in der Ecke
-  const topf = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.4, 14), new THREE.MeshStandardMaterial({ color: 0xc8683a, roughness: 0.8 }));
-  topf.position.set(mx + W / 2 - 0.4, 0.2, mz - D / 2 + 0.4); gruppe.add(topf);
-  for (let k = 0; k < 9; k++) {
-    const b = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 6), new THREE.MeshStandardMaterial({ color: 0x3f8a3a, roughness: 0.9, flatShading: true }));
-    b.scale.set(0.6, 1.6, 0.25); b.position.set(topf.position.x + (r() - 0.5) * 0.3, 0.75 + r() * 0.5, topf.position.z + (r() - 0.5) * 0.3); b.rotation.set(r() - 0.5, r() * 6, r() - 0.5);
-    gruppe.add(b);
-  }
-  // Regal mit Büchern
-  const regal = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.9, 1.6), holz); regal.position.set(mx - W / 2 + 0.2, 0.95, mz + 0.6); gruppe.add(regal);
-  for (let b = 0; b < 4; b++) for (let k = 0; k < 14; k++) {
-    const buch = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.24 + r() * 0.08, 0.06), new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(r(), 0.5, 0.45), roughness: 0.8 }));
-    buch.position.set(mx - W / 2 + 0.26, 0.2 + b * 0.45 + 0.13, mz + 0.6 - 0.7 + k * 0.1); gruppe.add(buch);
+  // Möbel: fertige Modelle (Kenney Furniture Kit), sonst wie früher aus Kisten
+  if (!zimmerMoebel(gruppe, welt, mx, mz, W, D)) {
+    // Sofa
+    const stoff = new THREE.MeshStandardMaterial({ color: 0x3f5d7a, roughness: 0.95 });
+    const sofa = new THREE.Group();
+    const sitz = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.42, 0.9), stoff); sitz.position.y = 0.21; sofa.add(sitz);
+    const lehne = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 0.22), stoff); lehne.position.set(0, 0.62, 0.34); sofa.add(lehne);
+    for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.6, 0.9), stoff); arm.position.set(s * 1.1, 0.3, 0); sofa.add(arm); }
+    for (let k = -1; k <= 1; k += 2) { const kissen = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.14, 0.75), new THREE.MeshStandardMaterial({ color: 0x4a6b8a, roughness: 1 })); kissen.position.set(k * 0.5, 0.48, -0.02); sofa.add(kissen); }
+    sofa.position.set(mx, 0, mz + D / 2 - 0.55);   // Lehne an der Wand, Sitz zeigt ins Zimmer
+    gruppe.add(sofa);
+    // Fernseh-Schrank und Fernseher
+    const holz = new THREE.MeshStandardMaterial({ color: 0x7a5232, roughness: 0.6 });
+    const schrank = new THREE.Mesh(new THREE.BoxGeometry(2, 0.5, 0.45), holz); schrank.position.set(mx, 0.25, mz - D / 2 + 0.3); gruppe.add(schrank);
+    const tv = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.85, 0.05), new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.2, metalness: 0.4 }));
+    tv.position.set(mx, 0.95, mz - D / 2 + 0.25); gruppe.add(tv);
+    welt.fernseher = tv;
+    // Pflanze in der Ecke
+    const topf = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.4, 14), new THREE.MeshStandardMaterial({ color: 0xc8683a, roughness: 0.8 }));
+    topf.position.set(mx + W / 2 - 0.4, 0.2, mz - D / 2 + 0.4); gruppe.add(topf);
+    for (let k = 0; k < 9; k++) {
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 6), new THREE.MeshStandardMaterial({ color: 0x3f8a3a, roughness: 0.9, flatShading: true }));
+      b.scale.set(0.6, 1.6, 0.25); b.position.set(topf.position.x + (r() - 0.5) * 0.3, 0.75 + r() * 0.5, topf.position.z + (r() - 0.5) * 0.3); b.rotation.set(r() - 0.5, r() * 6, r() - 0.5);
+      gruppe.add(b);
+    }
+    // Regal mit Büchern
+    const regal = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.9, 1.6), holz); regal.position.set(mx - W / 2 + 0.2, 0.95, mz + 0.6); gruppe.add(regal);
+    for (let b = 0; b < 4; b++) for (let k = 0; k < 14; k++) {
+      const buch = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.24 + r() * 0.08, 0.06), new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(r(), 0.5, 0.45), roughness: 0.8 }));
+      buch.position.set(mx - W / 2 + 0.26, 0.2 + b * 0.45 + 0.13, mz + 0.6 - 0.7 + k * 0.1); gruppe.add(buch);
+    }
   }
   // Schachtel der Rennbahn
   const box = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.12, 0.4), new THREE.MeshStandardMaterial({ color: 0xd8262a, roughness: 0.6 }));
@@ -758,4 +795,28 @@ function baueZimmer(T, gruppe, welt, r) {
     { name: 'Am Regal', x: minx - 0.9, y: aug, z: mz + 0.2 },
     { name: 'Auf dem Stuhl (Überblick)', x: maxx + 1.0, y: 2.25, z: maxz + 0.9 },
   ];
+}
+
+// Möbel im Wohnzimmer aus fertigen Modellen (Kenney Furniture Kit, CC0). Gibt false zurück, wenn die Modelle fehlen.
+// Die Modelle schauen nach +z; die Wand mit dem Fernseher liegt bei −z, das Sofa steht an der Wand bei +z.
+function zimmerMoebel(gruppe, welt, mx, mz, W, D) {
+  if (!modell('sofa') || !modell('fernsehschrank')) return false;
+  const hin = (g, x, z, dreh = 0, y = 0) => { if (!g) return null; g.position.set(x, y, z); g.rotation.y = dreh; gruppe.add(g); return g; };
+  // Sofa an der Wand, schaut ins Zimmer; daneben ein Sessel und eine Stehlampe
+  hin(alsGruppe('sofa', { breit: 2.2 }, { stoff: 0x3f5d7a }), mx, mz + D / 2 - 0.5, Math.PI);
+  hin(alsGruppe('sessel', { breit: 1.0 }, { stoff: 0x8a4f3a }), mx + 1.9, mz + D / 2 - 0.6, Math.PI + 0.5);
+  hin(alsGruppe('stehlampe', { hoch: 1.75 }), mx - 1.5, mz + D / 2 - 0.35);
+  // Fernseh-Schrank mit Fernseher, Lautsprechern und einer kleinen Pflanze
+  const holz = { rest: 0xb98a5e };   // Holz etwas dunkler als bei Kenney
+  const schrank = hin(alsGruppe('fernsehschrank', { breit: 2.0 }, holz), mx, mz - D / 2 + 0.3);
+  const oben = schrank ? schrank.userData.masse.hoch : 0.5;
+  welt.fernseher = hin(alsGruppe('fernseher', { breit: 1.45 }), mx, mz - D / 2 + 0.3, 0, oben);
+  for (const s of [-1, 1]) hin(alsGruppe('lautsprecher', { hoch: 1.1 }), mx + s * 1.3, mz - D / 2 + 0.3);
+  hin(alsGruppe('pflanze_klein', { hoch: 0.45 }), mx + 0.8, mz - D / 2 + 0.3, 0, oben);
+  hin(alsGruppe('radio', { breit: 0.4 }), mx - 0.8, mz - D / 2 + 0.3, 0, oben);
+  // große Pflanze in der Ecke
+  hin(alsGruppe('pflanze', { hoch: 1.3 }), mx + W / 2 - 0.45, mz - D / 2 + 0.45);
+  // zwei Regale an der linken Wand, sie schauen ins Zimmer (+x)
+  for (const dz of [0.05, 1.0]) hin(alsGruppe('regal', { hoch: 1.9 }, holz), mx - W / 2 + 0.3, mz + dz, Math.PI / 2);
+  return true;
 }

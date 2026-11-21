@@ -3,10 +3,16 @@
 // Jede Fahrzeugart (Kleinwagen, Limousine, Geländewagen, Transporter, Lastwagen, Bus) ist eine Form aus wenigen Kisten.
 // Alle Autos einer Art werden auf einmal gemalt ("Instanzen") – das geht viel schneller als jedes Auto einzeln.
 // Die Lackfarbe kommt pro Auto dazu, Scheiben und Reifen bleiben dunkel, die Lichter leuchten.
+// Autos in der Nähe der Kamera (bis NAH Meter) zeigen ein fertiges Modell (Kenney Car Kit, CC0, siehe js/modelle.js),
+// weiter weg reichen die Kisten – das spart viele Dreiecke (ein Modell hat etwa 2000, eine Kisten-Form etwa 100).
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ARTEN } from './verkehr.js';
+import { modell, passend, eckMaterial } from './modelle.js';
+
+const NAH = 220;   // so nah (m) muss ein Auto sein, damit es als Modell gezeigt wird
+const MODELL = { kompakt: 'auto_kompakt', limousine: 'auto_limousine', gelaende: 'auto_gelaende', transporter: 'auto_transporter', lkw: 'auto_lkw' };
 
 // Kiste mit einer festen Farbe (wird mit der Lackfarbe malgenommen: weiß = Lack, dunkel = bleibt dunkel)
 function teil(w, h, d, x, y, z, farbe) {
@@ -68,11 +74,12 @@ function form(typ) {
 }
 
 export class VerkehrBild {
-  constructor(szene, verkehr, { abend = false } = {}) {
-    this.v = verkehr; this.gruppen = [];
+  constructor(szene, verkehr, { abend = false, kamera = null } = {}) {
+    this.v = verkehr; this.gruppen = []; this.kamera = kamera;
     const koerperMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.4 });
     const lichtMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
     lichtMat.color.setScalar(abend ? 2.2 : 1.2);
+    const lackMat = eckMaterial(0xffffff, { roughness: 0.3, metalness: 0.35 }), restMat = eckMaterial(0xffffff, { roughness: 0.6 });
     for (const typ of Object.keys(ARTEN)) {
       const liste = verkehr.autos.filter(t => t.typ === typ);
       if (!liste.length) continue;
@@ -84,18 +91,41 @@ export class VerkehrBild {
       k.castShadow = true; k.receiveShadow = true;
       k.frustumCulled = l.frustumCulled = false;   // die Autos fahren herum: nicht mit der alten Größe wegschneiden
       szene.add(k, l);
-      this.gruppen.push({ liste, k, l });
+      // fertiges Modell für die nahen Autos (auf die Maße der Fahrzeugart gezogen)
+      let nah = null;
+      const m = MODELL[typ] && modell(MODELL[typ]);
+      if (m) {
+        const A = ARTEN[typ], t = passend(m, { breit: A.breit, hoch: A.hoch, lang: A.lang });
+        const lack = new THREE.InstancedMesh(t.lack, lackMat, liste.length), rest = new THREE.InstancedMesh(t.rest, restMat, liste.length);
+        for (const o of [lack, rest]) { o.castShadow = o.receiveShadow = true; o.frustumCulled = false; o.count = 0; szene.add(o); }
+        nah = { lack, rest };
+      }
+      this.gruppen.push({ liste, k, l, nah });
     }
     this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.p = new THREE.Vector3(); this.e = new THREE.Vector3(1, 1, 1); this.Y = new THREE.Vector3(0, 1, 0);
+    this.farbe = new THREE.Color();
   }
   update() {
     const { m4, q, p, e, Y } = this;
-    for (const { liste, k, l } of this.gruppen) {
+    const kp = this.kamera ? this.kamera.position : null;
+    for (const { liste, k, l, nah } of this.gruppen) {
+      let fern = 0, n = 0;
       liste.forEach((t, i) => {
         q.setFromAxisAngle(Y, t.h); p.set(t.x, t.y, t.z);
-        m4.compose(p, q, e); k.setMatrixAt(i, m4); l.setMatrixAt(i, m4);
+        m4.compose(p, q, e); l.setMatrixAt(i, m4);
+        // nah: als Modell, weit weg: als Kisten-Form (die Listen werden jedes Bild neu gefüllt)
+        if (nah && kp && (t.x - kp.x) ** 2 + (t.z - kp.z) ** 2 < NAH * NAH) {
+          nah.lack.setMatrixAt(n, m4); nah.rest.setMatrixAt(n, m4); nah.lack.setColorAt(n, this.farbe.setHex(t.farbe)); n++;
+        } else { k.setMatrixAt(fern, m4); k.setColorAt(fern, this.farbe.setHex(t.farbe)); fern++; }
       });
+      k.count = fern;
       k.instanceMatrix.needsUpdate = true; l.instanceMatrix.needsUpdate = true;
+      if (k.instanceColor) k.instanceColor.needsUpdate = true;
+      if (nah) {
+        nah.lack.count = nah.rest.count = n;
+        nah.lack.instanceMatrix.needsUpdate = nah.rest.instanceMatrix.needsUpdate = true;
+        if (nah.lack.instanceColor) nah.lack.instanceColor.needsUpdate = true;
+      }
     }
   }
 }

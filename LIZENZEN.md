@@ -21,6 +21,23 @@ zu Schleifen geschnitten (Ende weich in den Anfang überblendet). Sie liegen im 
 Wind, Rumpeln auf Gras und Kies, die Piep-Töne der Startampel und alle Rückfall-Töne (solange die Aufnahmen laden oder wenn sie fehlen)
 erzeugt das Spiel selbst (`js/klang.js`).
 
+## 3D-Modelle
+
+Die Modelle im Ordner `modelle/` stammen von **Kenney** ([kenney.nl](https://kenney.nl)) und stehen unter **CC0**
+(gemeinfrei, frei nutzbar, auch ohne Namensnennung – Lizenztext in `modelle/Kenney-Lizenz.txt`). Danke, Kenney!
+Geladen am 21.11.2026 aus der Sammlung [jam-ready-assets](https://github.com/series-ai/jam-ready-assets), die jedes
+Kenney-Paket mit seiner Lizenzdatei aufbewahrt (kenney.nl selbst ist im Test-Rechner gesperrt).
+`tools/modelle.mjs` hat sie umgerechnet: Farben aus dem Farbbild an die Ecken geschrieben, nach Teilen sortiert
+(z. B. Lack, Krone, Dach – die färbt das Spiel selbst), Bilder, Normalen und Bild-Koordinaten entfernt. Keine Logos.
+
+| Datei | Wofür | Kenney-Paket | Vorlage |
+| --- | --- | --- | --- |
+| `auto_kompakt`, `auto_limousine`, `auto_gelaende`, `auto_transporter`, `auto_lkw` | Verkehr (nahe Autos) | [Car Kit 3.1](https://kenney.nl/assets/car-kit) | `hatchback-sports`, `sedan`, `suv`, `van`, `delivery` |
+| `sofa`, `sessel`, `fernsehschrank`, `fernseher`, `pflanze`, `pflanze_klein`, `regal`, `stehlampe`, `lautsprecher`, `radio` | Wohnzimmer | [Furniture Kit 2.1](https://kenney.nl/assets/furniture-kit) | `loungeSofa`, `loungeChair`, `cabinetTelevisionDoors`, `televisionModern`, `pottedPlant`, `plantSmall2`, `bookcaseOpen`, `lampRoundFloor`, `speaker`, `radio` |
+| `baum_tanne`, `baum_laub`, `baum_zypresse` | Bäume | [Nature Kit 2.1](https://kenney.nl/assets/nature-kit) | `tree_pineTallA`, `tree_default`, `tree_tall` |
+| `zelt`, `zelt_lang`, `flutlicht`, `fahne_ziel`, `tv_kamera`, `fahnenturm` | Rennstrecke | [Racing Kit 2.0](https://kenney.nl/assets/racing-kit) | `tent`, `tentLong`, `lightPostLarge`, `flagCheckers`, `camera_exclusive`, `bannerTowerRed` |
+| `haus_a`, `haus_g`, `haus_h`, `haus_i`, `haus_m`, `haus_q` | Dorfhäuser | [City Kit Suburban 2.0](https://kenney.nl/assets/city-kit-suburban) | `building-type-a`, `-g`, `-h`, `-i`, `-m`, `-q` |
+
 ## Programme
 
 - [three.js](https://threejs.org) r160, MIT-Lizenz, geladen von jsDelivr.
