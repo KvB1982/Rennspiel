@@ -41,6 +41,9 @@ export const FORMEN = {
     licht: 'schlitz', ruecklicht: 'rund', einlass: true, fluegel: 2, auspuff: 'mitte', kabineBreit: 0.66, streifen: true },
   vento: { W: 1.0, zF: 2.3, zR: -2.25, nase: 0.55, haube: 0.82, huefte: 0.95, heck: 0.9, kv: 0.8, kh: -0.95, dach: 1.17, scheibe: 0.95, flach: 0.35, rund: 2.6,
     licht: 'turm', ruecklicht: 'rund', einlass: true, fluegel: 0, auspuff: 'vier', kabineBreit: 0.64, klappen: true },
+  // wie der Falkner, nur ohne Heckflügel (die Form sieht man nur im Cockpit oder wenn das Modell fehlt)
+  falkner_s: { W: 0.93, zF: 2.2, zR: -2.3, nase: 0.6, haube: 0.8, huefte: 0.88, heck: 0.84, kv: 0.45, kh: -2.0, dach: 1.3, scheibe: 0.85, flach: 0.55, rund: 2.8,
+    licht: 'rund', ruecklicht: 'band', einlass: false, fluegel: 0, auspuff: 'zwei', kabineBreit: 0.74 },
 };
 
 // weich zwischen Stützwerten [z, Wert] hin und her (Werte nach z sortiert)

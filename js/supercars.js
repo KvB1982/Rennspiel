@@ -69,6 +69,14 @@ export const SUPERCARS = [
     p: { masse: 1350, leistung: 600000, schubMax: 14500, vMax: 380 * KMH, haft: 1.19, widerstand: 0.7, abtrieb: 1.0, drehzahlMax: 7000 },
     farbe: 0x8a96a4, zweit: 0x2a2a2e,
   },
+  {
+    // Das einzige Supercar, das nicht aus 3D AI Studio kommt: freies Modell von Karol Miklas (CC-BY-SA 4.0, siehe LIZENZEN.md),
+    // Wappen, Schriftzug und Nummernschilder entfernt
+    id: 'falkner_s', name: 'Falkner 9 S Allrad', vorbild: 'Porsche 911 Carrera 4S',
+    text: 'Der kleine Bruder des Turbo: weniger Kraft, aber Allrad und sehr genau zu lenken.',
+    p: { allrad: 0.35, masse: 1565, leistung: 331000, schubMax: 13500, vMax: 306 * KMH, haft: 1.21, hinten: 1.13, widerstand: 0.7, drehzahlMax: 7500, lenkMax: 0.52 },
+    farbe: 0x2a8fe0, zweit: 0x1a1a1a,
+  },
 ];
 
 // Lackfarben zum Aussuchen (die erste ist die Lieblingsfarbe des Autos)

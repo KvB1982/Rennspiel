@@ -56,11 +56,26 @@ und Modelle mit vielen Dreiecken vereinfacht.
 
 ### Supercars aus 3D AI Studio
 
-Die sechs Supercars in `modelle/supercars/` hat Kristian am 21.11.2026 mit [3D AI Studio](https://www.3daistudio.com) erzeugt
+Sechs der sieben Supercars in `modelle/supercars/` (alle außer `falkner_s`) hat Kristian am 21.11.2026 mit [3D AI Studio](https://www.3daistudio.com) erzeugt
 (erst ein Bild mit Nano Banana 2.1, daraus das Modell mit Prism 3.1). `tools/supercars.mjs` hat sie verkleinert, die Räder
 herausgeschnitten und den Lack umfärbbar gemacht. Die Formen sind an bekannte Sportwagen angelehnt, tragen aber kein Logo und
 keinen echten Namen. Vor einer bezahlten Veröffentlichung die Nutzungsbedingungen von 3D AI Studio und die Ähnlichkeit zu den
 Vorbildern prüfen – das Spiel ist für den Privatgebrauch.
+
+### Falkner 9 S Allrad (freies Modell, CC-BY-SA 4.0)
+
+`modelle/supercars/falkner_s.glb` beruht auf dem Modell **„(FREE) Porsche 911 Carrera 4S“** von
+**[Karol Miklas](https://sketchfab.com/karolmiklas)**, Quelle: [Sketchfab](https://sketchfab.com/3d-models/free-porsche-911-carrera-4s-d01b254483794de3819786d93e0e1ebf),
+Lizenz **[CC-BY-SA 4.0](http://creativecommons.org/licenses/by-sa/4.0/)** (Namensnennung, Weitergabe unter gleichen Bedingungen). Danke, Karol!
+Kristian hat es am 21.11.2026 heruntergeladen. Geändert mit `tools/sketchfab.mjs`: Wappen, Schriftzug, Nummernschilder und die
+Glanzschicht über dem Lack entfernt, Materialien durch Farbfelder ersetzt (Lack blau zum Umfärben), eingelenkte Vorderräder
+gerade gestellt, Räder einzeln, von etwa 650.000 auf 21.600 Dreiecke vereinfacht. Die geänderte Datei `falkner_s.glb` steht
+ebenfalls unter CC-BY-SA 4.0 (für den Rest des Spiels gilt das nicht). Der Name im Spiel ist ausgedacht; die Form ist die des
+echten Autos, das Spiel ist für den Privatgebrauch.
+
+Die anderen Modelle aus Kristians Ordner „Models Free“ (Audi R8 LMS, McLaren P1, Bugatti Chiron, Corvette C8, Huracán,
+„modified“ 911) stehen unter der Sketchfab-Standard-Lizenz, die keine Weitergabe der Datei erlaubt – sie sind deshalb
+nicht im Spiel.
 
 ### Formel-Rennwagen und Verkehr aus 3D AI Studio
 

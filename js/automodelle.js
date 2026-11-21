@@ -1,4 +1,4 @@
-// Rennspiel – fertige Auto-Modelle aus 3D AI Studio laden: die sechs Supercars, der Formel-Rennwagen und der Verkehr.
+// Rennspiel – fertige Auto-Modelle laden: die Supercars (sechs aus 3D AI Studio, eins von Sketchfab), der Formel-Rennwagen und der Verkehr.
 //
 // Alle Dateien macht tools/supercars.mjs aus den großen Vorlagen:
 //   modelle/supercars/<id>.glb   Karosserie und vier einzelne Räder (drehen und lenken), Farbbild 1024
