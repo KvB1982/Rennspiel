@@ -11,6 +11,8 @@ Das Besondere: **Das Handy ist das Lenkrad.** Das Spiel läuft auf dem großen B
 2. Mit der Handy-Kamera den QR-Code im Menü scannen (oder die Adresse eintippen). Auf dem Handy „Los geht's“ tippen und den Bewegungssensor erlauben.
 3. Handy quer halten wie ein Lenkrad: drehen = lenken, rechter Daumen = Gas, linker Daumen = Bremse. Oben auf dem Handy: Kamera wechseln, Pause, zurück auf die Strecke, Mitte neu setzen, Empfindlichkeit.
 
+**Als App auf iPad und iPhone:** siehe [APP-ANLEITUNG.md](APP-ANLEITUNG.md). Dort wird das iPhone ohne Internet und ohne QR-Code zum Lenkrad für das iPad.
+
 Ohne Handy: Pfeiltasten oder W A S D, ein Controller, oder auf einem Tablet „dieses Gerät als Lenkrad“ (Pedale auf dem Bildschirm).
 
 ## Was es gibt
@@ -34,4 +36,4 @@ python3 tools/server.py     # dann http://localhost:8765 öffnen
 node tools/sim.mjs          # Computerfahrer auf allen Strecken testen
 ```
 
-Die 3D-Grafik nutzt [three.js](https://threejs.org) (MIT), die Handy-Verbindung [PeerJS](https://peerjs.com) (MIT), der QR-Code [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT). Alle drei werden von jsDelivr geladen.
+Die 3D-Grafik nutzt [three.js](https://threejs.org) (MIT), die Handy-Verbindung [PeerJS](https://peerjs.com) (MIT), der QR-Code [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT). Alle drei werden von jsDelivr geladen, in der App liegen sie auf dem Gerät.

@@ -123,3 +123,7 @@ body.verbunden #hlStatus { color: var(--gruen); }
 #hKurve b { font-size: 26px; color: var(--gelb); }
 #hKurve b.runter { color: #ff6b5e; }
 #hKurve .knapp { color: #ff6b5e; font-weight: bold; }
+#hlStart button.link { font-size: 15px; padding: 0; background: none; border-radius: 0; }
+#lbNah { display: none; }
+html.app #lbNah { display: block; }
+#lbNah button { font-size: 16px; padding: 10px 16px; border-radius: 12px; border: none; background: var(--blau); color: #fff; margin: 4px 0 6px; }
