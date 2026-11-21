@@ -349,7 +349,11 @@ function rallyeHoehe(def, T, Y) {
     for (let i = 0; i < n; i++) Y[i] += hoch * Math.sin(T.s[i] / L * mal * 6.283 + ph);
   }
   for (const [f, hoch, lang] of def.spruenge || []) {
-    const mitte = f * L;
+    // Gesprungen wird nur auf (fast) geraden Stücken: In der Luft kann man nicht lenken, also darf die Landung nicht
+    // in einer Kurve liegen. Deshalb rückt der Sprung bis 150 m weit an die geradeste Stelle in der Nähe.
+    const krumm = m => { let g = 0; for (let d = -lang; d <= lang * 1.6; d += 4) g = Math.max(g, Math.abs(T.k[Math.min(n - 1, Math.floor(((((m + d) % L) + L) % L) / L * n))])); return g; };
+    let mitte = f * L, best = krumm(mitte);
+    for (let d = -150; d <= 150; d += 10) { const g = krumm(f * L + d) + Math.abs(d) * 0.00002; if (g < best) { best = g; mitte = f * L + d; } }
     for (let i = 0; i < n; i++) {
       let d = T.s[i] - mitte; if (d > L / 2) d -= L; if (d < -L / 2) d += L;
       // Form: weich hinauf (Rampe), oben rund, hinten etwas steiler hinunter (so landet man auf dem Abhang)

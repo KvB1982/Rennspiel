@@ -31,7 +31,7 @@ const HALT = { [BELAG.asphalt]: 1, [BELAG.schotter]: 0.74, [BELAG.matsch]: 0.56,
 // Die anderen Fahrer (ausgedacht). faktor = wie viel langsamer als der Tempo-Plan (1 = genau der Plan)
 const NAMEN = ['Aino Virtala', 'Bastien Lacombe', 'Tõnis Vaher', 'Kalle Rautio', 'Rhys Glanmor', 'Mathis Ferrand',
   'Iker Basaldua', 'Jari Kalliola', 'Henrik Øvregård', 'Fergus McAlden', 'Konrad Haberl', 'Odile Marchetti'];
-export const STAERKE_RALLYE = { leicht: [1.25, 1.5], mittel: [1.12, 1.32], schwer: [1.02, 1.15] };   // geschätzt: ein guter Fahrer schafft etwa 1,15-mal den Plan
+export const STAERKE_RALLYE = { leicht: [1.08, 1.4], mittel: [0.95, 1.2], schwer: [0.86, 1.02] };   // geschätzt: Mit der Arcade-Hilfe ist man oft schneller als der Plan, deshalb sind die Gegner auf „mittel“ schon nah dran
 
 // fester Zufall aus einem Text (gleiche Zeiten bei jedem Start)
 function zufallAus(text) {

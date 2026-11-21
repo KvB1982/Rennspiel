@@ -10,8 +10,10 @@ import { STRECKEN } from '../js/strecken.js';
 import { baueStrecke } from '../js/strecke.js';
 import { neuesAuto, schritt, aufStrecke, lenkGrenze } from '../js/physik.js';
 import { ideallinie } from '../js/ki.js';
+import { RALLYEAUTOS } from '../js/rallyeautos.js';
 
-const ohne = process.argv[2] === 'aus';
+const ohne = process.argv.includes('aus');
+const nurRallye = process.argv.includes('rallye');   // node tools/fahrgefuehl.mjs rallye [aus]: nur die Rallyeautos
 const dt = 1 / 60;
 const fein = x => (Math.round(x * 100) / 100).toFixed(2);
 
@@ -64,7 +66,7 @@ function fahrer(art, id, wild) {
   const def = STRECKEN.find(s => s.id === id);
   const T = baueStrecke(def);
   const a = auto(art);
-  const L = ideallinie(T, a.p, { rechts: !!def.strasse });
+  const L = ideallinie(T, a.p, def.strasse ? { rechts: true } : undefined);
   aufStrecke(a, T, 0, 0);
   let t = 0, wand = 0, neben = 0, dreher = 0, quer = false, s0 = 0, weg = 0;
   while (t < 400 && weg < T.laenge) {
@@ -94,13 +96,14 @@ function fahrer(art, id, wild) {
 }
 
 console.log(ohne ? 'OHNE Arcade-Hilfe' : 'MIT Arcade-Hilfe');
-for (const art of ['f1', 'falkner', 'stallone', 'aurelion', 'nordvind']) {
+const RALLYE = RALLYEAUTOS.map(r => r.id);
+for (const art of nurRallye ? RALLYE : ['f1', 'falkner', 'stallone', 'aurelion', 'nordvind', ...RALLYE]) {
   const b = beschleunigung(art);
   const s1 = spurwechsel(art, 120), s2 = spurwechsel(art, 220), s3 = spurwechsel(art, 220, 0.7);
   console.log(`\n${art}: 0–100 ${fein(b.t100)} s, 0–200 ${fein(b.t200)} s`);
   for (const [n, s] of [['Spurwechsel 120 km/h', s1], ['Spurwechsel 220 km/h', s2], ['Haken lang 220 km/h', s3]])
     console.log(`  ${n.padEnd(22)} seitlich ${fein(s.seit)} m, Rutschwinkel höchstens ${s.beta.toFixed(1)}°, gedreht höchstens ${s.dreh.toFixed(1)}°, ruhig nach ${fein(s.ruhig)} s`);
-  const strecken = art === 'f1' ? ['kueste', 'wald', 'hafen'] : ['metropole', 'landstrasse', 'staedtetour'];
+  const strecken = art === 'f1' ? ['kueste', 'wald', 'hafen'] : RALLYE.includes(art) ? ['wp_seen', 'wp_nebel', 'wp_pass'] : ['metropole', 'landstrasse', 'staedtetour'];
   for (const id of strecken) for (const wild of [false, true]) {
     const r = fahrer(art, id, wild);
     console.log(`  ${(wild ? 'Wild ' : 'Profi') + ' ' + id.padEnd(12)} ${r.fertig ? 'Runde ' + r.t.toFixed(1) + ' s' : 'NICHT fertig'}, Wand ${r.wand}, neben der Straße ${r.neben.toFixed(1)} s, Dreher ${r.dreher}`);

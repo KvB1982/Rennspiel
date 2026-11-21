@@ -23,8 +23,14 @@ const BASIS = {
   widerstand: 0.85,
   rollen: 0.016,
   bremse: 1.0, bremseVorn: 0.62,
-  bremsGriff: 1.5, zugGriff: 1.55, schub: 1.25,
-  esp: null,                         // kein Schleuderschutz: Driften ist erwünscht
+  bremsGriff: 1.7, zugGriff: 2.0, schub: 1.6,   // kräftige Spiel-Bremse und viel Schub (mit Absicht stärker als echt)
+  // Schleuderschutz erst ab knapp 30° Rutschwinkel: Driften ist erwünscht, Drehen nicht (aus mit „Traktion aus“)
+  esp: { beta: 0.5, dreh: 5, quer: 0.25 },
+  // Arcade-Hilfe wie bei den Supercars (siehe physik.js), aber mit mehr Drift: bis "frei" (gut 15°) darf das Auto
+  // quer stehen, mit Handbremse bis "freiHand" (gut 35°). Was darüber hinaus rutscht, holt die Hilfe zurück, ohne Tempo
+  // zu kosten. "fang" fängt das Heck ab, wenn es sich schneller dreht, als die Räder zeigen – so kommt man aus jedem
+  // Schleudern wieder heraus, auch ohne perfektes Gegenlenken. "belag": Auf Schotter und Matsch hilft sie etwas mehr.
+  arcade: { lenk: 1.6, folgen: 24, griff: 1.35, ein: 9, fang: 7, frei: 0.27, freiHand: 0.62, halt: 2.4, rand: 2.5, belag: 0.5 },
   tcRest: 0.9,                       // Traktionskontrolle (wenn an) lässt nur wenig Haftung für die Kurve übrig
   lenkMax: 0.62, lenkTempo: 24,
   gaenge: 6, drehzahlMax: 8200, rueck: 7, abregeln: true,
@@ -43,7 +49,7 @@ export const RALLYEAUTOS = [
   {
     id: 'quadra', name: 'Quadra S1 Gruppe B', vorbild: 'Gruppe-B-Coupé der 80er (Audi Sport quattro S1)',
     text: 'Das Monster aus den Achtzigern: enorm viel Kraft, wenig Halt. Für Mutige – das Heck will immer nach außen.',
-    p: { masse: 1100, leistung: 440000, schubMax: 14000, vMax: 215 * KMH, haft: 1.08, hinten: 0.93, allrad: 0.4, traeg: 1350, a: 1.3, b: 1.2, drehzahlMax: 7800, gaenge: 5 },
+    p: { masse: 1100, leistung: 440000, schubMax: 14000, vMax: 215 * KMH, haft: 1.1, hinten: 0.97, allrad: 0.4, traeg: 1350, a: 1.3, b: 1.2, drehzahlMax: 7800, gaenge: 5 },
     farbe: 0xd8d8d2, zweit: 0xd01818, jahr: 1985,
   },
   {
