@@ -1,6 +1,6 @@
 # Rennspiel – Hinweise für Claude
 
-3D-Rennspiel für den Browser mit Formel-Rennwagen, ferngesteuertem Auto und Slotcar-Bahn. Das zentrale Element: das Handy als Lenkrad.
+3D-Rennspiel für den Browser mit Formel-Rennwagen, Supercars im Straßenverkehr, ferngesteuertem Auto und Slotcar-Bahn. Das zentrale Element: das Handy als Lenkrad.
 Vater-Sohn-Lernprojekt wie die Geschwister-Spiele Powershot (`KvB1982/Powershot`), Frontline (`KvB1982/Frontline`) und Reitturnier.
 Repository: https://github.com/KvB1982/rennspiel · läuft auf GitHub Pages unter https://kvb1982.github.io/rennspiel/ (Pages muss im Repository eingeschaltet sein).
 
@@ -53,6 +53,12 @@ Lenken, Drehen, seitlicher Abstand: plus = links.
 | `js/klang.js`, `sounds/` | Motor, Reifen, Aufprall, Boxenstopp aus Aufnahmen (`DATEIEN` oben in der Datei; CC0 von Freesound, Quellen in `LIZENZEN.md`): Rennwagen = zwei Schleifen (Leerlauf, hohe Drehzahl), Tonhöhe über `playbackRate` aus der Drehzahl (`DZ_LEER`, `DZ_HOCH`, `UEBERGANG`), kleine Autos = Elektromotor-Schleife. Solange die Aufnahmen laden oder wenn sie fehlen, erzeugt WebAudio die Töne selbst (Rückfall). Wind, Rumpeln und Piepen sind immer selbst erzeugt |
 | `js/spiel.js` | Menü, Spiel-Schleife, Anzeige, Ergebnis, QR-Code. Rennwagen: Gang für die nächste Kurve (`kurvenFinden`: Scheitelpunkte = Tiefpunkte des Tempo-Plans), Ideallinie und rote Bremszonen auf der Fahrbahn (`linieZeigen` in `streckebau.js`, Einstellung `E.linie`) |
 | `js/main.js` | Start: Lenkrad-Seite oder Spiel |
+| `js/supercars.js` | Supercar-Modus (ohne three.js): sechs Sportwagen mit ausgedachten Namen, je einem bekannten Vorbild nachempfunden (`SUPERCARS`: Falkner/Porsche 911 Turbo, Taurino/Lamborghini, Stallone/Ferrari, Aurelion/Bugatti Chiron, Nordvind/Koenigsegg Jesko, Vento/Pagani Huayra), Lackfarben (`LACKE`), Physik-Werte (`SUPER_AUTOS`, kommen in `AUTOS`). Physik dazu in `physik.js`: Allrad-Anteil (`allrad`), Gewicht wandert beim Bremsen/Beschleunigen (`super`), Traktionskontrolle lässt Haftung für die Kurve übrig (`tcRest`) |
+| `js/supercarbau.js` | Die Supercars aus Formen (`FORMEN` je Auto: Nase, Haube, Hüften, Heck, Kabine, Lichter, Flügel …), mit Cockpit innen (`innen`, nur in der Cockpit-Kamera sichtbar). Kein Logo |
+| `js/strecke.js` → `ZONEN` | Straßen-Strecken (`strasse: true` in `strecken.js`): jedes Stück hat eine Zone `stadt`, `dorf`, `land`, `autobahn` (Breite, Rand, Spuren, Tempo und Dichte des Verkehrs). Gesetzt mit `{ zone: '…' }` an einer Ecke oder `def.zone`; `T.zone`, `T.strasse`. Strecken: `metropole` (Stadt), `landstrasse` (Land und Dörfer), `staedtetour` (Valmera → Land → Dorf → Bergheim → Autobahn zurück, 19 km) |
+| `js/verkehr.js` | Verkehr (ohne three.js): Autos, Transporter, Lastwagen, Busse (`ARTEN`) fahren auf ihrer Spur, Gegenverkehr links, halten Abstand, bremsen für Rennfahrer. `stoesse` = Zusammenstöße mit Rennfahrern. Menge im Menü (`VERKEHR` in `spiel.js`) |
+| `js/verkehrbau.js` | Verkehr in 3D: eine Form je Fahrzeugart, alle als `InstancedMesh` |
+| `js/stadtbau.js` | Straßen-Welt: Fahrbahnmarkierungen, Zebrastreifen, zweite Autobahn-Fahrbahn mit Mittelwand, Leitplanken, Laternen, Häuserzeilen, Großstadt mit Hochhäusern (Blöcke rund um `welt.staedte`), Dörfer, Bauernhöfe, Ortsschilder, Ampeln, Gelände mit Feldern und Wald, Berge am Horizont. Städte- und Dorfnamen ausgedacht |
 
 ## Handy als Lenkrad
 
@@ -68,6 +74,7 @@ Lenken, Drehen, seitlicher Abstand: plus = links.
 
 - Ferngesteuertes Auto und Slotcar (Stand 21.11.2026): Tempo, Haftung, Abflug-Grenze und Ausrollen sind geschätzt. Geprüft mit `tools/sim.mjs` und als Standbilder im Test-Browser, nicht von Hand gefahren. Das Slotcar fliegt immer geradeaus von der Bahn und wird nach gut 2 Sekunden wieder eingesetzt; es überschlägt sich nicht. Die Tacho-Zahl der kleinen Autos ist mal 30 hochgerechnet.
 - Boxengasse, Tank, Reifen, Auslauf-Streifen, größere Slotcar-Bahn (30 cm breit statt 20 cm wie bei einer echten Kunststoffbahn), Ideallinie, Bremszonen und Kurven-Gang (Stand 21.11.2026): mit `tools/sim.mjs`, kleinen Rechen-Tests und als Standbilder geprüft, nicht von Hand gefahren. Verbrauch, Reifenabnutzung und Slotcar-Haftung (`haft: 15`, wie mit Haftmagnet) sind geschätzt. Die Boxengasse des Rennwagens fehlt. Im Zeitfahren gibt es keinen Verbrauch.
+- Supercar-Modus (Stand 21.11.2026): geprüft mit `tools/sim.mjs` (alle Rennen kommen ins Ziel, mit Verkehr gibt es viele Stöße) und als Standbilder im Test-Browser (Stadt, Städtetour, Übersicht von oben); nicht von Hand gefahren, nicht auf dem iPad. Je Straßen-Strecke etwa 1,5 Millionen Dreiecke und 550–800 Zeichenaufrufe – auf dem iPad kann das ruckeln. Fahrwerte nur ungefähr wie beim Vorbild, der Rest geschätzt. Verkehr fährt nicht über Kreuzungen und Ampeln (die sind nur Schmuck), Computerfahrer weichen aus, stoßen aber trotzdem oft an. Strecken sind geschlossene Runden; Querstraßen in der Stadt sind nur Bild.
 - Geräusche (Stand 21.11.2026): nur im Test-Browser geprüft (alle Aufnahmen laden, Lautstärke und Tonhöhe folgen Drehzahl und Gas, Hörprobe als Spektrum angesehen), nicht von Menschen angehört und nicht auf iPad oder Handy. Die Rennwagen-Aufnahme ist vom Streckenrand aufgenommen und hat deshalb leichte Doppler-Schwankungen. Pixabay sperrt Programme (Cloudflare), deshalb kommen die Aufnahmen von Freesound, nur CC0. Neue Aufnahmen: WAV (Mono, 32 kHz) statt MP3, weil MP3 am Anfang eine kleine Stille einbaut und Schleifen dann hörbar springen.
 - Im Cockpit ist der Halo-Bügel des eigenen Autos ausgeblendet (`m.halo` in `szene.js`), weil er genau vor den Augen läge.
 

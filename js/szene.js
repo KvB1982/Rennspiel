@@ -6,6 +6,9 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { baueWelt, gummiAuftragen, linieZeigen, stimmung } from './streckebau.js';
 import { baueAuto, autoStellen } from './autobau.js';
 import { MASSSTAB } from './strecke.js';
+import { baueSupercar } from './supercarbau.js';
+import { AUTOS } from './physik.js';
+import { VerkehrBild } from './verkehrbau.js';
 
 export class Buehne {
   constructor(canvas, qualitaet = 'hoch') {
@@ -27,7 +30,8 @@ export class Buehne {
   }
 
   // Strecke T laden und Autos (Liste aus dem Rennen) hinstellen
-  laden(T, autos, L, { linie = false } = {}) {
+  // verkehr = der Verkehr aus dem Rennen (Supercar-Strecken), sonst null
+  laden(T, autos, L, { linie = false, verkehr = null } = {}) {
     if (this.szene) this.aufraeumen();
     const s = this.szene = new THREE.Scene();
     const def = T.def, st = stimmung(def), modell = !!def.modell;
@@ -41,7 +45,7 @@ export class Buehne {
     this.sonnenRichtung = sonne;
     const pmrem = new THREE.PMREMGenerator(r);
     if (!modell) {
-      const himmel = new Sky(); himmel.scale.setScalar(8000);
+      const himmel = this.himmel = new Sky(); himmel.scale.setScalar(T.strasse ? 14000 : 8000);
       const u = himmel.material.uniforms;
       u.turbidity.value = st.truebe; u.rayleigh.value = st.rayleigh; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.85;
       u.sunPosition.value.copy(sonne);
@@ -79,6 +83,13 @@ export class Buehne {
 
     // Strecke und Landschaft
     this.welt = baueWelt(T, s, { qualitaet: this.qualitaet });
+    if (T.strasse) {
+      // Straßen-Strecken sind riesig: weiter sehen, die Berge am Horizont nur leicht im Dunst
+      const weit = Math.max(9000, (this.welt.weit || 6000) + 2500);
+      s.fog = new THREE.Fog(st.nebel, 900, weit * 0.95);
+      this.kamera.far = weit; this.kamera.updateProjectionMatrix();
+    }
+    this.verkehrBild = verkehr ? new VerkehrBild(s, verkehr, { abend: def.welt.zeit === 'abend' }) : null;
     if (L) gummiAuftragen(this.welt, T, L);
     if (L && linie && !modell) linieZeigen(this.welt, T, L);
     if (modell) {
@@ -90,12 +101,17 @@ export class Buehne {
 
     // Autos
     this.autos = autos.map(c => {
-      const m = baueAuto({ farbe: c.farbe, zweit: c.zweit, num: c.nummer, massstab: modell ? MASSSTAB : 1 });
+      const sup = AUTOS[c.a.art] && AUTOS[c.a.art].super;
+      const m = sup ? baueSupercar(c.a.art, { farbe: c.farbe }) : baueAuto({ farbe: c.farbe, zweit: c.zweit, num: c.nummer, massstab: modell ? MASSSTAB : 1 });
+      if (m.auge) c.a.auge = m.auge;   // für die Cockpit-Kamera
+      if (m.scheinwerfer) m.scheinwerfer.emissiveIntensity = def.welt.zeit === 'abend' ? 3 : 1.2;
       s.add(m.gruppe);
       return { c, m };
     });
     // Geist (durchsichtiges Auto der Bestrunde)
-    const g = this.geist = baueAuto({ farbe: 0x9fe8ff, zweit: 0xffffff, num: 0, massstab: modell ? MASSSTAB : 1 });
+    const ichC = autos.find(c => c.ich);
+    const g = this.geist = ichC && AUTOS[ichC.a.art] && AUTOS[ichC.a.art].super ? baueSupercar(ichC.a.art, { farbe: 0x9fe8ff })
+      : baueAuto({ farbe: 0x9fe8ff, zweit: 0xffffff, num: 0, massstab: modell ? MASSSTAB : 1 });
     g.gruppe.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.32; o.material.depthWrite = false; o.castShadow = false; } });
     g.gruppe.visible = false;
     s.add(g.gruppe);
@@ -110,7 +126,11 @@ export class Buehne {
       const imAuto = ichSicht === c;
       m.helm[0].visible = m.helm[1].visible = !imAuto;
       for (const h of m.halo) h.visible = !imAuto;   // der Bügel wäre sonst genau vor den Augen
+      if (m.innen) m.innen.visible = imAuto;           // Supercar: Armaturenbrett und Lenkrad nur von innen
     }
+    if (this.verkehrBild) this.verkehrBild.update();
+    // Himmel wandert mit der Kamera mit (die Straßen-Strecken sind größer als der Himmel)
+    if (this.himmel && this.T.strasse) this.himmel.position.copy(this.kamera.position);
     // Geist
     if (geistLage) {
       const g = this.geist; g.gruppe.visible = true;
