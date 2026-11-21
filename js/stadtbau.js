@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as TX from './texturen.js';
 import { band, abschnitte, mesh, naeheGitter } from './streckebau.js';
+import { baumModell, modell, passend, eckMaterial } from './modelle.js';
 
 const STADT = 0, DORF = 1, LAND = 2, AUTOBAHN = 3;
 const DOERFER = ['Lindenau', 'Kirchberg', 'Weidenfeld', 'Hasenmoor', 'Eichtal', 'Sonnwies'];
@@ -244,6 +245,31 @@ function sammler(gruppe) {
   };
 }
 
+// Dorfhaus aus einem fertigen Modell (Kenney City Kit Suburban, CC0): eine Form mit Eckfarben,
+// Wand und Dach bekommen zufällige Farben. Die Haustür (Modell-Vorderseite +z) zeigt mit dreh zur Straße.
+const HAEUSER = ['haus_a', 'haus_g', 'haus_h', 'haus_i', 'haus_m', 'haus_q'];
+const WAND = [0xf2ead8, 0xf6f0e2, 0xe8d6b8, 0xdfe6e0, 0xf0d8c8, 0xe9e3cf];
+const DACH = [0xa83c2a, 0x8a3a2a, 0x9c4a30, 0x5e4a3e, 0x6a6e74];
+const hausMat = eckMaterial(0xffffff, { roughness: 0.85 });
+function hausModell(r, breit, tief, x, y, z, dreh) {
+  const m = modell(HAEUSER[Math.floor(r() * HAEUSER.length)]);
+  if (!m) return null;
+  const g = m.kiste.getSize(new THREE.Vector3());
+  const s = Math.min(breit / g.x, tief * 1.4 / g.z);
+  const t = passend(m, { mal: s });
+  const wand = new THREE.Color(WAND[Math.floor(r() * WAND.length)]), dach = new THREE.Color(DACH[Math.floor(r() * DACH.length)]);
+  const teile = [];
+  for (const [n, geo] of Object.entries(t)) {
+    if (n === 'masse') continue;
+    const f = n === 'wand' ? wand : n === 'dach' ? dach : null;
+    if (f) { const c = geo.getAttribute('color'); for (let k = 0; k < c.count; k++) c.setXYZ(k, c.getX(k) * f.r, c.getY(k) * f.g, c.getZ(k) * f.b); }
+    teile.push(geo);
+  }
+  const ganz = mergeGeometries(teile);
+  ganz.rotateY(dreh); ganz.translate(x, y, z);
+  return ganz;
+}
+
 // Häuserzeilen direkt an der Straße (Stadt) und Häuser mit Giebeldach (Dorf)
 function haeuserzeilen(T, gruppe, nah, r, abend, viel) {
   const M = hausMaterialien(abend), S = sammler(gruppe);
@@ -276,8 +302,12 @@ function haeuserzeilen(T, gruppe, nah, r, abend, viel) {
         S.dazu(glas ? M.glas[Math.floor(r() * M.glas.length)] : M.fassaden[Math.floor(r() * M.fassaden.length)], kiste(breit - 0.4, h, tief, x, y, z, dreh, [7, 25.6 / 8 * 8]));
       } else {
         const h = 5.5 + r() * 2.5;
-        S.dazu(M.putz[Math.floor(r() * M.putz.length)], kiste(breit, h, tief, x, y, z, dreh, [7, 25.6]));
-        S.dazu(M.dach[Math.floor(r() * 3)], giebel(tief + 0.8, breit + 0.6, 3 + r() * 1.5, x, y + h, z, dreh + Math.PI / 2));
+        const haus = hausModell(r, breit, tief, x, y + 0.3, z, Math.atan2(-seite * T.tz[i], seite * T.tx[i]));
+        if (haus) S.dazu(hausMat, haus);
+        else {
+          S.dazu(M.putz[Math.floor(r() * M.putz.length)], kiste(breit, h, tief, x, y, z, dreh, [7, 25.6]));
+          S.dazu(M.dach[Math.floor(r() * 3)], giebel(tief + 0.8, breit + 0.6, 3 + r() * 1.5, x, y + h, z, dreh + Math.PI / 2));
+        }
       }
       k += Math.max(1, Math.round((breit + luecke) / ds));
     }
@@ -488,10 +518,13 @@ function baeume(T, gruppe, nah, land, staedte, r, viel) {
   const arten = [['nadel', 0x2c4f2a, 0.45, 1, 3], ['laub', 0x46722f, 0.55, 1, 4]];
   const kroneMat = new THREE.MeshStandardMaterial({ roughness: 0.95, flatShading: true });
   const stammMat = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 1 });
+  // fertige Baum-Modelle (Kenney Nature Kit, CC0), wenn geladen
+  const MODELL = { nadel: ['baum_tanne', 11.5], laub: ['baum_laub', 8.5] };
   for (const [name, farbe, anteil, groesse, stammH] of arten) {
     const zahl = Math.round(anzahl * anteil);
-    const krone = new THREE.InstancedMesh(formen[name](), kroneMat, zahl);
-    const st = new THREE.InstancedMesh(stamm, stammMat, zahl);
+    const bm = baumModell(...MODELL[name]);
+    const krone = new THREE.InstancedMesh(bm ? bm.krone : formen[name](), bm ? bm.kroneMat : kroneMat, zahl);
+    const st = new THREE.InstancedMesh(bm ? bm.stamm : stamm, bm ? bm.stammMat : stammMat, zahl);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), Y = new THREE.Vector3(0, 1, 0);
     let k = 0, versuche = 0;
     while (k < zahl && versuche < zahl * 25) {
@@ -514,7 +547,8 @@ function baeume(T, gruppe, nah, land, staedte, r, viel) {
       const s = (0.75 + r() * 0.6) * groesse;
       q.setFromAxisAngle(Y, r() * 6.28);
       m4.compose(new THREE.Vector3(x, hh.h - 0.2, z), q, new THREE.Vector3(s, s, s)); krone.setMatrixAt(k, m4);
-      m4.compose(new THREE.Vector3(x, hh.h - 0.2, z), q, new THREE.Vector3(s, s * stammH, s)); st.setMatrixAt(k, m4);
+      if (!bm) m4.compose(new THREE.Vector3(x, hh.h - 0.2, z), q, new THREE.Vector3(s, s * stammH, s));
+      st.setMatrixAt(k, m4);
       c.setHex(farbe).offsetHSL((r() - 0.5) * 0.04, (r() - 0.5) * 0.1, (r() - 0.5) * 0.08); krone.setColorAt(k, c);
       k++;
     }

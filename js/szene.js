@@ -89,7 +89,7 @@ export class Buehne {
       s.fog = new THREE.Fog(st.nebel, 900, weit * 0.95);
       this.kamera.far = weit; this.kamera.updateProjectionMatrix();
     }
-    this.verkehrBild = verkehr ? new VerkehrBild(s, verkehr, { abend: def.welt.zeit === 'abend' }) : null;
+    this.verkehrBild = verkehr ? new VerkehrBild(s, verkehr, { abend: def.welt.zeit === 'abend', kamera: this.kamera }) : null;
     if (L) gummiAuftragen(this.welt, T, L);
     if (L && linie && !modell) linieZeigen(this.welt, T, L);
     if (modell) {
