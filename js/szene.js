@@ -126,7 +126,8 @@ export class Buehne {
       const imAuto = ichSicht === c;
       m.helm[0].visible = m.helm[1].visible = !imAuto;
       for (const h of m.halo) h.visible = !imAuto;   // der Bügel wäre sonst genau vor den Augen
-      if (m.innen) m.innen.visible = imAuto;           // Supercar: Armaturenbrett und Lenkrad nur von innen
+      if (m.innen) m.innen.visible = imAuto;
+      if (m.sicht) m.sicht(imAuto);                    // fertiges Modell von außen, selbst gebautes Auto im Cockpit           // Supercar: Armaturenbrett und Lenkrad nur von innen
     }
     if (this.verkehrBild) this.verkehrBild.update();
     // Himmel wandert mit der Kamera mit (die Straßen-Strecken sind größer als der Himmel)

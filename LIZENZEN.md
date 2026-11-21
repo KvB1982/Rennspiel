@@ -54,6 +54,22 @@ und Modelle mit vielen Dreiecken vereinfacht.
 | `regal` | Wohnzimmer | [Wooden Bookshelf Worn](https://polyhaven.com/a/wooden_bookshelf_worn) |
 | `pflanze_klein` | Wohnzimmer (auf dem Schrank) | [Potted Plant 04](https://polyhaven.com/a/potted_plant_04) |
 
+### Supercars aus 3D AI Studio
+
+Die sechs Supercars in `modelle/supercars/` hat Kristian am 21.11.2026 mit [3D AI Studio](https://www.3daistudio.com) erzeugt
+(erst ein Bild mit Nano Banana 2.1, daraus das Modell mit Prism 3.1). `tools/supercars.mjs` hat sie verkleinert, die Räder
+herausgeschnitten und den Lack umfärbbar gemacht. Die Formen sind an bekannte Sportwagen angelehnt, tragen aber kein Logo und
+keinen echten Namen. Vor einer bezahlten Veröffentlichung die Nutzungsbedingungen von 3D AI Studio und die Ähnlichkeit zu den
+Vorbildern prüfen – das Spiel ist für den Privatgebrauch.
+
+### Bilder für Boden und Bäume
+
+| Datei | Wofür | Quelle | Lizenz |
+| --- | --- | --- | --- |
+| `bilder/gras.jpg` | Wiesen und Rasen | [Leafy Grass](https://polyhaven.com/a/leafy_grass) von Poly Haven, verkleinert und grüner gefärbt | CC0 |
+| `bilder/asphalt.jpg` | Fahrbahn | [Asphalt 04](https://polyhaven.com/a/asphalt_04) von Poly Haven, verkleinert und abgedunkelt | CC0 |
+| `bilder/baum_fichte.webp`, `baum_laub.webp`, `baum_pinie.webp`, `baum_zypresse.webp` | Bäume als flache Bilder | Fotos der Baum-Modelle aus Powershot (`assets/gelaende/baum_*.glb`, dort mit 3D AI Studio erzeugt), gemacht mit `tools/baumbilder.html` | eigene Modelle |
+
 ## Programme
 
 - [three.js](https://threejs.org) r160, MIT-Lizenz, geladen von jsDelivr.

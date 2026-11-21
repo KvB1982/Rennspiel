@@ -6,10 +6,63 @@
 // wie eckig alles ist. Dazu Scheinwerfer, Rücklichter, Lufteinlässe, Flügel und Auspuff.
 // Alle Formen sind ausgedacht und nur an die Vorbilder angelehnt – keine Logos, keine echten Lackierungen.
 // Vorn ist +z, links ist +x. Der Nullpunkt liegt im Schwerpunkt zwischen den Achsen (wie beim Rennwagen).
+//
+// Seit November 2026 gibt es dazu fertige Modelle aus 3D AI Studio (modelle/supercars/<id>.glb, gemacht mit
+// tools/supercars.mjs): Karosserie mit Farbbild und vier einzelne Räder, die sich drehen und vorn einlenken.
+// ladeSupercars() holt sie vor dem Rennen. Von außen sieht man dann das fertige Modell; in der Cockpit-Kamera
+// bleibt das selbst gebaute Auto mit Armaturenbrett und Lenkrad (m.sicht schaltet um). Ohne Modell bleibt alles wie früher.
 
 import * as THREE from 'three';
 import { rumpf, rad, stange } from './autobau.js';
-import { supercar } from './supercars.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { supercar, SUPERCARS } from './supercars.js';
+
+// ---------------------------------------------------------------- fertige Modelle
+const echt = new Map();   // id → { koerper: Form, raeder: [{ form, ort }], bild }
+let echtLaeuft = null;
+// Alle Supercar-Modelle laden. Wartet höchstens `bis` Millisekunden. Mit ?ohnemodelle bleiben die selbst gebauten Autos.
+export function ladeSupercars({ bis = 8000 } = {}) {
+  if (typeof location !== 'undefined' && /ohnemodelle|ohnesupercars/.test(location.search)) return Promise.resolve();
+  if (!echtLaeuft) {
+    const lader = new GLTFLoader();
+    echtLaeuft = Promise.all(SUPERCARS.map(S => lader.loadAsync(`modelle/supercars/${S.id}.glb`).then(g => {
+      const e = { koerper: null, raeder: [], bild: null };
+      g.scene.traverse(o => {
+        if (!o.isMesh) return;
+        o.geometry.computeVertexNormals();
+        e.bild = o.material.map;
+        if (o.name === 'koerper') e.koerper = o.geometry;
+        else if (o.name.startsWith('rad_')) e.raeder.push({ name: o.name, form: o.geometry, ort: o.position.clone() });
+      });
+      e.raeder.sort((a, b) => 'rad_vl rad_vr rad_hl rad_hr'.indexOf(a.name) - 'rad_vl rad_vr rad_hl rad_hr'.indexOf(b.name));
+      if (e.koerper && e.raeder.length === 4) echt.set(S.id, e);
+    }).catch(() => { /* fehlt: dann das selbst gebaute Auto */ })));
+  }
+  return Promise.race([echtLaeuft, new Promise(ok => setTimeout(ok, bis))]);
+}
+
+// Material für die Karosserie: Im Farbbild ist der Lack blau gespeichert. Hier wird das Blau gegen die
+// gewünschte Lackfarbe getauscht (in einem kleinen Zusatz zum Malprogramm der Grafikkarte) und der Lack glänzt.
+function lackMaterial(bild, farbe) {
+  const mat = new THREE.MeshStandardMaterial({ map: bild, roughness: 0.6, metalness: 0 });
+  const u = { uLack: { value: new THREE.Color(farbe) } };
+  mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, u);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uLack;\nfloat lackK = 0.0;')
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        {
+          float grau = min(diffuseColor.r, diffuseColor.g);       // Glanzlicht und Schatten
+          float blau = diffuseColor.b - grau;                      // so viel Lack ist an dieser Stelle
+          lackK = smoothstep(0.03, 0.12, blau);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(grau) + uLack * min(blau * 3.4, 1.25), lackK);
+        }`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.2, lackK);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.4, lackK);');
+  };
+  mat.userData.lack = u.uLack.value;
+  return mat;
+}
 
 const VORN = 1.25, HINTEN = -1.45;   // Achsen (wie in supercars.js: a = 1,25 m, b = 1,45 m)
 const RAD = 0.35;                    // Radhalbmesser
@@ -238,9 +291,25 @@ export function baueSupercar(id, { farbe = null } = {}) {
   const nabe = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.03), innenMat); lenkrad.add(nabe);
   const mark = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.03, 0.03), new THREE.MeshStandardMaterial({ color: 0xf2c21a })); mark.position.y = 0.17; lenkrad.add(mark);
 
-  // Räder mit Bremssätteln
+  // Gibt es das fertige Modell? Dann kommt alles bisher Gebaute in eine Gruppe "alt" (nur im Cockpit zu sehen)
+  const E = echt.get(S.id);
   const raeder = [], lenkVorn = [];
-  for (const [z, b, k] of [[VORN, 0.26, 0], [VORN, 0.26, 1], [HINTEN, 0.32, 2], [HINTEN, 0.32, 3]]) {
+  let sicht = null;
+  if (E) {
+    const alt = new THREE.Group();
+    for (const kind of [...koerper.children]) if (kind !== innen) alt.add(kind);
+    koerper.add(alt); alt.visible = false;
+    const neu = new THREE.Mesh(E.koerper, lackMaterial(E.bild, lackFarbe)); koerper.add(neu);
+    const radMat = lackMaterial(E.bild, 0x2a2b30);   // blaue Spiegelungen auf den Felgen werden dunkelgrau
+    E.raeder.forEach((R, k) => {
+      const halter = new THREE.Group(); halter.position.copy(R.ort); auto.add(halter);
+      const rd = new THREE.Mesh(R.form, radMat); halter.add(rd); raeder.push(rd);
+      if (k < 2) lenkVorn.push(halter);
+    });
+    sicht = imAuto => { alt.visible = imAuto; neu.visible = !imAuto; };
+  }
+  // Räder mit Bremssätteln
+  for (const [z, b, k] of E ? [] : [[VORN, 0.26, 0], [VORN, 0.26, 1], [HINTEN, 0.32, 2], [HINTEN, 0.32, 3]]) {
     const s = k % 2 ? -1 : 1;
     const halter = new THREE.Group(); halter.position.set(s * (W - 0.12), RAD, z); auto.add(halter);
     const rd = rad(RAD, b, mats); halter.add(rd); raeder.push(rd);
@@ -249,5 +318,5 @@ export function baueSupercar(id, { farbe = null } = {}) {
 
   auto.traverse(o => { if (o.isMesh) o.castShadow = true; });
   // Glas soll keine harten Schatten ins Auto werfen
-  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, licht: { material: rueckMat }, helm: [kopf, kopf], halo: [], innen, auge, scheinwerfer: scheinMat, massstab: 1, supercar: true };
+  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, licht: { material: rueckMat }, helm: [kopf, kopf], halo: [], innen, auge, scheinwerfer: scheinMat, massstab: 1, supercar: true, sicht };
 }

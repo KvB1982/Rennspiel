@@ -18,6 +18,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { foto } from './texturen.js';
 
 export const NAMEN = [
   'auto_kompakt', 'auto_limousine', 'auto_gelaende', 'auto_transporter', 'auto_lkw',
@@ -139,4 +140,26 @@ export function echtGruppe(name, { breit, hoch, lang, mal } = {}) {
   aussen.add(mitte);
   aussen.userData.masse = { breit: g.x * s.x, hoch: g.y * s.y, lang: g.z * s.z };
   return aussen;
+}
+
+// Baum als flaches Bild für sehr viele Instanzen: zwei Bild-Tafeln über Kreuz (nur 4 Dreiecke je Baum).
+// Die Bilder in bilder/baum_<art>.webp zeigen den Baum von zwei Seiten nebeneinander (gemacht mit tools/baumbilder.html).
+// art = 'fichte' | 'laub' | 'pinie' | 'zypresse'; hoch = Höhe in Metern bei Größe 1. Gibt { krone, kroneMat } oder null zurück.
+const baumBilder = new Map();
+export function baumBild(art, hoch) {
+  const bild = foto('baum_' + art);
+  if (!bild) return null;
+  if (!baumBilder.has(art)) {
+    const t = new THREE.Texture(bild); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; t.needsUpdate = true;
+    baumBilder.set(art, new THREE.MeshStandardMaterial({ map: t, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 1 }));
+  }
+  const b = hoch * (bild.width / 2) / bild.height / 2;      // halbe Breite einer Tafel
+  const g = new THREE.BufferGeometry();
+  // Tafel 1 steht quer (x), Tafel 2 längs (z); jede zeigt ihre Hälfte des Bildes
+  g.setAttribute('position', new THREE.Float32BufferAttribute([-b, 0, 0, b, 0, 0, b, hoch, 0, -b, hoch, 0, 0, 0, b, 0, 0, -b, 0, hoch, -b, 0, hoch, b], 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 0.5, 0, 0.5, 1, 0, 1, 0.5, 0, 1, 0, 1, 1, 0.5, 1], 2));
+  // alle Normalen zeigen nach oben: so werden beide Tafeln gleich hell beleuchtet
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(Array(8).fill([0, 1, 0]).flat(), 3));
+  g.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
+  return { krone: g, kroneMat: baumBilder.get(art) };
 }
