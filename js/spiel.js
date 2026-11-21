@@ -148,6 +148,7 @@ export function starteSpiel() {
       rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
       if (rennen.ich) rennen.ich.a.tc = E.traktion ? true : false;
       eingabe.autoGas = E.autogas && !slot;
+      eingabe.sanft = E.fahrzeug === 'modell' ? 0.5 : 1;
       if (E.modus === 'zeit') {
         const g = ladeGeist(id, E.fahrzeug + geistArt());
         if (g) { rennen.setzeGeist(g); }

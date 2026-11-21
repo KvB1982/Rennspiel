@@ -18,6 +18,7 @@ export class Eingabe {
     this.neigung = new Neigung();
     this.pedal = { gas: 0, brems: 0 };   // Pedale auf dem Bildschirm
     this.autoGas = false;
+    this.sanft = 1;               // kleine Autos: Tasten lenken langsamer und nicht ganz so weit (wird in spiel.js gesetzt)
     window.addEventListener('keydown', e => {
       if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
       if (!this.tasten.has(e.code)) {
@@ -77,9 +78,9 @@ export class Eingabe {
     // 4. Tastatur: Lenkung baut sich weich auf, damit man nicht ruckartig lenkt
     const T = this.tasten;
     const links = T.has('ArrowLeft') || T.has('KeyA'), rechts = T.has('ArrowRight') || T.has('KeyD');
-    const ziel = (links ? 1 : 0) - (rechts ? 1 : 0);
+    const ziel = ((links ? 1 : 0) - (rechts ? 1 : 0)) * (this.sanft < 1 ? 0.85 : 1);
     if (links || rechts || T.has('ArrowUp') || T.has('ArrowDown') || T.has('KeyW') || T.has('KeyS') || T.has('Space')) this.quelle = 'tastatur';
-    const tempo = ziel === 0 ? 6 : (Math.sign(ziel) !== Math.sign(this.lenk) ? 7 : 3.2);
+    const tempo = ziel === 0 ? 6 : (Math.sign(ziel) !== Math.sign(this.lenk) ? 7 : 3.2 * this.sanft);
     this.lenk += clamp(ziel - this.lenk, -tempo * dt, tempo * dt);
     const gasT = T.has('ArrowUp') || T.has('KeyW'), bremsT = T.has('ArrowDown') || T.has('KeyS') || T.has('Space');
     this.gas = this.autoGas ? (bremsT ? 0 : 1) : (gasT ? 1 : this.pedal.gas);
