@@ -2,12 +2,14 @@
 //
 // Die Fahrbahn, die Randsteine, Gras und Kies sind lange "Bänder", die der Mittellinie folgen.
 // Daneben stehen Leitplanken, Reifenstapel oder Mauern, dahinter Tribünen, Bäume, Häuser, Meer oder Berge.
-// Beim Modellauto ist alles eine Kunststoffbahn auf dem Wohnzimmerboden.
+// Die kleinen Autos fahren im Wohnzimmer: das ferngesteuerte Auto auf einer Strecke aus Matten,
+// das Slotcar auf einer Kunststoffbahn mit zwei Schlitzen und Weichen.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as TX from './texturen.js';
-import { BELAG } from './strecke.js';
+import { BELAG, MASSSTAB } from './strecke.js';
+import { weichen, WEICHE_LANG } from './slot.js';
 
 // ---------------------------------------------------------------- Hilfen
 
@@ -121,7 +123,7 @@ export function baueWelt(T, szene, { qualitaet = 'hoch' } = {}) {
   const as = TX.asphalt();
   const asMat = new THREE.MeshStandardMaterial({
     map: as.map, normalMap: as.normalMap, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.88, metalness: 0,
-    vertexColors: true, color: modell ? 0x8a8d92 : 0xffffff,
+    vertexColors: true, color: def.slot ? 0x4a4c50 : modell ? 0x7c7f84 : 0xffffff,
   });
   if (modell) { asMat.map = null; asMat.normalMap = null; asMat.roughness = 0.45; }
   const SP = modell ? 6 : 10;
@@ -139,13 +141,28 @@ export function baueWelt(T, szene, { qualitaet = 'hoch' } = {}) {
   for (const seite of [-1, 1]) {
     gruppe.add(mesh(band(T, 0, T.n, 1, (i, j) => seite * (T.hb[i] - lrand - j * lb), () => hoch), weiss, false, true));
   }
-  if (modell) {
-    // Schlitze der Kunststoffbahn: zwei Spuren, je ein dunkler Schlitz mit Metallstreifen daneben
-    const schlitz = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -2 });
-    const metall = new THREE.MeshStandardMaterial({ color: 0xbfc3c8, roughness: 0.25, metalness: 0.9, polygonOffset: true, polygonOffsetFactor: -2 });
-    for (const spur of [-0.5, 0.5]) {
-      gruppe.add(mesh(band(T, 0, T.n, 1, (i, j) => spur * T.hb[i] + (j - 0.5) * 0.004, () => 0.0004), schlitz, false, true));
-      for (const m of [-1, 1]) gruppe.add(mesh(band(T, 0, T.n, 1, (i, j) => spur * T.hb[i] + m * 0.006 + (j - 0.5) * 0.003, () => 0.0004), metall, false, true));
+  if (def.slot) {
+    // Schlitze der Kunststoffbahn: zwei Spuren, je ein dunkler Schlitz mit Metallstreifen (Strom) daneben
+    const schlitz = new THREE.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -3 });
+    const metall = new THREE.MeshStandardMaterial({ color: 0xc8ccd2, roughness: 0.25, metalness: 0.9, polygonOffset: true, polygonOffsetFactor: -2 });
+    const sp = def.spur;
+    for (const spur of [-sp, sp]) {
+      for (const m of [-1, 1]) gruppe.add(mesh(band(T, 0, T.n, 1, (i, j) => spur + m * 0.006 + (j - 0.5) * 0.004, () => 0.0004), metall, false, true));
+      gruppe.add(mesh(band(T, 0, T.n, 1, (i, j) => spur + (j - 0.5) * 0.004, () => 0.0006), schlitz, false, true));
+    }
+    // Weichen: Hier kreuzen sich zwei Schlitze, dazu ein gelbes Feld, damit man die Stelle von weitem sieht
+    const gelb = new THREE.MeshStandardMaterial({ color: 0xf2c21a, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -1 });
+    const dsT = T.laenge / T.n, lang = Math.round(WEICHE_LANG / dsT);
+    const weich = t => t * t * (3 - 2 * t);
+    for (const w of weichen(T)) {
+      const von = Math.round(w / dsT);
+      const t = i => Math.max(0, Math.min(1, (((i - von) % T.n + T.n) % T.n) / lang));
+      for (const seite of [-1, 1]) {
+        gruppe.add(mesh(band(T, von, von + lang, 1, (i, j) => seite * sp * (1 - 2 * weich(t(i))) + (j - 0.5) * 0.004, () => 0.0007), schlitz, false, true));
+        // gelbe Pfeile am Rand vor der Weiche
+        gruppe.add(mesh(band(T, von - 3, von + 1, 1, (i, j) => seite * (T.hb[i] - 0.012 - j * 0.014), () => 0.0005), gelb, false, true));
+      }
+      gruppe.add(mesh(band(T, von - 1, von, 1, (i, j) => -0.02 + j * 0.04, () => 0.0005), gelb, false, true));
     }
   }
   // Startlinie und Zielflagge auf dem Boden
@@ -231,7 +248,7 @@ export function gummiAuftragen(welt, T, L) {
 }
 
 function baueBegrenzung(T, gruppe, viel, modell) {
-  const n = T.n;
+  const n = T.n, def = T.def;
   const blech = new THREE.MeshStandardMaterial({ color: 0xc9ccd0, roughness: 0.35, metalness: 0.8, side: THREE.DoubleSide });
   const pfostenMat = new THREE.MeshStandardMaterial({ color: 0x777a7e, roughness: 0.6, metalness: 0.5 });
   const wandMat = new THREE.MeshStandardMaterial({ color: 0xe6e4dc, roughness: 0.85, side: THREE.DoubleSide });
@@ -248,6 +265,7 @@ function baueBegrenzung(T, gruppe, viel, modell) {
   for (const seite of [1, -1]) {
     const aus = seite > 0 ? T.ausL : T.ausR, artA = seite > 0 ? T.artL : T.artR;
     const lat = i => seite * (T.hb[i] + aus[i] + (modell ? 0 : 0.6));
+    if (def.slot) continue;   // die Slotcar-Bahn hat keine Wand: wer zu schnell ist, fliegt raus
     if (modell) {
       // Kunststoff-Leitplanke: dunkle Wand mit rotem Streifen oben
       gruppe.add(mesh(band(T, 0, n, 2, (i, j) => lat(i) + seite * (j === 2 ? 0.006 : 0), (i, j) => j === 0 ? 0 : 0.028), plastik));
@@ -302,9 +320,9 @@ function baueBegrenzung(T, gruppe, viel, modell) {
 const r01 = k => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 
 function baueAmpel(T, gruppe, welt, modell) {
-  const sc = modell ? 0.012 : 1;
+  const sc = modell ? MASSSTAB : 1;
   const i = T.index(T.laenge - 2 * sc);
-  const breite = T.hb[i] * 2 + (modell ? 0.04 : 4);
+  const breite = (T.hb[i] * 2 + (T.def.slot ? 0.06 : modell ? 0.3 : 4)) / sc;
   const g = new THREE.Group();
   const dunkel = new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.5, metalness: 0.5 });
   const traeger = new THREE.Mesh(new THREE.BoxGeometry(breite, 0.5, 0.6), dunkel); traeger.position.y = 6.2; g.add(traeger);
@@ -600,14 +618,15 @@ function baueStadt(T, gruppe, welt, viel, r) {
 function baueZimmer(T, gruppe, welt, r) {
   const { minx, maxx, minz, maxz } = welt.grenzen;
   const mx = (minx + maxx) / 2, mz = (minz + maxz) / 2;
-  const W = 7.5, D = 6.5, H = 2.7;
+  // Das Zimmer ist so groß, dass die Bahn mit Platz zum Herumgehen hineinpasst
+  const W = Math.max(7.5, maxx - minx + 3.4), D = Math.max(6.5, maxz - minz + 3.6), H = 2.7;
   // Boden
   const pk = TX.parkett().map.clone(); pk.needsUpdate = true; pk.repeat.set(W / 1.6, D / 1.6);
   const boden = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: pk, roughness: 0.45 }));
   boden.rotation.x = -Math.PI / 2; boden.position.set(mx, -0.004, mz); boden.receiveShadow = true; gruppe.add(boden);
   // Teppich unter der Bahn
   const tp = TX.teppich().map.clone(); tp.needsUpdate = true; tp.repeat.set(6, 4);
-  const tw = maxx - minx + 0.8, td = maxz - minz + 0.8;
+  const tw = maxx - minx + 1.3, td = maxz - minz + 1.3;
   const tep = new THREE.Mesh(new THREE.BoxGeometry(tw, 0.006, td), new THREE.MeshStandardMaterial({ map: tp, roughness: 1 }));
   tep.position.set(mx, -0.004, mz); tep.receiveShadow = true; gruppe.add(tep);
   // Bahn-Untergrund (die Platten der Kunststoffbahn sind etwas dick: Bahn liegt 4 mm hoch – hier flach)
@@ -663,8 +682,9 @@ function baueZimmer(T, gruppe, welt, r) {
   // Wo man stehen kann (Augenhöhe 1,5 m): drei Stellen rund um die Bahn
   const aug = 1.5;
   welt.standorte = [
-    { name: 'An der Startlinie', x: T.x[0] + T.tz[0] * 0.75, y: aug, z: T.z[0] - T.tx[0] * 0.75 },
-    { name: 'Vor dem Sofa', x: mx, y: aug, z: maxz + 0.9 },
-    { name: 'Am Regal', x: minx - 0.8, y: aug, z: mz + 0.2 },
+    { name: 'An der Startlinie', x: T.x[0] + T.tz[0] * (T.hb[0] + 0.9), y: aug, z: T.z[0] - T.tx[0] * (T.hb[0] + 0.9) },
+    { name: 'Vor dem Sofa', x: mx, y: aug, z: maxz + 1.0 },
+    { name: 'Am Regal', x: minx - 0.9, y: aug, z: mz + 0.2 },
+    { name: 'Auf dem Stuhl (Überblick)', x: maxx + 1.0, y: 2.25, z: maxz + 0.9 },
   ];
 }

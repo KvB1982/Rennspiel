@@ -1,6 +1,6 @@
 # Rennspiel
 
-Ein 3D-Rennspiel für den Browser: Formel-Rennwagen auf drei ausgedachten Strecken und ein Modellauto auf einer Bahn im Wohnzimmer.
+Ein 3D-Rennspiel für den Browser: Formel-Rennwagen auf drei ausgedachten Strecken, ein ferngesteuertes Auto im Wohnzimmer und eine Slotcar-Bahn mit zwei Spuren.
 Das Besondere: **Das Handy ist das Lenkrad.** Das Spiel läuft auf dem großen Bildschirm (Rechner, Fernseher, iPad), das Handy wird quer gehalten und gedreht.
 
 **Spielen:** https://kvb1982.github.io/rennspiel/ (dafür muss GitHub Pages für dieses Repository eingeschaltet sein: Settings → Pages → Branch `main`, Ordner `/`).
@@ -18,7 +18,9 @@ Ohne Handy: Pfeiltasten oder W A S D, ein Controller, oder auf einem Tablet „d
 - **Zeitfahren** gegen die Uhr, mit Geist-Auto der eigenen Bestrunde. Wer mit allen vier Rädern neben die Strecke fährt, bekommt die Runde nicht gezählt.
 - **Rennen** gegen 3–9 Computerfahrer mit Startampel, in drei Stärken.
 - **Kameras:** hinter dem Auto, weiter weg, im Cockpit am Lenkrad.
-- **Modellauto:** Kunststoffbahn im Wohnzimmer. Du stehst an einer festen Stelle neben der Bahn und lenkst das kleine Auto aus der Ferne (mit 🎥 wechselst du die Stelle).
+- **Ferngesteuertes Auto:** Strecke im Wohnzimmer (Maßstab 1:30, das Tempo ist mit heruntergerechnet und einstellbar). Du stehst an einer festen Stelle neben der Bahn und lenkst das kleine Auto aus der Ferne (mit 🎥 wechselst du die Stelle).
+- **Slotcar-Bahn:** Zwei Spuren mit Schlitz. Du gibst nur Gas. Wer zu schnell in die Kurve fährt, fliegt raus – also rechtzeitig vom Gas gehen. An den gelben Weichen wechselst du die Spur: dabei nach links oder rechts lenken.
+- **Rückwärts:** Im Stand die Bremse halten.
 - **Fahrhilfen:** Bremshilfe, Lenkhilfe, Traktionskontrolle, Gas von allein.
 
 Alle Teams, Fahrer, Werbung und Strecken sind ausgedacht.

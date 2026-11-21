@@ -8,6 +8,9 @@ import * as THREE from 'three';
 import { nummer } from './texturen.js';
 
 const VORN = 1.6, HINTEN = -2.0;   // Achsen (wie in physik.js: a = 1,6 m, b = 2,0 m)
+// Das ganze Auto ist 5,6 m lang und 1,95 m breit (wie ein echter Formel-Wagen).
+// nz staucht alles vor der Vorderachse, damit die Nase nicht zu lang wird.
+const nz = z => z > VORN ? VORN + (z - VORN) * 0.62 : z;
 
 // Rumpf aus Querschnitten: [z, halbe Breite, halbe Höhe, Mitte y, (Mitte x)]
 function rumpf(schnitte, rund = 3, M = 20) {
@@ -97,12 +100,12 @@ export function baueAuto({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massstab
 
   // Rumpf mit Nase, Cockpit, Motorhaube
   add(new THREE.Mesh(rumpf([
-    [3.38, 0.07, 0.05, 0.27], [3.05, 0.12, 0.08, 0.29], [2.5, 0.17, 0.12, 0.34], [1.9, 0.21, 0.16, 0.41],
-    [1.25, 0.29, 0.21, 0.46], [0.65, 0.37, 0.25, 0.49], [0.05, 0.41, 0.25, 0.49], [-0.45, 0.44, 0.31, 0.54],
-    [-0.95, 0.39, 0.37, 0.61], [-1.55, 0.29, 0.29, 0.55], [-2.15, 0.17, 0.19, 0.45], [-2.72, 0.09, 0.11, 0.38],
-  ], 3.2), lack));
+    [3.38, 0.08, 0.05, 0.27], [3.05, 0.13, 0.08, 0.29], [2.5, 0.19, 0.12, 0.34], [1.9, 0.24, 0.16, 0.41],
+    [1.25, 0.31, 0.21, 0.46], [0.65, 0.39, 0.25, 0.49], [0.05, 0.43, 0.25, 0.49], [-0.45, 0.46, 0.31, 0.54],
+    [-0.95, 0.41, 0.37, 0.61], [-1.55, 0.31, 0.29, 0.55], [-2.15, 0.19, 0.19, 0.45], [-2.72, 0.1, 0.11, 0.38],
+  ].map(q => [nz(q[0]), ...q.slice(1)]), 3.2), lack));
   // Streifen auf der Nase
-  add(new THREE.Mesh(rumpf([[3.2, 0.03, 0.02, 0.33], [2.4, 0.05, 0.02, 0.45], [1.6, 0.06, 0.02, 0.56], [1.1, 0.07, 0.02, 0.66]], 2, 10), akzent));
+  add(new THREE.Mesh(rumpf([[3.2, 0.03, 0.02, 0.33], [2.4, 0.05, 0.02, 0.45], [1.6, 0.06, 0.02, 0.56], [1.1, 0.07, 0.02, 0.66]].map(q => [nz(q[0]), ...q.slice(1)]), 2, 10), akzent));
   // Seitenkästen (Kühler)
   for (const s of [-1, 1]) {
     add(new THREE.Mesh(rumpf([
@@ -127,10 +130,10 @@ export function baueAuto({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massstab
   const bm = new THREE.Mesh(bg, karbon); bm.position.y = 0.11; bm.scale.z = -1; add(bm);
 
   // Frontflügel: Hauptblatt, zwei Klappen, Endplatten
-  add(kiste(1.9, 0.025, 0.42, karbon, 0, 0.1, 3.2));
-  add(kiste(1.75, 0.02, 0.2, lack, 0, 0.16, 3.05, -0.35));
-  add(kiste(1.6, 0.02, 0.16, akzent, 0, 0.22, 2.94, -0.6));
-  for (const s of [-1, 1]) add(kiste(0.025, 0.24, 0.6, akzent, s * 0.96, 0.17, 3.12));
+  add(kiste(1.9, 0.025, 0.38, karbon, 0, 0.1, nz(3.2)));
+  add(kiste(1.75, 0.02, 0.18, lack, 0, 0.16, nz(3.2) - 0.14, -0.35));
+  add(kiste(1.6, 0.02, 0.14, akzent, 0, 0.22, nz(3.2) - 0.24, -0.6));
+  for (const s of [-1, 1]) add(kiste(0.025, 0.24, 0.52, akzent, s * 0.96, 0.17, nz(3.2) - 0.07));
   // Heckflügel mit Endplatten und Halter
   add(kiste(1.0, 0.03, 0.32, karbon, 0, 0.86, -2.62, 0.12));
   add(kiste(0.98, 0.025, 0.2, lack, 0, 0.98, -2.55, 0.45));
@@ -145,8 +148,8 @@ export function baueAuto({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massstab
   const haloKurve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(0.3, 0.66, -0.15), new THREE.Vector3(0.3, 0.83, 0.2), new THREE.Vector3(0.17, 0.89, 0.5),
     new THREE.Vector3(0, 0.9, 0.58), new THREE.Vector3(-0.17, 0.89, 0.5), new THREE.Vector3(-0.3, 0.83, 0.2), new THREE.Vector3(-0.3, 0.66, -0.15)]);
-  add(new THREE.Mesh(new THREE.TubeGeometry(haloKurve, 30, 0.028, 8), karbon));
-  add(stange([0, 0.9, 0.58], [0, 0.72, 0.84], 0.022, karbon));
+  const halo = [add(new THREE.Mesh(new THREE.TubeGeometry(haloKurve, 30, 0.028, 8), karbon)),
+    add(stange([0, 0.9, 0.58], [0, 0.72, 0.84], 0.022, karbon))];
 
   // Fahrer: Helm und Schultern (Helm in der Zweitfarbe, Visier dunkel)
   const helmMat = new THREE.MeshPhysicalMaterial({ color: zweit, roughness: 0.25, clearcoat: 1 });
@@ -172,7 +175,7 @@ export function baueAuto({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massstab
 
   // Startnummer oben auf der Nase
   const nr = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), new THREE.MeshStandardMaterial({ map: nummer(num, '#fff'), transparent: true, roughness: 0.4 }));
-  nr.rotation.x = -Math.PI / 2 + 0.13; nr.rotation.z = Math.PI; nr.position.set(0, 0.53, 2.05); add(nr);
+  nr.rotation.x = -Math.PI / 2 + 0.13; nr.rotation.z = Math.PI; nr.position.set(0, 0.55, nz(2.05)); add(nr);
 
   // Räder und Aufhängung (die Räder federn nicht mit dem Körper)
   const raeder = [], lenkVorn = [];
@@ -189,7 +192,7 @@ export function baueAuto({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massstab
 
   auto.scale.setScalar(massstab);
   auto.traverse(o => { if (o.isMesh) o.castShadow = true; });
-  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, licht, helm: [helm, visier], massstab };
+  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, licht, helm: [helm, visier], halo, massstab };
 }
 
 // Das Auto im Bild auf den Stand der Physik bringen

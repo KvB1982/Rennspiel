@@ -1,7 +1,7 @@
 // Rennspiel – das Spiel auf dem großen Bildschirm: Menü, Spiel-Schleife, Anzeige, Ergebnis.
 
 import { STRECKEN, strecke } from './strecken.js';
-import { baueStrecke } from './strecke.js';
+import { baueStrecke, MASSSTAB } from './strecke.js';
 import { Rennen, TEAMS, zeitText } from './rennen.js';
 import { aufStrecke, kmh } from './physik.js';
 import { Buehne } from './szene.js';
@@ -14,10 +14,13 @@ const $ = id => document.getElementById(id);
 
 // ---------------------------------------------------------------- Einstellungen (werden im Browser gemerkt)
 const STANDARD = {
-  fahrzeug: 'f1', modus: 'rennen', strecke: 'kueste', strecke_modell: 'zimmer',
+  fahrzeug: 'f1', modus: 'rennen', strecke: 'kueste', strecke_modell: 'wohnzimmer', strecke_slot: 'slot_oval', tempo: 'mittel',
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
   bremshilfe: true, lenkhilfe: false, traktion: true, autogas: false, grafik: 'hoch',
 };
+// Höchsttempo der kleinen Autos in Metern pro Sekunde. 3 m/s sehen beim Maßstab 1:30 aus wie 325 km/h.
+const TEMPO = { modell: { langsam: 1.6, mittel: 2.3, schnell: 3.0 }, slot: { langsam: 2.2, mittel: 3.0, schnell: 3.8 } };
+const streckenFeld = () => E.fahrzeug === 'modell' ? 'strecke_modell' : E.fahrzeug === 'slot' ? 'strecke_slot' : 'strecke';
 const E = Object.assign({}, STANDARD);
 try { Object.assign(E, JSON.parse(localStorage.getItem('rennspiel.einst') || '{}')); } catch (e) {}
 const merken = () => { try { localStorage.setItem('rennspiel.einst', JSON.stringify(E)); } catch (e) {} };
@@ -27,6 +30,8 @@ const bestKey = (id, art) => 'rennspiel.geist.' + id + '.' + art;
 const ladeGeist = (id, art) => { try { return JSON.parse(localStorage.getItem(bestKey(id, art)) || 'null'); } catch (e) { return null; } };
 const speichereGeist = (id, art, g) => { try { localStorage.setItem(bestKey(id, art), JSON.stringify(g)); } catch (e) {} };
 
+// Bestzeiten der kleinen Autos gelten je Höchsttempo (sonst wären sie nicht vergleichbar)
+const geistArt = () => E.fahrzeug === 'f1' ? '' : '.' + E.tempo;
 const streckenCache = new Map();
 const holeStrecke = id => { if (!streckenCache.has(id)) streckenCache.set(id, baueStrecke(strecke(id))); return streckenCache.get(id); };
 
@@ -45,20 +50,20 @@ export function starteSpiel() {
     waehle('mFahrzeug', E.fahrzeug); waehle('mModus', E.modus);
     // Strecken passend zum Fahrzeug
     const box = $('mStrecke'); box.innerHTML = '';
-    const liste = STRECKEN.filter(s => !!s.modell === (E.fahrzeug === 'modell'));
-    const aktiv = E.fahrzeug === 'modell' ? E.strecke_modell : E.strecke;
+    const liste = STRECKEN.filter(s => E.fahrzeug === 'slot' ? s.slot : E.fahrzeug === 'modell' ? s.modell && !s.slot : !s.modell);
+    const feld = streckenFeld(), aktiv = E[feld];
     for (const def of liste) {
       const b = document.createElement('button'); b.dataset.wert = def.id;
       const T0 = holeStrecke(def.id);
-      const g = ladeGeist(def.id, E.fahrzeug);
+      const g = ladeGeist(def.id, E.fahrzeug + geistArt());
       const laenge = def.modell ? (T0.laenge).toFixed(1) + ' m' : (T0.laenge / 1000).toFixed(2) + ' km';
       b.innerHTML = `<canvas width="300" height="150"></canvas><b>${def.name}</b><small>${def.ort} · ${laenge}</small><small>${def.text}</small>${g ? `<span class="best">⏱ Bestzeit ${zeitText(g.zeit)}</span>` : ''}`;
       karteMalen(b.querySelector('canvas'), T0, '#e8edf3', 6);
-      b.addEventListener('click', () => { if (E.fahrzeug === 'modell') E.strecke_modell = def.id; else E.strecke = def.id; merken(); menueBauen(); });
+      b.addEventListener('click', () => { E[feld] = def.id; merken(); menueBauen(); });
       box.appendChild(b);
     }
     waehle('mStrecke', aktiv);
-    if (!liste.some(s => s.id === aktiv)) { if (E.fahrzeug === 'modell') E.strecke_modell = liste[0].id; else E.strecke = liste[0].id; waehle('mStrecke', liste[0].id); }
+    if (!liste.some(s => s.id === aktiv)) { E[feld] = liste[0].id; waehle('mStrecke', liste[0].id); }
     // Einstellungen
     const ein = $('mEinst'); ein.innerHTML = '';
     const zeile = (name, schluessel, werte, sichtbar = true) => {
@@ -74,16 +79,17 @@ export function starteSpiel() {
       }
       ein.appendChild(z);
     };
-    const rennenAn = E.modus === 'rennen', modell = E.fahrzeug === 'modell';
+    const rennenAn = E.modus === 'rennen', modell = E.fahrzeug !== 'f1', slot = E.fahrzeug === 'slot';   // modell = eines der kleinen Autos
     zeile('Gegner', 'gegner', (modell ? [1, 2, 3] : [3, 5, 7, 9]).map(n => [n, String(n)]), rennenAn);
     if (modell && E.gegner > 3) E.gegner = 3;
     zeile('Stärke der Gegner', 'staerke', [['leicht', 'leicht'], ['mittel', 'mittel'], ['schwer', 'schwer']], rennenAn);
     zeile('Runden', 'runden', (modell ? [3, 5, 10, 20] : [1, 3, 5, 10]).map(n => [n, String(n)]), rennenAn);
     if (!modell) zeile('Kamera', 'kamera', [['hinten', 'hinter dem Auto'], ['weit', 'weiter weg'], ['cockpit', 'im Cockpit']]);
-    zeile('Bremshilfe', 'bremshilfe', [[true, 'an'], [false, 'aus']]);
-    zeile('Lenkhilfe', 'lenkhilfe', [[true, 'an'], [false, 'aus']]);
-    zeile('Traktionskontrolle', 'traktion', [[true, 'an'], [false, 'aus']]);
-    zeile('Gas von allein', 'autogas', [[true, 'an'], [false, 'aus']]);
+    zeile('Höchsttempo', 'tempo', [['langsam', 'langsam'], ['mittel', 'mittel'], ['schnell', 'schnell']], modell);
+    zeile('Bremshilfe', 'bremshilfe', [[true, 'an'], [false, 'aus']], !slot);
+    zeile('Lenkhilfe', 'lenkhilfe', [[true, 'an'], [false, 'aus']], !slot);
+    zeile('Traktionskontrolle', 'traktion', [[true, 'an'], [false, 'aus']], !slot);
+    zeile('Gas von allein', 'autogas', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Grafik', 'grafik', [['hoch', 'schön'], ['mittel', 'mittel'], ['niedrig', 'schnell']]);
     // Farbe des eigenen Autos
     const z = document.createElement('div'); z.className = 'zeile'; z.innerHTML = '<span>Dein Rennstall</span><div class="wahl"></div>';
@@ -98,7 +104,8 @@ export function starteSpiel() {
     ton.innerHTML = `<span>Ton</span><div class="wahl"><button class="${klang.an ? 'an' : ''}">an</button><button class="${klang.an ? '' : 'an'}">aus</button></div>`;
     ton.querySelectorAll('button').forEach((b, k) => b.addEventListener('click', () => { klang.schalten(k === 0); menueBauen(); }));
     ein.appendChild(ton);
-    $('mBest').textContent = modell ? 'Modellauto: Du stehst neben der Bahn. Mit 🎥 wechselst du die Stelle, an der du stehst.' : '';
+    $('mBest').textContent = slot ? 'Slotcar: Du gibst nur Gas. Vor der Kurve vom Gas gehen, sonst fliegt das Auto raus! Spur wechseln: an einer gelben Weiche nach links oder rechts lenken. Mit 🎥 wechselst du die Stelle, an der du stehst.'
+      : modell ? 'Ferngesteuertes Auto: Du stehst neben der Bahn. Mit 🎥 wechselst du die Stelle, an der du stehst.' : '';
   };
   $('mFahrzeug').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { E.fahrzeug = b.dataset.wert; merken(); menueBauen(); } });
   $('mModus').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { E.modus = b.dataset.wert; merken(); menueBauen(); } });
@@ -134,30 +141,33 @@ export function starteSpiel() {
   function starten() {
     zeige('laden', true);
     setTimeout(() => {
-      const modell = E.fahrzeug === 'modell';
-      const id = modell ? E.strecke_modell : E.strecke;
+      const modell = E.fahrzeug !== 'f1', slot = E.fahrzeug === 'slot';
+      const id = E[streckenFeld()];
       T = holeStrecke(id);
-      rennen = new Rennen(T, { modus: E.modus, runden: E.runden, gegner: modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: modell ? 'modell' : 'f1', spielerFarbe: E.farbe });
-      rennen.hilfe.bremsen = E.bremshilfe; rennen.hilfe.lenken = E.lenkhilfe;
+      rennen = new Rennen(T, { modus: E.modus, runden: E.runden, gegner: modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: E.fahrzeug, spielerFarbe: E.farbe, tempo: modell ? TEMPO[E.fahrzeug][E.tempo] || 0 : 0 });
+      rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
       if (rennen.ich) rennen.ich.a.tc = E.traktion ? true : false;
-      eingabe.autoGas = E.autogas;
+      eingabe.autoGas = E.autogas && !slot;
       if (E.modus === 'zeit') {
-        const g = ladeGeist(id, E.fahrzeug);
+        const g = ladeGeist(id, E.fahrzeug + geistArt());
         if (g) { rennen.setzeGeist(g); }
         rennen.wennBestzeit = neu => {
-          const alt = ladeGeist(id, E.fahrzeug);
-          if (!alt || neu.zeit < alt.zeit) speichereGeist(id, E.fahrzeug, neu);
+          const alt = ladeGeist(id, E.fahrzeug + geistArt());
+          if (!alt || neu.zeit < alt.zeit) speichereGeist(id, E.fahrzeug + geistArt(), neu);
         };
       }
       rennen.wennBestzeit = rennen.wennBestzeit || null;
       if (!buehne || buehne.qualitaet !== E.grafik) { buehne = new Buehne($('bild'), E.grafik); app.buehne = buehne; }
       buehne.laden(T, rennen.autos, rennen.L);
+      $('hEinheit').textContent = modell ? 'km/h im Maßstab' : 'km/h';
       kamera = new Kamera(buehne.kamera);
       kamera.setze(modell ? 'stand' : E.kamera);
       groesse();
       zeige('menue', false); zeige('laden', false); zeige('ergebnis', false); zeige('pause', false); zeige('hud', true);
       zeige('pedale', !empfang.verbunden && eingabe.neigung.an);
-      $('hHilfe').textContent = eingabe.quelle === 'handy' || empfang.verbunden ? '' : 'Lenken ← →   Gas ↑   Bremse ↓   Kamera C   Pause P   Zurück auf die Strecke R';
+      $('hHilfe').textContent = eingabe.quelle === 'handy' || empfang.verbunden ? (slot ? 'Spur wechseln: an einer gelben Weiche nach links oder rechts lenken' : '')
+        : slot ? 'Gas ↑   Bremse ↓   Spur wechseln ← → (an einer gelben Weiche)   Standort C   Pause P'
+        : 'Lenken ← →   Gas ↑   Bremse ↓ (im Stand: rückwärts)   Kamera C   Pause P   Zurück auf die Strecke R';
       kartenGrund = null;
       laeuft = true; pausiert = false; fertigGezeigt = false; letzteZeit = performance.now(); app.rennen = rennen; app.T = T; app.kamera = kamera;
       lenkradAnzeigen();
@@ -180,7 +190,7 @@ export function starteSpiel() {
     melden(SICHTEN[kamera.modus]);
   }
   function zurueckAufStrecke() {
-    const c = rennen && rennen.ich; if (!c) return;
+    const c = rennen && rennen.ich; if (!c || rennen.slot) return;
     const d = Math.max(-T.hb[c.a.idx] * 0.5, Math.min(T.hb[c.a.idx] * 0.5, c.a.d));
     aufStrecke(c.a, T, c.a.s, d);
     c.a.y = T.y[c.a.idx];
@@ -225,9 +235,10 @@ export function starteSpiel() {
     z += `<div>Letzte ${zeitText(c.letzte)}</div><div>Beste ${zeitText(c.beste ?? (R.geistAlt ? R.geistAlt.zeit : null))}</div>`;
     $('hZeiten').innerHTML = z;
     // Tacho
-    $('hKmh').textContent = Math.round(kmh(a));
-    $('hGang').textContent = modell ? '' : (a.u < -0.5 ? 'R' : Math.abs(a.u) < 0.3 && a.gas < 0.05 ? 'N' : a.gang);
-    $('hDz').firstChild.style.width = (Math.max(0, (a.drehzahl - 4000) / (a.p.drehzahlMax - 4000)) * 100).toFixed(1) + '%';
+    // Kleine Autos: Tempo auf ein großes Auto hochgerechnet (mal 30), damit man es vergleichen kann
+    $('hKmh').textContent = Math.round(kmh(a) * (modell ? 1 / MASSSTAB : 1));
+    $('hGang').textContent = R.slot ? (c.slot.raus > 0 ? '💥' : c.slot.spur > 0 ? '◀ links' : 'rechts ▶') : modell ? (a.u < -0.05 ? 'R' : '') : (a.u < -0.5 ? 'R' : Math.abs(a.u) < 0.3 && a.gas < 0.05 ? 'N' : a.gang);
+    $('hDz').firstChild.style.width = (modell ? Math.min(1, Math.abs(a.u) / a.p.vMax) * 100 : Math.max(0, (a.drehzahl - 4000) / (a.p.drehzahlMax - 4000)) * 100).toFixed(1) + '%';
     // Ampel
     const amp = $('hAmpel');
     amp.classList.toggle('an', R.phase === 'ampel');
@@ -297,7 +308,7 @@ export function starteSpiel() {
     if (infoTakt <= 0 && empfang.verbunden) {
       infoTakt = 0.1;
       const a = R.ich.a, rueck = (a.grund === 1 ? 0.6 : a.grund >= 2 ? 0.8 : 0) * Math.min(1, Math.abs(a.u) / (a.p.vMax * 0.2)) + Math.min(1, a.stoss * 0.1);
-      empfang.senden({ t: 'i', v: kmh(a), gang: T.def.modell ? 0 : a.gang, dz: Math.max(0, (a.drehzahl - 4000) / (a.p.drehzahlMax - 4000)), platz: R.modus === 'rennen' ? R.ich.platz : 0, von: R.autos.length, runde: R.ich.runde, runden: R.modus === 'rennen' ? R.runden : 0, r: +rueck.toFixed(2) });
+      empfang.senden({ t: 'i', v: kmh(a) * (T.def.modell ? 1 / MASSSTAB : 1), gang: T.def.modell ? 0 : a.gang, dz: Math.max(0, (a.drehzahl - 4000) / (a.p.drehzahlMax - 4000)), platz: R.modus === 'rennen' ? R.ich.platz : 0, von: R.autos.length, runde: R.ich.runde, runden: R.modus === 'rennen' ? R.runden : 0, r: +rueck.toFixed(2) });
     }
   }
 
