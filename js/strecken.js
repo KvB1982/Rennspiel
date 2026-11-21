@@ -80,6 +80,48 @@ export const STRECKEN = [
     hoehe: [[0, 0]],
     welt: { art: 'zimmer', zeit: 'drinnen' },
   },
+  // ---------------------------------------------------------------- Straßen-Strecken für die Supercars
+  // Hier fährt man auf normalen Straßen: durch die Stadt, über Land, auf der Autobahn – mit Verkehr.
+  // Die Zone (stadt, dorf, land, autobahn) steht an der Geraden nach einer Ecke ({ zone: … } als 5. Angabe)
+  // und gilt bis zur nächsten Angabe. Was eine Zone bedeutet, steht in strecke.js (ZONEN).
+  {
+    id: 'metropole', name: 'Metropole Valmera', ort: 'Großstadt, Abendrot',
+    text: 'Quer durch die Innenstadt: breite Boulevards zwischen Hochhäusern, enge Kreuzungen, eine lange Allee am Fluss.',
+    strasse: true, zone: 'stadt', glatt: 12, kerbAb: 1,
+    ecken: [
+      [600, 0, 30], [600, 500, 25], [300, 500, 22], [300, 800, 40], [900, 1100, 60], [1250, 1100, 28],
+      [1250, 1550, 32], [400, 1550, 60], [-250, 1300, 120], [-500, 900, 28], [-200, 700, 26], [-500, 400, 30], [-500, 0, 30],
+    ],
+    hoehe: [[0, 0]],
+    welt: { art: 'stadt', zeit: 'abend', staedte: [{ x: 350, z: 750, r: 1300, name: 'Valmera' }] },
+  },
+  {
+    id: 'landstrasse', name: 'Hügelland-Runde', ort: 'Landstraße, Nachmittag',
+    text: 'Kurvige Landstraße über Hügel, an Feldern und Wäldern vorbei, mitten durch zwei kleine Dörfer.',
+    strasse: true, zone: 'land', glatt: 25, kerbAb: 1,
+    ecken: [
+      [700, 0, 120, {}, { zone: 'land' }], [1300, 300, 200], [1500, 900, 90], [1200, 1300, 60], [1500, 1700, 150],
+      [1300, 2300, 70, {}, { zone: 'dorf' }], [900, 2350, 40, {}, { zone: 'land' }], [400, 2100, 180], [-200, 2400, 110],
+      [-700, 2000, 60], [-600, 1500, 140], [-1100, 1100, 90], [-900, 500, 70], [-500, 0, 60, {}, { zone: 'dorf' }],
+    ],
+    hoehe: [[0, 5], [0.1, 30], [0.2, 62], [0.3, 40], [0.42, 15], [0.55, 48], [0.66, 80], [0.78, 44], [0.9, 20]],
+    welt: { art: 'land', zeit: 'nachmittag', staedte: [] },
+  },
+  {
+    id: 'staedtetour', name: 'Städtetour Valmera – Bergheim', ort: 'Stadt, Land, Stadt, Autobahn – Mittag',
+    text: 'Von Stadt zu Stadt: aus Valmera hinaus über die Landstraße und durch ein Dorf nach Bergheim, auf der Autobahn zurück.',
+    strasse: true, zone: 'stadt', glatt: 16, kerbAb: 1,
+    ecken: [
+      [400, -400, 28], [400, -900, 32, {}, { zone: 'land' }],
+      [1200, -1300, 160], [2000, -1100, 130], [2800, -1600, 110], [3600, -1400, 200],
+      [4250, -1750, 60, {}, { zone: 'dorf' }], [4750, -1750, 60, {}, { zone: 'land' }], [5400, -1250, 160], [6200, -1450, 130, {}, { zone: 'stadt' }],
+      [6800, -900, 30], [7400, -900, 26], [7400, -300, 26], [6850, -300, 26], [6850, 350, 40, {}, { zone: 'autobahn' }],
+      [6300, 800, 500], [4500, 1000, 900], [2500, 650, 900], [1100, 750, 450, {}, { zone: 'stadt' }],
+      [300, 400, 32], [-400, 400, 26], [-400, -400, 28],
+    ],
+    hoehe: [[0, 0], [0.06, 0], [0.12, 12], [0.2, 35], [0.28, 22], [0.36, 40], [0.42, 18], [0.47, 4], [0.5, 4], [0.58, 4], [0.66, 14], [0.78, 24], [0.9, 2], [0.95, 0]],
+    welt: { art: 'reise', zeit: 'mittag', staedte: [{ x: 0, z: 0, r: 1100, name: 'Valmera' }, { x: 7100, z: -600, r: 900, name: 'Bergheim' }] },
+  },
 ];
 
 export const strecke = id => STRECKEN.find(s => s.id === id) || STRECKEN[0];

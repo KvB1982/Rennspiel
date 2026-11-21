@@ -6,6 +6,8 @@ import { MASSSTAB } from './strecke.js';
 import { slotStellen, slotSchritt, slotStoesse, slotFahren, slotPlan } from './slot.js';
 import { boxNeu, verbrauch, boxDienst, boxFahrt, boxRel, reifenHalt } from './box.js';
 import { ideallinie, neuerFahrer, fahren, bremsHilfe, lenkZurLinie } from './ki.js';
+import { SUPERCARS, supercar } from './supercars.js';
+import { Verkehr } from './verkehr.js';
 
 // Ausgedachte Rennställe und Fahrer (keine echten Teams, Farben frei gewählt)
 export const TEAMS = [
@@ -27,14 +29,23 @@ export const STAERKE = { leicht: [0.8, 0.86], mittel: [0.87, 0.93], schwer: [0.9
 
 export class Rennen {
   // modus: 'zeit' (allein gegen die Uhr) oder 'rennen'. art: 'f1', 'modell' oder 'slot'. tempo: Höchsttempo der kleinen Autos (m/s).
-  constructor(T, { modus = 'rennen', runden = 3, gegner = 7, staerke = 'mittel', art = 'f1', spielerFarbe = 0, name = 'Du', mitSpieler = true, tempo = 0, boxen = false } = {}) {
+  // Supercars: art = 'super', auto = welches Supercar du fährst, lack = Farbe (Zahl oder null = Werksfarbe),
+  // verkehr = wie viel Verkehr (0 = keiner, 1 = normal)
+  constructor(T, { modus = 'rennen', runden = 3, gegner = 7, staerke = 'mittel', art = 'f1', spielerFarbe = 0, name = 'Du', mitSpieler = true, tempo = 0, boxen = false,
+    auto = 'falkner', lack = null, verkehr = 0 } = {}) {
     this.T = T; this.modus = modus; this.runden = runden; this.art = art;
+    this.super = art === 'super';
+    // Welches Fahrzeug fährt wer? Bei den Supercars fahren die Gegner die anderen Modelle (reihum).
+    const andereSuper = SUPERCARS.filter(s => s.id !== auto);
+    const artVon = (ich, k) => !this.super ? art : ich ? supercar(auto).id : andereSuper[k % andereSuper.length].id;
     this.sc = T.def.modell ? MASSSTAB : 1;
     this.slot = art === 'slot';
     // Tanken und Reifenwechsel: nur bei den kleinen Autos, nur im Rennen, nur wenn die Strecke eine Boxengasse hat
     this.boxen = !!(boxen && T.box && modus === 'rennen');
-    const muster = neuesAuto(art, tempo).p;
-    this.L = this.slot ? null : ideallinie(T, muster);
+    const muster = neuesAuto(this.super ? supercar(auto).id : art, tempo).p;
+    // Verkehr auf den Straßen (nur Supercar-Strecken)
+    this.verkehr = T.strasse && verkehr > 0 ? new Verkehr(T, { menge: verkehr, seed: T.n }) : null;
+    this.L = this.slot ? null : ideallinie(T, muster, { rechts: !!this.verkehr });
     this.plan = this.slot ? slotPlan(T, muster) : null;
     this.autos = [];
     this.zeit = 0;           // Sekunden seit dem Start (grünes Licht)
@@ -60,12 +71,13 @@ export class Rennen {
     let k = 0;
     for (let platz = 0; platz <= anzahl; platz++) {
       if (!mitSpieler && platz === meinPlatz) continue;
-      const a = neuesAuto(art, tempo);
       const ich = platz === meinPlatz || (modus === 'zeit' && platz === 0);
+      const a = neuesAuto(artVon(ich, k), tempo);
       if (this.slot) { /* wird unten in die Spur gesetzt */ }
       else if (modus === 'zeit') aufStrecke(a, T, T.laenge - (T.def.modell ? 1.5 : 150), 0);
       else aufStrecke(a, T, slots[platz].s, slots[platz].d);
-      const team = ich ? TEAMS[spielerFarbe] : teams[k % teams.length];
+      let team = ich ? TEAMS[spielerFarbe] : teams[k % teams.length];
+      if (this.super) { const sc0 = supercar(a.art); team = { team: sc0.name, farbe: ich && lack !== null ? lack : sc0.farbe, zweit: sc0.zweit }; }
       const st = lo + (hi - lo) * (anzahl > 1 ? (k / (anzahl - 1)) : 0.5);
       this.autos.push({
         a, ich, name: ich ? name : FAHRER[k % FAHRER.length], team: team.team, farbe: team.farbe, zweit: team.zweit,
@@ -96,6 +108,9 @@ export class Rennen {
     } else if (this.phase !== 'pause') this.zeit += dt;
 
     const steht = this.phase === 'ampel';
+    // Alle, denen die Computerfahrer ausweichen: die anderen Rennautos und der Verkehr
+    const andere = this.autos.map(c => c.a);
+    if (this.verkehr) andere.push(...this.verkehr.autos);
     if (this.slot) { this.slotUpdate(dt, eingabe, steht); this.runden_zaehlen(); this.plaetze(); return; }
     let nr = 0;
     for (const c of this.autos) {
@@ -111,9 +126,9 @@ export class Rennen {
         a.lenkWunsch = eingabe.lenk; a.gas = eingabe.gas; a.brems = eingabe.brems;
         if (this.hilfe.lenken) a.lenkWunsch = Math.max(-1, Math.min(1, eingabe.lenk * 0.6 + lenkZurLinie(a, T, this.L) * 0.55));
         c.hilfeBremst = this.hilfe.bremsen ? bremsHilfe(a, T, this.L) : false;
-        if (c.ziel !== null && this.modus === 'rennen') { fahren(c.auslauf || (c.auslauf = neuerFahrer(0.7)), a, T, this.L, this.autos, dt); }
+        if (c.ziel !== null && this.modus === 'rennen') { fahren(c.auslauf || (c.auslauf = neuerFahrer(0.7)), a, T, this.L, andere, dt); }
       } else if (c.fahrer) {
-        fahren(c.fahrer, a, T, this.L, this.autos, dt);
+        fahren(c.fahrer, a, T, this.L, andere, dt);
         if (c.ziel !== null) { a.gas = Math.min(a.gas, 0.5); }
       }
       if (this.boxen && c.sprit === 0) a.gas = Math.min(a.gas, 0.3);   // Tank leer: nur noch Schleichfahrt
@@ -123,10 +138,19 @@ export class Rennen {
       // Computerfahrer, die festhängen (an der Mauer, im Kies), setzt ein Streckenposten zurück auf die Strecke
       if (c.fahrer && this.phase === 'los') {
         c.steckt = Math.abs(a.u) < 2 * this.sc ? (c.steckt || 0) + dt : 0;
-        if (c.steckt > 3) { aufStrecke(a, T, a.s + 1 * this.sc, this.L.off[a.idx] || 0); c.steckt = 0; }
+        // auch wer zwar zappelt, aber nicht vorankommt (eingeklemmt zwischen Mauer und Verkehr), wird zurückgesetzt
+        c.wegUhr = (c.wegUhr || 0) + dt;
+        if (c.wegUhr > 5) { let w = a.s - (c.wegS ?? a.s); if (w < -T.laenge / 2) w += T.laenge; if (w < 15 * this.sc) c.steckt = 9; c.wegS = a.s; c.wegUhr = 0; }
+        if (c.steckt > 3) { aufStrecke(a, T, a.s + (this.verkehr ? 12 : 1) * this.sc, this.L.off[a.idx] || 0); c.steckt = 0; c.wegS = a.s; c.wegUhr = 0; }
       }
     }
     this.zusammenstoesse();
+    if (this.verkehr) {
+      const rennerA = this.autos.map(c => c.a);
+      this.verkehr.update(steht ? 0 : dt, rennerA);
+      const hart = this.verkehr.stoesse(rennerA, this.ich ? this.ich.a : null);
+      if (hart > 0.5) this.beruehrt = Math.max(this.beruehrt || 0, hart);
+    }
     this.runden_zaehlen();
     this.plaetze();
   }
@@ -201,7 +225,7 @@ export class Rennen {
       const vor = c.prevS > Lg * 0.75 && s < Lg * 0.25;
       const zurueckUeber = c.prevS < Lg * 0.25 && s > Lg * 0.75;
       // Strecke verlassen (alle vier Räder neben der Fahrbahn): Runde zählt im Zeitfahren nicht
-      if (!this.slot && c.ich && this.modus === 'zeit' && c.runde > 0 && Math.abs(c.a.d) > T.hb[c.a.idx] + 1.6 * this.sc + (T.kerbL[c.a.idx] || T.kerbR[c.a.idx] ? 1.2 * this.sc : 0)) {
+      if (!this.slot && !T.strasse && c.ich && this.modus === 'zeit' && c.runde > 0 && Math.abs(c.a.d) > T.hb[c.a.idx] + 1.6 * this.sc + (T.kerbL[c.a.idx] || T.kerbR[c.a.idx] ? 1.2 * this.sc : 0)) {
         if (c.gueltig) this.melden('Strecke verlassen – Runde zählt nicht', 'warn');
         c.gueltig = false;
       }

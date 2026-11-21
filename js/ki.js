@@ -12,16 +12,19 @@ import { MASSSTAB } from './strecke.js';
 
 const G = 9.81, LUFT = 1.2;
 
-export function ideallinie(T, p) {
+// rechts = true: auf Straßen mit Gegenverkehr bleibt die Linie auf der rechten Straßenhälfte
+export function ideallinie(T, p, { rechts = false } = {}) {
   const n = T.n;
   const schritt = Math.max(1, Math.round((T.def.modell ? 0.25 : 10) / T.ds));
   const m = Math.floor(n / schritt);
   const rand = T.def.modell ? 0.06 : 1.6;
-  const cx = [], cz = [], nx = [], nz = [], lim = [];
+  const cx = [], cz = [], nx = [], nz = [], lim = [], oben = [];
   for (let j = 0; j < m; j++) {
     const i = j * schritt;
     cx.push(T.x[i]); cz.push(T.z[i]); nx.push(T.tz[i]); nz.push(-T.tx[i]);
     lim.push(Math.max(0, T.hb[i] - rand));
+    // Gegenverkehr links: höchstens bis kurz über die Mittellinie (nicht auf der Autobahn, dort ist die ganze Breite deine)
+    oben.push(rechts && T.zone && T.zone[i] !== 3 ? Math.min(lim[j], T.hb[i] * 0.06) : lim[j]);
   }
   const o = new Float64Array(m);
   for (let it = 0; it < 900; it++) {
@@ -30,7 +33,7 @@ export function ideallinie(T, p) {
       const px = (cx[a] + nx[a] * o[a] + cx[b] + nx[b] * o[b]) / 2;
       const pz = (cz[a] + nz[a] * o[a] + cz[b] + nz[b] * o[b]) / 2;
       let w = (px - cx[j]) * nx[j] + (pz - cz[j]) * nz[j];
-      o[j] = Math.max(-lim[j], Math.min(lim[j], o[j] + (w - o[j]) * 0.8));
+      o[j] = Math.max(-lim[j], Math.min(oben[j], o[j] + (w - o[j]) * 0.8));
     }
   }
   // zurück auf alle Messpunkte verteilen
@@ -107,25 +110,41 @@ export function lenkZurLinie(a, T, L, extra = 0, vorausMal = 1) {
 export function fahren(f, a, T, L, andere, dt) {
   const p = a.p, sc = T.def.modell ? MASSSTAB : 1;
   const hbRand = T.hb[Math.max(0, a.idx)] - (T.def.modell ? 0.06 : 2);
-  // Überholen: Ist vorn jemand langsamer auf meiner Linie? Dann daneben vorbei.
+  // Überholen und Ausweichen: Ist vorn jemand langsamer auf meiner Linie (ein Rennauto, ein Auto im Verkehr,
+  // Gegenverkehr)? Dann auf der Seite vorbei, auf der Platz ist – und nur bremsen, wenn es nicht anders geht.
   let bremsWegen = Infinity;
   f.extraZiel = 0;
+  const hind = [];
   for (const b of andere) {
     if (b === a) continue;
     let ab = b.s - a.s;
     if (ab < -T.laenge / 2) ab += T.laenge; if (ab > T.laenge / 2) ab -= T.laenge;
-    if (ab <= 0 || ab > 30 * sc) continue;
-    const meinD = a.d, seinD = b.d;
-    if (Math.abs(meinD - seinD) < 2.6 * sc) {
-      if (a.u > b.u - 0.5 * sc) {
-        // auf die Seite mit mehr Platz
-        const links = seinD < (L.off[a.idx] || 0) ? 1 : -1;
-        f.extraZiel = links * 3.4 * sc;
-        if (ab < 12 * sc) bremsWegen = Math.min(bremsWegen, b.u + (ab - 6 * sc) * 0.5);
-      }
+    // Wer viel schneller ist (oder wem Gegenverkehr entgegenkommt), muss weiter vorausschauen
+    const rel = a.u - b.u;
+    // auch wer gerade neben mir ist, zählt noch (sonst lenkt man beim Vorbeifahren zu früh zurück)
+    const neben = -((b.lang || 5) / 2 + 3) * sc;
+    if (ab <= neben || ab > Math.max(30 * sc, rel * 2.6 + 10 * sc) || (a.u <= b.u - 0.5 * sc && ab > 0)) continue;
+    const breit = (b.breit ? b.breit / 2 + 1.5 : 2.6) * sc;
+    const linie = L.off[T.index(b.s)] || 0;   // wo meine Linie an seiner Stelle verläuft
+    hind.push({ b, ab, rel, breit, plan: linie + f.extra, linie });
+  }
+  hind.sort((p, q) => p.ab - q.ab);
+  const vorn = hind.find(h => Math.abs(a.d - h.b.d) < h.breit || Math.abs(h.linie - h.b.d) < h.breit);
+  if (vorn) {
+    const { b, ab, rel, breit } = vorn;
+    const linB = L.off[T.index(b.s)] || 0;
+    // Ist an dieser Stelle (seitlich d) frei? Andere Hindernisse kurz dahinter zählen mit.
+    const frei = d => Math.abs(d) <= hbRand + 0.3 * sc && !hind.some(h => h !== vorn && h.ab < ab + 45 * sc && Math.abs(h.b.d - d) < h.breit);
+    const dL = b.d + breit + 0.4 * sc, dR = b.d - breit - 0.4 * sc;
+    const seiten = [dL, dR].filter(frei).sort((p, q) => Math.abs(p - vorn.plan) - Math.abs(q - vorn.plan));
+    if (seiten.length) f.extraZiel = seiten[0] - linB;
+    // so spät wie möglich bremsen: erst wenn der Bremsweg knapp wird und ich noch nicht daneben bin
+    if (ab > 0 && (!seiten.length || Math.abs(a.d - b.d) < breit)) {
+      const halt = 6 * sc + (b.lang ? b.lang / 2 + 2.4 : 0) * sc;
+      if (ab < halt + rel * rel / 16 + 6 * sc) bremsWegen = Math.min(bremsWegen, Math.max(0, b.u) + Math.sqrt(Math.max(0, 16 * (ab - halt))));
     }
   }
-  f.extra += (f.extraZiel - f.extra) * Math.min(1, dt * 1.5);
+  f.extra += (f.extraZiel - f.extra) * Math.min(1, dt * (vorn && vorn.b.breit ? 2.5 : 1.5));
   const lin = L.off[a.idx] || 0;
   f.extra = Math.max(-hbRand - lin, Math.min(hbRand - lin, f.extra));
 

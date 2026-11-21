@@ -9,18 +9,23 @@ import { Kamera, SICHTEN } from './kamera.js';
 import { Eingabe } from './eingabe.js';
 import { LenkradEmpfang } from './verbindung.js';
 import { Klang } from './klang.js';
+import { SUPERCARS, LACKE, supercar } from './supercars.js';
 
 const $ = id => document.getElementById(id);
 
 // ---------------------------------------------------------------- Einstellungen (werden im Browser gemerkt)
 const STANDARD = {
-  fahrzeug: 'f1', modus: 'rennen', strecke: 'kueste', strecke_modell: 'wohnzimmer', strecke_slot: 'slot_oval', tempo: 'mittel',
+  fahrzeug: 'f1', modus: 'rennen', strecke: 'kueste', strecke_modell: 'wohnzimmer', strecke_slot: 'slot_oval', strecke_super: 'metropole', tempo: 'mittel',
+  supercar: 'falkner', lack: 0, verkehr: 'normal', runden_super: 1, gegner_super: 5,
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
   bremshilfe: true, lenkhilfe: false, traktion: true, autogas: false, grafik: 'hoch', linie: true, boxen: true,
 };
 // Höchsttempo der kleinen Autos in Metern pro Sekunde. 3 m/s sehen beim Maßstab 1:30 aus wie 325 km/h.
 const TEMPO = { modell: { langsam: 1.6, mittel: 2.3, schnell: 3.0 }, slot: { langsam: 2.6, mittel: 3.5, schnell: 4.5 } };
-const streckenFeld = () => E.fahrzeug === 'modell' ? 'strecke_modell' : E.fahrzeug === 'slot' ? 'strecke_slot' : 'strecke';
+const streckenFeld = () => E.fahrzeug === 'modell' ? 'strecke_modell' : E.fahrzeug === 'slot' ? 'strecke_slot' : E.fahrzeug === 'super' ? 'strecke_super' : 'strecke';
+// Wie viel Verkehr: Zahl für verkehr.js (0 = keiner)
+const VERKEHR = { aus: 0, wenig: 0.5, normal: 1, viel: 1.6 };
+const istKlein = () => E.fahrzeug === 'modell' || E.fahrzeug === 'slot';   // die kleinen Autos (Maßstab 1:30)
 const E = Object.assign({}, STANDARD);
 try { Object.assign(E, JSON.parse(localStorage.getItem('rennspiel.einst') || '{}')); } catch (e) {}
 const merken = () => { try { localStorage.setItem('rennspiel.einst', JSON.stringify(E)); } catch (e) {} };
@@ -31,7 +36,7 @@ const ladeGeist = (id, art) => { try { return JSON.parse(localStorage.getItem(be
 const speichereGeist = (id, art, g) => { try { localStorage.setItem(bestKey(id, art), JSON.stringify(g)); } catch (e) {} };
 
 // Bestzeiten der kleinen Autos gelten je Höchsttempo (sonst wären sie nicht vergleichbar)
-const geistArt = () => E.fahrzeug === 'f1' ? '' : '.' + E.tempo;
+const geistArt = () => E.fahrzeug === 'f1' ? '' : E.fahrzeug === 'super' ? '.' + E.supercar : '.' + E.tempo;
 const streckenCache = new Map();
 const holeStrecke = id => { if (!streckenCache.has(id)) streckenCache.set(id, baueStrecke(strecke(id))); return streckenCache.get(id); };
 
@@ -51,7 +56,10 @@ export function starteSpiel() {
     waehle('mFahrzeug', E.fahrzeug); waehle('mModus', E.modus);
     // Strecken passend zum Fahrzeug
     const box = $('mStrecke'); box.innerHTML = '';
-    const liste = STRECKEN.filter(s => E.fahrzeug === 'slot' ? s.slot : E.fahrzeug === 'modell' ? s.modell && !s.slot : !s.modell);
+    const liste = STRECKEN.filter(s => E.fahrzeug === 'slot' ? s.slot : E.fahrzeug === 'modell' ? s.modell && !s.slot : E.fahrzeug === 'super' ? s.strasse : !s.modell && !s.strasse);
+    // Supercars: Auswahl des Autos
+    $('mSuper').hidden = E.fahrzeug !== 'super';
+    if (E.fahrzeug === 'super') autosBauen();
     const feld = streckenFeld(), aktiv = E[feld];
     for (const def of liste) {
       const b = document.createElement('button'); b.dataset.wert = def.id;
@@ -80,11 +88,18 @@ export function starteSpiel() {
       }
       ein.appendChild(z);
     };
-    const rennenAn = E.modus === 'rennen', modell = E.fahrzeug !== 'f1', slot = E.fahrzeug === 'slot';   // modell = eines der kleinen Autos
-    zeile('Gegner', 'gegner', (modell ? [1, 2, 3] : [3, 5, 7, 9]).map(n => [n, String(n)]), rennenAn);
-    if (modell && E.gegner > 3) E.gegner = 3;
-    zeile('Stärke der Gegner', 'staerke', [['leicht', 'leicht'], ['mittel', 'mittel'], ['schwer', 'schwer']], rennenAn);
-    zeile('Runden', 'runden', (modell ? [3, 5, 10, 20] : [1, 3, 5, 10]).map(n => [n, String(n)]), rennenAn);
+    const rennenAn = E.modus === 'rennen', modell = istKlein(), slot = E.fahrzeug === 'slot', sup = E.fahrzeug === 'super';   // modell = eines der kleinen Autos
+    if (sup) {
+      zeile('Gegner', 'gegner_super', [3, 5, 7].map(n => [n, String(n)]), rennenAn);
+      zeile('Stärke der Gegner', 'staerke', [['leicht', 'leicht'], ['mittel', 'mittel'], ['schwer', 'schwer']], rennenAn);
+      zeile('Runden', 'runden_super', [1, 2, 3, 5].map(n => [n, String(n)]), rennenAn);
+      zeile('Verkehr', 'verkehr', [['aus', 'keiner'], ['wenig', 'wenig'], ['normal', 'normal'], ['viel', 'viel']]);
+    } else {
+      zeile('Gegner', 'gegner', (modell ? [1, 2, 3] : [3, 5, 7, 9]).map(n => [n, String(n)]), rennenAn);
+      if (modell && E.gegner > 3) E.gegner = 3;
+      zeile('Stärke der Gegner', 'staerke', [['leicht', 'leicht'], ['mittel', 'mittel'], ['schwer', 'schwer']], rennenAn);
+      zeile('Runden', 'runden', (modell ? [3, 5, 10, 20] : [1, 3, 5, 10]).map(n => [n, String(n)]), rennenAn);
+    }
     if (!modell) zeile('Kamera', 'kamera', [['hinten', 'hinter dem Auto'], ['weit', 'weiter weg'], ['cockpit', 'im Cockpit']]);
     zeile('Höchsttempo', 'tempo', [['langsam', 'langsam'], ['mittel', 'mittel'], ['schnell', 'schnell']], modell);
     zeile('Tanken und Reifen', 'boxen', [[true, 'an'], [false, 'aus']], modell && rennenAn);
@@ -94,9 +109,17 @@ export function starteSpiel() {
     zeile('Traktionskontrolle', 'traktion', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Gas von allein', 'autogas', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Grafik', 'grafik', [['hoch', 'schön'], ['mittel', 'mittel'], ['niedrig', 'schnell']]);
-    // Farbe des eigenen Autos
-    const z = document.createElement('div'); z.className = 'zeile'; z.innerHTML = '<span>Dein Rennstall</span><div class="wahl"></div>';
-    TEAMS.forEach((t, k) => {
+    // Farbe des eigenen Autos (Supercar: Lackfarbe, sonst Rennstall)
+    const z = document.createElement('div'); z.className = 'zeile'; z.innerHTML = `<span>${sup ? 'Lackfarbe' : 'Dein Rennstall'}</span><div class="wahl"></div>`;
+    if (sup) LACKE.forEach((l, k) => {
+      const b = document.createElement('button'); b.className = 'farbe' + (E.lack === k ? ' an' : ''); b.title = l.name;
+      const f = l.farbe ?? supercar(E.supercar).farbe;
+      b.style.background = '#' + f.toString(16).padStart(6, '0');
+      if (l.farbe === null) b.style.boxShadow = 'inset 0 0 0 3px rgba(0,0,0,.35)';
+      b.addEventListener('click', () => { E.lack = k; merken(); menueBauen(); });
+      z.lastChild.appendChild(b);
+    });
+    else TEAMS.forEach((t, k) => {
       const b = document.createElement('button'); b.className = 'farbe' + (E.farbe === k ? ' an' : ''); b.title = t.team;
       b.style.background = `linear-gradient(135deg, #${t.farbe.toString(16).padStart(6, '0')} 60%, #${t.zweit.toString(16).padStart(6, '0')} 60%)`;
       b.addEventListener('click', () => { E.farbe = k; merken(); menueBauen(); });
@@ -108,8 +131,22 @@ export function starteSpiel() {
     ton.querySelectorAll('button').forEach((b, k) => b.addEventListener('click', () => { klang.schalten(k === 0); menueBauen(); }));
     ein.appendChild(ton);
     $('mBest').textContent = slot ? 'Slotcar: Du gibst nur Gas. Vor der Kurve vom Gas gehen, sonst fliegt das Auto raus! Spur wechseln: an einer gelben Weiche nach links oder rechts lenken. Boxengasse: auf der rechten Spur an der Einfahrt nach rechts lenken und im blauen Feld anhalten. Mit 🎥 wechselst du die Stelle, an der du stehst.'
-      : modell ? 'Ferngesteuertes Auto: Du stehst neben der Bahn. Tanken und Reifen wechseln: in der Boxengasse rechts neben der Startgeraden im blauen Feld anhalten. Mit 🎥 wechselst du die Stelle, an der du stehst.' : '';
+      : modell ? 'Ferngesteuertes Auto: Du stehst neben der Bahn. Tanken und Reifen wechseln: in der Boxengasse rechts neben der Startgeraden im blauen Feld anhalten. Mit 🎥 wechselst du die Stelle, an der du stehst.'
+      : sup ? 'Supercar: Rechts fährt der Verkehr in deine Richtung, links kommt dir Gegenverkehr entgegen. Auf der Autobahn ist der Gegenverkehr hinter der Mittelmauer. Überhol vorsichtig!' : '';
   };
+  // Karten der Supercars: kleines Bild (Seitenansicht als Umriss), Name, Vorbild, Leistung
+  function autosBauen() {
+    const box = $('mAutos'); box.innerHTML = '';
+    for (const S of SUPERCARS) {
+      const b = document.createElement('button'); b.dataset.wert = S.id;
+      const ps = Math.round(S.p.leistung / 735.5), kmhMax = Math.round(S.p.vMax * 3.6);
+      b.innerHTML = `<canvas width="300" height="120"></canvas><b>${S.name}</b><small>Vorbild: ${S.vorbild}</small><small>${S.text}</small><span class="werte">${ps} PS · ${kmhMax} km/h · ${S.p.masse} kg</span>`;
+      umriss(b.querySelector('canvas'), S, E.supercar === S.id && LACKE[E.lack] && LACKE[E.lack].farbe !== null ? LACKE[E.lack].farbe : S.farbe);
+      b.classList.toggle('an', S.id === E.supercar);
+      b.addEventListener('click', () => { E.supercar = S.id; merken(); menueBauen(); });
+      box.appendChild(b);
+    }
+  }
   $('mFahrzeug').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { E.fahrzeug = b.dataset.wert; merken(); menueBauen(); } });
   $('mModus').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { E.modus = b.dataset.wert; merken(); menueBauen(); } });
   $('mStart').addEventListener('click', () => { klang.wecken(); starten(); });
@@ -144,10 +181,11 @@ export function starteSpiel() {
   function starten() {
     zeige('laden', true);
     setTimeout(() => {
-      const modell = E.fahrzeug !== 'f1', slot = E.fahrzeug === 'slot';
+      const modell = istKlein(), slot = E.fahrzeug === 'slot', sup = E.fahrzeug === 'super';
       const id = E[streckenFeld()];
       T = holeStrecke(id);
-      rennen = new Rennen(T, { modus: E.modus, runden: E.runden, gegner: modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: E.fahrzeug, spielerFarbe: E.farbe, tempo: modell ? TEMPO[E.fahrzeug][E.tempo] || 0 : 0, boxen: modell && E.boxen });
+      rennen = new Rennen(T, { modus: E.modus, runden: sup ? E.runden_super : E.runden, gegner: sup ? E.gegner_super : modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: E.fahrzeug, spielerFarbe: E.farbe, tempo: modell ? TEMPO[E.fahrzeug][E.tempo] || 0 : 0, boxen: modell && E.boxen,
+        auto: E.supercar, lack: sup && LACKE[E.lack] ? LACKE[E.lack].farbe : null, verkehr: sup ? VERKEHR[E.verkehr] ?? 1 : 0 });
       kurven = rennen.L && !modell ? kurvenFinden(T, rennen.L, rennen.ich.a.p) : null;
       rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
       if (rennen.ich) rennen.ich.a.tc = E.traktion ? true : false;
@@ -163,7 +201,7 @@ export function starteSpiel() {
       }
       rennen.wennBestzeit = rennen.wennBestzeit || null;
       if (!buehne || buehne.qualitaet !== E.grafik) { buehne = new Buehne($('bild'), E.grafik); app.buehne = buehne; }
-      buehne.laden(T, rennen.autos, rennen.L, { linie: E.linie });
+      buehne.laden(T, rennen.autos, rennen.L, { linie: E.linie, verkehr: rennen.verkehr });
       $('hEinheit').textContent = modell ? 'km/h im Maßstab' : 'km/h';
       kamera = new Kamera(buehne.kamera);
       kamera.setze(modell ? 'stand' : E.kamera);
@@ -172,6 +210,7 @@ export function starteSpiel() {
       zeige('pedale', !empfang.verbunden && eingabe.neigung.an);
       $('hHilfe').textContent = eingabe.quelle === 'handy' || empfang.verbunden ? (slot ? 'Spur wechseln: an einer gelben Weiche nach links oder rechts lenken' : '')
         : slot ? 'Gas ↑   Bremse ↓   Spur wechseln ← → (an einer gelben Weiche)   Standort C   Pause P'
+        : sup ? 'Lenken ← →   Gas ↑   Bremse ↓ (im Stand: rückwärts)   Kamera C   Pause P   Zurück auf die Straße R'
         : 'Lenken ← →   Gas ↑   Bremse ↓ (im Stand: rückwärts)   Kamera C   Pause P   Zurück auf die Strecke R';
       kartenGrund = null;
       laeuft = true; pausiert = false; fertigGezeigt = false; letzteZeit = performance.now(); app.rennen = rennen; app.T = T; app.kamera = kamera;
@@ -401,4 +440,30 @@ async function qrMalen(cv, text) {
   } catch (e) {
     const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.fillStyle = '#000'; ctx.font = '14px sans-serif'; ctx.fillText('QR-Code fehlt', 50, 110);
   }
+}
+
+// ---------------------------------------------------------------- Umriss eines Supercars für die Karte im Menü (Seitenansicht)
+function umriss(cv, S, farbe) {
+  const ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  import('./supercarbau.js').then(({ FORMEN }) => {
+    const F = FORMEN[S.id]; if (!F) return;
+    const sc = W / 5.4, ox = W / 2 - (F.zF + F.zR) / 2 * sc, boden = H - 18;
+    const X = z => ox + z * sc, Y = y => boden - y * sc;
+    const hex = '#' + farbe.toString(16).padStart(6, '0');
+    // Körper: von hinten unten über Heck, Hüfte, Kabine, Haube zur Nase
+    const dachV = F.kv - F.scheibe, dachH = dachV - F.flach;
+    ctx.beginPath();
+    ctx.moveTo(X(F.zR), Y(0.25)); ctx.lineTo(X(F.zR), Y(F.heck - 0.1)); ctx.lineTo(X(F.zR + 0.25), Y(F.heck));
+    ctx.quadraticCurveTo(X(F.kh), Y(F.huefte + 0.05), X(dachH), Y(F.dach)); ctx.lineTo(X(dachV), Y(F.dach));
+    ctx.quadraticCurveTo(X(F.kv - F.scheibe * 0.3), Y(F.dach - 0.05), X(F.kv), Y(F.haube)); ctx.lineTo(X(F.zF - 0.35), Y(F.nase + 0.06));
+    ctx.quadraticCurveTo(X(F.zF), Y(F.nase), X(F.zF), Y(0.25)); ctx.closePath();
+    ctx.fillStyle = hex; ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 2; ctx.stroke();
+    // Fenster
+    ctx.beginPath(); ctx.moveTo(X(F.kh + 0.35), Y(F.huefte)); ctx.quadraticCurveTo(X(dachH), Y(F.dach - 0.06), X(dachH + 0.1), Y(F.dach - 0.06));
+    ctx.lineTo(X(dachV), Y(F.dach - 0.06)); ctx.lineTo(X(F.kv - 0.12), Y(F.haube + 0.04)); ctx.closePath(); ctx.fillStyle = '#16202c'; ctx.fill();
+    // Räder
+    for (const z of [1.25, -1.45]) { ctx.beginPath(); ctx.arc(X(z), Y(0.35), 0.35 * sc, 0, 7); ctx.fillStyle = '#111'; ctx.fill(); ctx.beginPath(); ctx.arc(X(z), Y(0.35), 0.2 * sc, 0, 7); ctx.fillStyle = '#9aa0a8'; ctx.fill(); }
+    if (F.fluegel === 2) { ctx.fillStyle = '#111'; ctx.fillRect(X(F.zR + 0.1), Y(F.heck + 0.4), 0.5 * sc, 0.06 * sc); }
+  });
 }

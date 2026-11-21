@@ -13,7 +13,7 @@ const VORN = 1.6, HINTEN = -2.0;   // Achsen (wie in physik.js: a = 1,6 m, b = 2
 const nz = z => z > VORN ? VORN + (z - VORN) * 0.62 : z;
 
 // Rumpf aus Querschnitten: [z, halbe Breite, halbe Höhe, Mitte y, (Mitte x)]
-function rumpf(schnitte, rund = 3, M = 20) {
+export function rumpf(schnitte, rund = 3, M = 20) {
   const pos = [], idx = [];
   for (const [z, w, h, y, x = 0] of schnitte) {
     for (let k = 0; k < M; k++) {
@@ -47,7 +47,7 @@ function kiste(w, h, d, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
   return m;
 }
 
-function stange(a, b, r, mat) {
+export function stange(a, b, r, mat) {
   const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b);
   const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, A.distanceTo(B), 6), mat);
   m.position.copy(A).add(B).multiplyScalar(0.5);
@@ -57,7 +57,7 @@ function stange(a, b, r, mat) {
 }
 
 // Ein Rad: Reifen mit runden Schultern, Felge, farbiger Ring (Reifenmischung)
-function rad(radius, breite, mats) {
+export function rad(radius, breite, mats) {
   const g = new THREE.Group();
   const prof = [];
   const sch = 0.06;
