@@ -15,6 +15,18 @@ const tempo = +(process.env.TEMPO || 0.9);
 // AUS=1: ohne Arcade-Hilfe (zum Vergleichen)
 const wild = !!process.env.WILD, ohneHilfe = !!process.env.AUS;
 
+// MENSCH=1: fährt wie ein Mensch mit dem Handy-Lenkrad: sieht alles erst 0,22 s später (Schrecksekunde), schaut etwa
+// eine Sekunde voraus auf die Mitte des Wegs (kennt keine Ideallinie), lenkt kräftig und bremst spät.
+const mensch = !!process.env.MENSCH, VERZUG = +(process.env.VERZUG || 13), puffer = [];
+function menschFahrer(a, T, L) {
+  const sh = Math.sin(a.h), ch = Math.cos(a.h), i = T.index(a.s + Math.max(12, Math.abs(a.u) * 0.9));
+  const dx = T.x[i] - a.x, dz = T.z[i] - a.z;
+  const fw = Math.atan2(dx * ch - dz * sh, Math.max(1, dx * sh + dz * ch));
+  const plan = L.tempo[T.index(a.s + Math.abs(a.u) * 0.5)];
+  puffer.push({ lenk: Math.max(-1, Math.min(1, fw / 0.18)), gas: a.u < plan * 1.02 ? 1 : 0, brems: a.u > plan * 1.2 ? 1 : 0 });
+  return puffer.length > VERZUG ? puffer.shift() : { lenk: 0, gas: 1, brems: 0 };
+}
+
 function wilderFahrer(a, T, L) {
   const sh = Math.sin(a.h), ch = Math.cos(a.h), i = T.index(a.s + 0.5 * Math.abs(a.u) + 6);
   const dx = L.lx[i] - a.x, dz = L.lz[i] - a.z;
@@ -48,13 +60,16 @@ for (const def of STRECKEN.filter(s => s.rallye && (!nur || s.id === nur))) {
   E.countdown = 0;
   const a = E.ich.a; a.tc = true; a.arcade = !ohneHilfe;
   let zurueck = 0;
-  let flug = 0, maxFlug = 0, stoesse = 0;
+  let flug = 0, maxFlug = 0, stoesse = 0, neben = 0, maxQuer = 0, querZeit = 0; puffer.length = 0;
   for (let k = 0; k < 400 * 60 && E.phase !== 'fertig' && E.ich.ziel === null; k++) {
-    E.update(1 / 60, (wild ? wilderFahrer : testFahrer)(a, T, E.L));
+    E.update(1 / 60, (mensch ? menschFahrer : wild ? wilderFahrer : testFahrer)(a, T, E.L));
     while (E.ereignisse.length) if (E.ereignisse.shift().art === 'warn') zurueck++;
     if (a.luft) flug++;
     maxFlug = Math.max(maxFlug, a.flug || 0);
     if (a.stoss > 2) stoesse++;
+    if (Math.abs(a.d) > T.hb[a.idx] + 0.3) neben++;
+    const quer = Math.abs(Math.atan2(a.v, Math.abs(a.u) + 0.1)); if (quer > maxQuer) maxQuer = quer; if (quer > 0.5) querZeit++;
+    if (process.env.SPUR && neben % 30 === 1 && Math.abs(a.d) > T.hb[a.idx] + 0.3) console.log(`    neben bei ${Math.round(E.weg)} m, ${Math.round(a.u * 3.6)} km/h, Luft ${a.luft}, Kurve ${T.k[a.idx].toFixed(3)}, Kuppe ${T.kv[a.idx].toFixed(4)}`);
   }
-  console.log(`  ${wild ? 'Wilder Fahrer' : 'Testfahrer (' + Math.round(tempo * 100) + ' % vom Plan)'}${ohneHilfe ? ' ohne Hilfe' : ''}: ${zurueck}-mal zurückgesetzt, ${E.ich.ziel !== null ? zeitText(E.ich.ziel) + ', Platz ' + E.ich.platz : 'nicht im Ziel (' + Math.round(E.weg) + ' m)'}, ${(flug / 60).toFixed(1)} s in der Luft, längster Sprung ${maxFlug.toFixed(2)} s, ${stoesse} Bilder mit Anstoß`);
+  console.log(`  ${mensch ? 'Mensch (0,22 s Verzug)' : wild ? 'Wilder Fahrer' : 'Testfahrer (' + Math.round(tempo * 100) + ' % vom Plan)'}${ohneHilfe ? ' ohne Hilfe' : ''}: ${zurueck}-mal zurückgesetzt, ${E.ich.ziel !== null ? zeitText(E.ich.ziel) + ', Platz ' + E.ich.platz : 'nicht im Ziel (' + Math.round(E.weg) + ' m)'}, ${(flug / 60).toFixed(1)} s in der Luft, längster Sprung ${maxFlug.toFixed(2)} s, ${stoesse} Bilder mit Anstoß, ${(neben / 60).toFixed(1)} s neben dem Weg, ${(querZeit / 60).toFixed(1)} s mehr als 29° quer`);
 }

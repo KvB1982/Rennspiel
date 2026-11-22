@@ -158,6 +158,20 @@ export function schritt(a, T, dt) {
   // Rallye: Bei Tempo darf man normal nur wenig einlenken (sonst wäre das Auto zu zappelig). Rutscht das Heck aber weg,
   // darf man zum Gegenlenken bis zum vollen Einschlag drehen – so wie ein echter Rallyefahrer, der den Drift fängt.
   if (p.rallye && a.u > 3 && Math.sign(a.lenkWunsch) === Math.sign(a.v)) lenkGr += (p.lenkMax - lenkGr) * Math.min(1, Math.abs(Math.atan2(a.v, a.u)) / 0.35);
+  // Arcade (sauber): Mehr Einschlag, als die Reifen in eine Kurve umsetzen können, bremst nur (die Vorderräder schieben
+  // quer über den Boden). Deshalb drehen die Räder bei Tempo höchstens ein Stück ("sauber") weiter als nötig für die
+  // engste Kurve, die die Haftung hergibt. Voll einlenken bleibt die engste Kurve – nur ohne Festbremsen. Gegenlenken ist frei.
+  if (A && A.sauber && a.u > 2) {
+    const lose = A.belag && gr.haft < 1 ? 1 + (1 / gr.haft - 1) * A.belag : 1;
+    const rMax = p.haft * gr.haft * G * A.griff * lose / a.u;
+    let eng = Math.min(lenkGr, Math.atan((p.a + p.b) * rMax / a.u) + A.sauber);
+    // kreis: Der engste Kreis beim Fahren ist "kreis" Meter groß – das reicht für jede Kehre. Noch enger würde das Auto
+    // bei wenig Tempo nur hin und her zappeln. Fast im Stand (zum Wenden) gilt wieder der volle Einschlag.
+    if (A.kreis) { const k = Math.atan((p.a + p.b) / A.kreis); if (eng > k) eng = k + (eng - k) * Math.max(0, 1 - (a.u - 2) / 3); }
+    // beim Gegenlenken geht es weich über zum vollen Einschlag (je weiter das Heck weg ist, desto mehr)
+    const gegen = Math.sign(a.lenkWunsch) === Math.sign(a.v) ? Math.min(1, Math.abs(Math.atan2(a.v, a.u)) / 0.35) : 0;
+    lenkGr = eng + (lenkGr - eng) * gegen;
+  }
   const ziel = a.lenkWunsch * lenkGr;
   a.lenk += (ziel - a.lenk) * Math.min(1, dt * (A ? A.folgen : 14));
 
@@ -326,6 +340,13 @@ export function schritt(a, T, dt) {
   //    etwas zurück: Fahrtrichtung und Auto drehen sich gemeinsam ein Stück in Richtung der Straße. Je näher am Rand
   //    und je schneller, desto mehr. Mitten auf der Straße merkt man nichts davon.
   if (A && A.rand && Math.abs(a.u) > 5) streckenHelfer(a, T, f, A, dt);
+  // 4. Spur-Helfer (Rallye): Zeigt die Nase schräg zum Weg, dreht die Hilfe Auto und Fahrtrichtung langsam wieder in
+  //    Richtung des Wegs. Das nimmt dem Auto das Pendeln von links nach rechts, wenn man zu spät gegenlenkt.
+  //    Wer lenkt, ist immer stärker als diese Hilfe.
+  if (A && A.spur && Math.abs(a.u) > 4 && !a.handbremse) {
+    let d = Math.atan2(T.tx[f.i], T.tz[f.i]) - a.h; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+    if (Math.abs(d) < 1.2) { const w = d * Math.min(1, dt * A.spur); a.h += w; a.r -= a.r * Math.min(1, dt * A.spur * (A.ruhe || 0)) * (1 - Math.abs(a.lenkWunsch)); }
+  }
   // In der Luft (Rallye-Sprung) kann man nicht lenken. Die Arcade-Hilfe dreht das Auto im Flug sanft in Richtung Straße,
   // damit es nach der Landung nicht quer in den Wald schießt (so machen es viele Arcade-Rallyespiele).
   else if (a.luft && a.arcade && p.arcade && p.arcade.rand && Math.abs(a.u) > 5) luftHelfer(a, T, f, dt);
@@ -400,9 +421,14 @@ export function schritt(a, T, dt) {
 function luftHelfer(a, T, f, dt) {
   const i = f.i, rw = Math.atan2(T.tx[i], T.tz[i]);
   let d = rw - a.h; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+  a.r *= Math.exp(-dt * 4);                                     // Drehen in der Luft hört schnell auf
+  a.v *= Math.exp(-dt * 3);                                     // seitliches Rutschen auch: Man landet gerade
   if (Math.abs(d) > 1.2) return;                                // fährt das Auto quer oder rückwärts: nicht eingreifen
-  a.h += d * Math.min(1, dt * 2.5);                             // Nase und Fahrtrichtung drehen zusammen zur Straße
-  a.r *= Math.exp(-dt * 3);                                     // Drehen in der Luft hört langsam auf
+  // Nase und Fahrtrichtung drehen zusammen: zur Straße hin, und du kannst auch im Flug noch etwas lenken
+  a.h += d * Math.min(1, dt * 3) + a.lenkWunsch * 0.45 * dt;
+  // zur Mitte des Wegs: Je weiter außen, desto mehr schiebt die Hilfe den Flug zurück (sonst landet man im Wald)
+  const hb = T.hb[i], aussen = Math.max(0, Math.abs(f.d) - hb * 0.35) / hb;
+  if (aussen > 0) { const schub = -Math.sign(f.d) * Math.min(1, aussen) * 5 * dt; a.x += T.tz[i] * schub; a.z -= T.tx[i] * schub; }
 }
 
 function streckenHelfer(a, T, f, A, dt) {
@@ -435,18 +461,25 @@ function huepfen(a, T, f, dt) {
   a.landung = 0;
   if (a.vy === undefined) { a.vy = 0; a.y = boden; a.luft = false; a.nick = 0; a.flug = 0; }
   if (a.luft) {
-    a.vy -= G * dt; a.y += a.vy * dt; a.flug += dt;
+    // Arcade: Das Auto fällt schneller, als es in echt würde (fall) – so sind die Sprünge kurz und knackig,
+    // und man hat schnell wieder Räder am Boden zum Lenken
+    const fall = a.arcade && a.p.arcade && a.p.arcade.fall || 1;
+    a.vy -= G * fall * dt; a.y += a.vy * dt; a.flug += dt;
     // In der Luft dreht sich das Auto weiter, wie es abgesprungen ist – aber gebremst (Spiel-Wert: sonst landet man zu oft quer)
     a.r *= Math.exp(-dt * 2.5);
     if (a.y <= boden) {
       // aufsetzen: je steiler das Auto im Vergleich zur Straße fällt, desto härter
       const hart = Math.max(0, steig * vLang - a.vy);
       a.landung = hart; a.luft = false; a.y = boden; a.vy = steig * vLang;
-      if (hart > 5) { a.u *= 1 - Math.min(0.12, (hart - 5) * 0.015); a.stoss = Math.max(a.stoss, (hart - 5) * 1.5); }
+      const weich = a.arcade && a.p.arcade && a.p.arcade.fall;     // Arcade: Landen kostet kaum Tempo und das Auto steht sofort gerade
+      if (hart > 5) { a.u *= 1 - Math.min(weich ? 0.04 : 0.12, (hart - 5) * 0.015); a.stoss = Math.max(a.stoss, (hart - 5) * 1.5); }
+      if (weich) { a.v *= 0.3; a.r *= 0.3; }
     }
   } else {
     a.vy = steig * vLang; a.y = boden;
-    if (-kv * vLang * vLang > G && Math.abs(vLang) > 8) { a.luft = true; a.flug = 0; }
+    // (Arcade: erst bei einer deutlichen Kuppe abheben, nicht schon auf jeder Bodenwelle)
+    const ab = a.arcade && a.p.arcade && a.p.arcade.abheben || 1;
+    if (-kv * vLang * vLang > G * ab && Math.abs(vLang) > 8) { a.luft = true; a.flug = 0; }
   }
   // Das Auto neigt sich mit der Straße (bergauf: Nase hoch); im Flug folgt es der Flugbahn, die Nase sinkt langsam
   const ziel = a.luft ? Math.max(-0.5, Math.min(0.5, a.vy / Math.max(6, Math.abs(vLang)))) * 0.8 : steig;

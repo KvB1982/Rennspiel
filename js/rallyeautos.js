@@ -23,14 +23,16 @@ const BASIS = {
   widerstand: 0.85,
   rollen: 0.016,
   bremse: 1.0, bremseVorn: 0.62,
-  bremsGriff: 1.7, zugGriff: 2.0, schub: 1.6,   // kräftige Spiel-Bremse und viel Schub (mit Absicht stärker als echt)
+  bremsGriff: 1.7, zugGriff: 2.0, schub: 1.85,   // kräftige Spiel-Bremse und viel Schub (mit Absicht stärker als echt)
   // Schleuderschutz erst ab knapp 30° Rutschwinkel: Driften ist erwünscht, Drehen nicht (aus mit „Traktion aus“)
   esp: { beta: 0.5, dreh: 5, quer: 0.25 },
   // Arcade-Hilfe wie bei den Supercars (siehe physik.js), aber mit mehr Drift: bis "frei" (gut 15°) darf das Auto
   // quer stehen, mit Handbremse bis "freiHand" (gut 35°). Was darüber hinaus rutscht, holt die Hilfe zurück, ohne Tempo
   // zu kosten. "fang" fängt das Heck ab, wenn es sich schneller dreht, als die Räder zeigen – so kommt man aus jedem
   // Schleudern wieder heraus, auch ohne perfektes Gegenlenken. "belag": Auf Schotter und Matsch hilft sie etwas mehr.
-  arcade: { lenk: 1.6, folgen: 24, griff: 1.35, ein: 9, fang: 7, frei: 0.27, freiHand: 0.62, halt: 2.4, rand: 2.5, belag: 0.5 },
+  // "sauber": Die Räder drehen bei Tempo nur so weit, wie es etwas bringt (sonst bremst voller Einschlag das Auto fast bis zum Stand).
+  // "fall": In der Luft fällt das Auto 2,2-mal so schnell (kurze Sprünge), "abheben": erst an deutlichen Kuppen abheben.
+  arcade: { lenk: 1.3, folgen: 20, griff: 1.35, ein: 8, fang: 8, frei: 0.06, freiHand: 0.62, halt: 8, rand: 3.2, belag: 0.6, sauber: 0.1, kreis: 7, spur: 1.5, ruhe: 1, fall: 2.2, abheben: 1.5 },
   tcRest: 0.9,                       // Traktionskontrolle (wenn an) lässt nur wenig Haftung für die Kurve übrig
   lenkMax: 0.62, lenkTempo: 24,
   gaenge: 6, drehzahlMax: 8200, rueck: 7, abregeln: true,

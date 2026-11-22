@@ -69,7 +69,7 @@ export class Kamera {
       cam.up.set(Math.cos(a.h) * roll, 1, -Math.sin(a.h) * roll);
       cam.lookAt(vorX + ch * ex, a.y + (ey - (haube ? 1.6 : a.auge ? 1.2 : 1.6) - nick * 20 + (a.nick || 0) * 30) * sc, vorZ - sh * ex);
       cam.up.set(0, 1, 0);
-      const fov = (haube ? 64 + speed * 16 : 60 + speed * (rallye ? 14 : 10)) + this.schub * 5;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
+      const fov = (haube ? 64 + speed * 24 : 60 + speed * (rallye ? 14 : 10)) + this.schub * 5;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
       cam.fov += (fov - cam.fov) * Math.min(1, dt * 3); cam.near = modell ? 0.002 : 0.05;
       cam.updateProjectionMatrix();
       this.frisch = false;
@@ -79,7 +79,7 @@ export class Kamera {
     // hinter dem Auto: Richtung folgt dem Auto mit etwas Verzögerung (so sieht man das Driften)
     const weit = this.modus === 'weit';
     // Rallye: etwas tiefer und näher am Auto, damit man den Weg und das Driften gut sieht
-    const ab = (weit ? 11 : rallye ? 6.4 : 7.2) * sc * (1 + this.schub * 0.12), hoch = (weit ? 4.4 : rallye ? 2.05 : 2.35) * sc;
+    const ab = (weit ? 11 : rallye ? 5.9 : 7.2) * sc * (1 + this.schub * 0.12), hoch = (weit ? 4.4 : rallye ? 1.9 : 2.35) * sc;
     let d = a.h - this.richtung; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
     if (this.frisch) this.richtung = a.h; else this.richtung += d * Math.min(1, dt * (Math.abs(a.u) < 3 * sc ? 2.5 : 5));
     const rs = Math.sin(this.richtung), rc = Math.cos(this.richtung);
@@ -88,7 +88,7 @@ export class Kamera {
     // nicht unter die Fahrbahn
     cam.position.copy(this.pos); cam.position.x += zit(); cam.position.y += zit();
     cam.lookAt(a.x + rs * 3.5 * sc, a.y + (weit ? 0.3 : 0.75) * sc, a.z + rc * 3.5 * sc);
-    const fov = (weit ? 46 : 48) + speed * (rallye ? 24 : 15) + this.schub * 7;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
+    const fov = (weit ? 46 : 48) + speed * (rallye ? 32 : 15) + this.schub * 7;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
     cam.fov += (fov - cam.fov) * Math.min(1, dt * 3);
     cam.near = modell ? 0.005 : 0.1;
     cam.updateProjectionMatrix();
