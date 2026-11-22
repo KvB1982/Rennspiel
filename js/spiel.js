@@ -78,7 +78,7 @@ export function starteSpiel() {
     waehle('mFahrzeug', E.fahrzeug); waehle('mModus', E.modus);
     // Strecken passend zum Fahrzeug
     const box = $('mStrecke'); box.innerHTML = '';
-    const liste = STRECKEN.filter(s => E.fahrzeug === 'slot' ? s.slot : E.fahrzeug === 'drift' ? s.drift : E.fahrzeug === 'modell' ? s.modell && !s.slot && !s.drift : E.fahrzeug === 'super' ? s.strasse : E.fahrzeug === 'rallye' ? s.rallye : !s.modell && !s.strasse && !s.rallye);
+    const liste = STRECKEN.filter(s => E.fahrzeug === 'slot' ? s.slot : E.fahrzeug === 'drift' ? s.drift : E.fahrzeug === 'modell' ? s.modell && !s.slot && !s.drift : E.fahrzeug === 'super' ? s.strasse || s.auchSuper : E.fahrzeug === 'rallye' ? s.rallye : !s.modell && !s.strasse && !s.rallye);
     // Supercars: Auswahl des Autos
     $('mSuper').hidden = E.fahrzeug !== 'super' && E.fahrzeug !== 'rallye';
     $('mAutoTitel').textContent = E.fahrzeug === 'rallye' ? 'Dein Rallyeauto' : 'Dein Supercar';
@@ -132,13 +132,15 @@ export function starteSpiel() {
     } else if (sup) {
       zeile('Gegner', 'gegner_super', [3, 5, 7].map(n => [n, String(n)]), rennenAn);
       zeile('Stärke der Gegner', 'staerke', [['leicht', 'leicht'], ['mittel', 'mittel'], ['schwer', 'schwer']], rennenAn);
-      zeile('Runden', 'runden_super', [1, 2, 3, 5].map(n => [n, String(n)]), rennenAn);
-      zeile('Verkehr', 'verkehr', [['aus', 'keiner'], ['wenig', 'wenig'], ['normal', 'normal'], ['viel', 'viel']]);
+      zeile('Runden', 'runden_super', (strecke(E.strecke_super).rundenMax ? [1, 2] : [1, 2, 3, 5]).map(n => [n, String(n)]), rennenAn);
+      // Verkehr gibt es nur auf Straßen – auf einer Rennstrecke (Hohenburg-Schleife) sind die Supercars unter sich
+      zeile('Verkehr', 'verkehr', [['aus', 'keiner'], ['wenig', 'wenig'], ['normal', 'normal'], ['viel', 'viel']], !!strecke(E.strecke_super).strasse);
     } else {
       zeile('Gegner', 'gegner', (modell ? [1, 2, 3] : [3, 5, 7, 9]).map(n => [n, String(n)]), rennenAn);
       if (modell && E.gegner > 3) E.gegner = 3;
       zeile('Stärke der Gegner', 'staerke', [['leicht', 'leicht'], ['mittel', 'mittel'], ['schwer', 'schwer']], rennenAn);
-      zeile('Runden', 'runden', (modell ? [3, 5, 10, 20] : [1, 3, 5, 10]).map(n => [n, String(n)]), rennenAn);
+      // sehr lange Strecken (rundenMax): höchstens zwei Runden – eine dauert schon so lange wie sonst ein ganzes Rennen
+      zeile('Runden', 'runden', (modell ? [3, 5, 10, 20] : !sup && strecke(E.strecke).rundenMax ? [1, 2] : [1, 3, 5, 10]).map(n => [n, String(n)]), rennenAn);
     }
     if (!modell && !rallye) zeile('Kamera', 'kamera', [['hinten', 'hinter dem Auto'], ['weit', 'weiter weg'], ['cockpit', 'im Cockpit']]);
     zeile('Kamera', 'kamera_klein', [['hinten', 'hinter dem Auto'], ['cockpit', 'im Cockpit'], ['stand', 'neben der Bahn']], modell);
@@ -186,6 +188,7 @@ export function starteSpiel() {
       : drift ? 'Drift-Rallye: Du lenkst, wohin das Auto fährt. Je mehr du einlenkst und Gas gibst, desto schräger stellt es sich – Gas weg oder gerade lenken, und es fängt sich wieder. Handbremse für Haarnadeln: Gas und Bremse gleichzeitig (Tastatur: Leertaste). Je schräger und schneller du rutschst, desto mehr Drift-Punkte. Hängst du Drifts aneinander, steigt der Faktor bis x5. In die Bande = Drift verloren. Drift-Turbo: Beim Driften sprühen Funken – erst blau, dann orange, dann rosa. Stellst du das Auto wieder gerade und gibst Gas, zündet der Turbo! Die leuchtenden Pfeile auf der Matte sind Turbo-Felder. Mit 🎥 wechselst du die Kamera.'
       : slot ? 'Slotcar: Du gibst nur Gas. Vor der Kurve vom Gas gehen, sonst fliegt das Auto raus! Spur wechseln: an einer gelben Weiche nach links oder rechts lenken. Boxengasse: auf der rechten Spur an der Einfahrt nach rechts lenken und im blauen Feld anhalten. Mit 🎥 wechselst du die Kamera.'
       : modell ? 'Ferngesteuertes Auto: Es fährt wie ein kleiner Rennwagen – auf der Geraden schaltet es bis in den 6. Gang, vor der Kurve bremst die Bremshilfe. Drift-Turbo: Fährst du hart durch die Kurve, stellt sich das Auto quer und Funken sprühen (blau, orange, rosa). Am Kurvenausgang zündet der Turbo! Noch weiter quer: Gas und Bremse gleichzeitig (Tastatur: Leertaste). Leuchtende Pfeile auf der Bahn sind Turbo-Felder. Tanken und Reifen wechseln: in der Boxengasse rechts neben der Startgeraden im blauen Feld anhalten. Mit 🎥 wechselst du die Kamera: hinter dem Auto, im Cockpit oder neben der Bahn.'
+      : sup && !strecke(E.strecke_super).strasse ? 'Supercar auf der Rennstrecke: Hier gibt es keinen Verkehr und keinen Gegenverkehr – die ganze Breite gehört dir. Die Strecke ist sehr lang: Eine Runde dauert etwa sechs bis acht Minuten.'
       : sup ? 'Supercar: Rechts fährt der Verkehr in deine Richtung, links kommt dir Gegenverkehr entgegen. Auf der Autobahn ist der Gegenverkehr hinter der Mittelmauer. Überhol vorsichtig!' : '';
   };
   // Karten der Supercars: Bild des Autos in der gewählten Lackfarbe, Name, Vorbild, Leistung
@@ -260,7 +263,7 @@ export function starteSpiel() {
       T = holeStrecke(id);
       if (sprecher) sprecher.stopp();
       rennen = rallye ? new Etappe(T, { auto: E.rallyeauto, lack: LACKE[E.lack_rallye] ? LACKE[E.lack_rallye].farbe : null, staerke: E.staerke, nr: ganz ? app.rallyeStand.nr + 1 : 0 })
-        : new Rennen(T, { modus: E.modus, runden: sup ? E.runden_super : E.runden, gegner: sup ? E.gegner_super : modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: E.fahrzeug, spielerFarbe: E.farbe, tempo: modell ? TEMPO[E.fahrzeug][E.tempo] || 0 : 0, boxen: modell && !drift && E.boxen,
+        : new Rennen(T, { modus: E.modus, runden: Math.min(T.def.rundenMax || 99, sup ? E.runden_super : E.runden), gegner: sup ? E.gegner_super : modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: E.fahrzeug, spielerFarbe: E.farbe, tempo: modell ? TEMPO[E.fahrzeug][E.tempo] || 0 : 0, boxen: modell && !drift && E.boxen,
         auto: E.supercar, lack: sup && LACKE[E.lack] ? LACKE[E.lack].farbe : null, verkehr: sup ? VERKEHR[E.verkehr] ?? 1 : 0 });
       kurven = rennen.L && !modell && !rallye ? kurvenFinden(T, rennen.L, rennen.ich.a.p) : null;
       rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
