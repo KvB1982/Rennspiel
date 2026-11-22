@@ -41,6 +41,53 @@ export const STRECKEN = [
     hoehe: [[0, 2], [0.3, 2], [0.45, 7], [0.6, 7], [0.8, 3]],
     welt: { art: 'hafen', zeit: 'abend' },
   },
+  // ---------------------------------------------------------------- mehr Rennstrecken in anderen Landschaften
+  // Wüste, Hochgebirge, Großstadt bei Nacht und ein alter Schlosspark im Herbst. Wie die Landschaft aussieht,
+  // steht in streckebau.js (LAND). stimmung = Angaben, die für diese Strecke anders sind als sonst zu dieser Tageszeit.
+  {
+    id: 'wueste', name: 'Dünenring Al-Qamar', ort: 'In der Wüste, Mittagshitze',
+    text: 'Schnelle Strecke zwischen Sanddünen und roten Tafelbergen: eine Gerade von über einem Kilometer, weite Bögen und eine enge Kehre an der Oase.',
+    breite: 15, glatt: 30,
+    ecken: [
+      [800, 0, 30], [860, 260, 70], [600, 420, 130], [680, 760, 90], [300, 940, 180], [-120, 820, 70], [-260, 1080, 50],
+      [-620, 1040, 110], [-760, 660, 220], [-420, 420, 80], [-640, 200, 55], [-900, 280, 45], [-1000, 0, 90],
+    ],
+    hoehe: [[0, 6], [0.2, 10], [0.35, 22], [0.5, 12], [0.65, 26], [0.8, 14], [0.92, 6]],
+    welt: { art: 'wueste', zeit: 'mittag', stimmung: { nebel: 0xe6d3b0, nebelWeit: 5200, truebe: 5 } },
+  },
+  {
+    id: 'alpen', name: 'Alpenring Silbersee', ort: 'Hochtal in den Bergen, Mittag',
+    text: 'Bergauf und bergab durch ein Hochtal: steil hinauf zur Almkurve, in schnellen Bögen wieder hinunter zum See. Ringsum Gipfel mit Schnee.',
+    breite: 12.5, glatt: 28,
+    ecken: [
+      [520, 0, 28], [640, 260, 50], [420, 380, 45], [520, 620, 90], [260, 820, 140], [-60, 700, 40], [-140, 440, 60],
+      [-420, 520, 35], [-560, 300, 110], [-360, 140, 30], [-640, 60, 45], [-560, -20, 20],
+    ],
+    hoehe: [[0, 30], [0.12, 34], [0.25, 62], [0.38, 86], [0.5, 70], [0.62, 46], [0.75, 58], [0.88, 36]],
+    welt: { art: 'alpen', zeit: 'mittag', stimmung: { nebelWeit: 7000 } },
+  },
+  {
+    id: 'nacht', name: 'Nachtrennen Lumina City', ort: 'Großstadt bei Nacht, Flutlicht',
+    text: 'Straßenkurs unter Flutlicht zwischen leuchtenden Hochhäusern: ein langer Boulevard, rechte Winkel, eine schnelle Schlange – und überall Mauern.',
+    breite: 13, glatt: 16, aus: 'mauer', mauerAbstand: 1.6,
+    ecken: [
+      [700, 0, 16], [700, 260, 18], [480, 260, 14], [480, 520, 60], [760, 760, 22], [560, 940, 25], [180, 800, 150],
+      [-200, 900, 20], [-200, 620, 18], [-520, 620, 16], [-520, 380, 40], [-360, 220, 35], [-600, 120, 16], [-600, 0, 16],
+    ],
+    hoehe: [[0, 2], [0.3, 2], [0.5, 8], [0.7, 3]],
+    welt: { art: 'nacht', zeit: 'nacht' },
+  },
+  {
+    id: 'park', name: 'Königspark-Ring', ort: 'Alter Schlosspark im Herbst, Nachmittag',
+    text: 'Die schnellste Strecke: lange Geraden unter bunten Herbstbäumen, drei Schikanen zum Abbremsen und zwei endlos lange Kurven. Hier zählt Höchsttempo.',
+    breite: 13, glatt: 32,
+    ecken: [
+      [900, 0, 60], [960, 60, 25, { aus: 'kies' }], [1040, 20, 25, { aus: 'kies' }], [1300, 120, 180], [1380, 520, 240], [1040, 800, 120],
+      [700, 760, 30, { aus: 'kies' }], [640, 850, 30, { aus: 'kies' }], [200, 900, 300], [-300, 760, 60], [-400, 820, 40], [-700, 760, 160], [-900, 400, 130], [-760, 0, 150],
+    ],
+    hoehe: [[0, 8], [0.25, 14], [0.5, 6], [0.75, 12]],
+    welt: { art: 'park', zeit: 'nachmittag' },
+  },
   {
     id: 'wohnzimmer', name: 'Wohnzimmer-Ring', ort: 'Ferngesteuertes Auto auf dem Teppich',
     text: 'Eine Rennstrecke aus Matten quer durchs Wohnzimmer. Du stehst daneben und lenkst das kleine Auto aus der Ferne.',
@@ -152,6 +199,62 @@ export const STRECKEN = [
     ],
     hoehe: [[0, 0], [0.06, 0], [0.12, 12], [0.2, 35], [0.28, 22], [0.36, 40], [0.42, 18], [0.47, 4], [0.5, 4], [0.58, 4], [0.66, 14], [0.78, 24], [0.9, 2], [0.95, 0]],
     welt: { art: 'reise', zeit: 'mittag', staedte: [{ x: 0, z: 0, r: 1100, name: 'Valmera' }, { x: 7100, z: -600, r: 900, name: 'Bergheim' }] },
+  },
+  // ---------------------------------------------------------------- mehr Straßen in anderen Landschaften
+  // welt.land sagt, durch welche Landschaft die Straße führt: 'kueste' (Meer im Süden), 'alpen', 'wueste' – sonst Felder und Wälder.
+  {
+    id: 'riviera', name: 'Riviera-Küstenstraße', ort: 'Am Meer entlang, Nachmittag',
+    text: 'Aus der Hafenstadt Porto Lumen hinaus auf die Küstenstraße: Kurve um Kurve über den Klippen, durch ein Fischerdorf und über die Pinienhügel im Hinterland zurück.',
+    strasse: true, zone: 'stadt', glatt: 18, kerbAb: 1,
+    ecken: [
+      [2600, 0, 30], [2600, 420, 28, {}, { zone: 'land' }],
+      [2200, 640, 120], [1800, 520, 90], [1450, 700, 80], [1050, 560, 110], [700, 760, 70], [300, 620, 100, {}, { zone: 'dorf' }],
+      [-150, 700, 60, {}, { zone: 'land' }], [-600, 560, 90], [-1000, 720, 70], [-1400, 520, 60],
+      [-1500, 100, 120], [-1100, -300, 160], [-500, -200, 140], [100, -500, 200], [800, -300, 180], [1500, -550, 150, {}, { zone: 'stadt' }],
+      [2000, -300, 40], [2000, 0, 26],
+    ],
+    hoehe: [[0, 4], [0.08, 4], [0.14, 20], [0.2, 34], [0.27, 18], [0.34, 28], [0.4, 12], [0.47, 24], [0.55, 52], [0.65, 92], [0.75, 70], [0.85, 84], [0.93, 30], [0.97, 6]],
+    welt: { art: 'reise', land: 'kueste', zeit: 'nachmittag', staedte: [{ x: 2300, z: 0, r: 620, name: 'Porto Lumen' }], doerfer: ['Santa Marea'] },
+  },
+  {
+    id: 'alpenpass', name: 'Alpenpass Silberjoch', ort: 'Passstraße im Hochgebirge, Mittag',
+    text: 'Aus dem Bergdorf in fünf Haarnadelkurven hinauf zur Passhöhe auf 320 Metern über dem Tal, drüben in Kehren wieder hinunter und am Hang entlang zurück.',
+    strasse: true, zone: 'dorf', glatt: 14, kerbAb: 1,
+    ecken: [
+      [300, 0, 60, {}, { zone: 'land' }], [900, 150, 120], [1300, 0, 90],
+      [1750, 150, 24], [1300, 330, 24], [1800, 500, 24], [1300, 680, 24], [1800, 860, 24], [1350, 1060, 60],
+      [1500, 1500, 140], [1100, 1850, 110],
+      [500, 1800, 90], [200, 2100, 24], [-200, 1750, 24], [-500, 2050, 24], [-900, 1700, 80],
+      [-1100, 1200, 160], [-800, 700, 120], [-1050, 300, 90], [-700, 0, 70, {}, { zone: 'dorf' }],
+    ],
+    hoehe: [[0, 20], [0.1, 40], [0.16, 76], [0.24, 150], [0.32, 225], [0.4, 295], [0.47, 340], [0.55, 300], [0.63, 230], [0.7, 170], [0.8, 100], [0.9, 40], [0.96, 20]],
+    welt: { art: 'reise', land: 'alpen', zeit: 'mittag', staedte: [], doerfer: ['Almbach'] },
+  },
+  {
+    id: 'dorado', name: 'Wüsten-Highway Dorado', ort: 'Wüste und Canyon, Abendrot',
+    text: 'Aus der Wüstenstadt Dorado auf den Highway: fünf Kilometer fast geradeaus – Vollgas! Zurück geht es kurvig durch den Canyon und an einer Oase vorbei.',
+    strasse: true, zone: 'stadt', glatt: 16, kerbAb: 1,
+    ecken: [
+      [500, 0, 30], [500, 500, 40, {}, { zone: 'autobahn' }],
+      [1500, 1300, 600], [4200, 1500, 900], [6000, 900, 500, {}, { zone: 'land' }],
+      [6600, 200, 120], [6200, -300, 80], [5600, -100, 90], [5100, -600, 70], [4500, -350, 110, {}, { zone: 'dorf' }],
+      [4000, -700, 60, {}, { zone: 'land' }], [3300, -500, 150], [2700, -900, 120], [2000, -600, 200], [1200, -900, 160, {}, { zone: 'stadt' }],
+      [500, -500, 40], [-200, -500, 28], [-200, 0, 28],
+    ],
+    hoehe: [[0, 0], [0.1, 0], [0.2, 10], [0.35, 4], [0.45, 30], [0.52, 70], [0.6, 45], [0.68, 85], [0.76, 50], [0.86, 25], [0.93, 4]],
+    welt: { art: 'reise', land: 'wueste', zeit: 'abend', staedte: [{ x: 150, z: -250, r: 950, name: 'Dorado' }], doerfer: ['Oase Tamira'] },
+  },
+  {
+    id: 'neonstadt', name: 'Nachtfahrt Neonstadt', ort: 'Großstadt bei Nacht, Stadtautobahn',
+    text: 'Nachts durch die leuchtende Großstadt: breite Boulevards mit rechten Winkeln, dann auf die Stadtautobahn und im weiten Bogen um die Hochhäuser.',
+    strasse: true, zone: 'stadt', glatt: 14, kerbAb: 1,
+    ecken: [
+      [700, 0, 30], [700, 600, 28], [1300, 600, 30], [1300, 1300, 34, {}, { zone: 'autobahn' }],
+      [600, 1900, 420], [-700, 1900, 380], [-1500, 1100, 420, {}, { zone: 'stadt' }],
+      [-1500, 300, 40], [-900, 300, 28], [-900, -300, 28], [-300, -300, 26], [-300, 0, 26],
+    ],
+    hoehe: [[0, 0], [0.3, 0], [0.45, 12], [0.6, 12], [0.75, 0]],
+    welt: { art: 'stadt', zeit: 'nacht', staedte: [{ x: -100, z: 700, r: 1700, name: 'Neonstadt' }] },
   },
   // ---------------------------------------------------------------- Rallye: Wertungsprüfungen (WP)
   // Rallyestrecken sind Wege durchs Gelände: schmal, ohne Leitplanken, mit Wald direkt am Rand.

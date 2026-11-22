@@ -11,7 +11,7 @@ import * as TX from './texturen.js';
 import { BELAG, MASSSTAB } from './strecke.js';
 import { weichen, WEICHE_LANG } from './slot.js';
 import { boxLage } from './box.js';
-import { baueStrassenWelt } from './stadtbau.js';
+import { baueStrassenWelt, berge, grossstadt, kiste, giebel, hausMaterialien } from './stadtbau.js';
 import { modell, alsGruppe, baumModell, echtGruppe, baumBild } from './modelle.js';
 
 // ---------------------------------------------------------------- Hilfen
@@ -82,9 +82,31 @@ const STIMMUNG = {
   abend: { hoehe: 5, richtung: 280, truebe: 8, rayleigh: 2.8, nebel: 0xd8a27c, nebelWeit: 2000, licht: 2.4, himmel: 0.75, belicht: 0.62 },
   // Rallye: trüber Morgen im Wald (tief hängende Wolken, Nebel zwischen den Bäumen)
   trueb: { grau: true, hoehe: 22, richtung: 150, truebe: 12, rayleigh: 0.5, nebel: 0xa7aeae, nebelNah: 20, nebelWeit: 430, licht: 1.5, himmel: 1.45, belicht: 0.66 },
+  // Nacht in der Großstadt: Der Himmel ist dunkel, das Licht kommt von oben wie von Flutlicht-Masten.
+  nacht: { nacht: true, hoehe: 62, richtung: 200, truebe: 2, rayleigh: 0.3, nebel: 0x0a1020, nebelWeit: 2600, licht: 1.5, himmel: 0.7, belicht: 0.85 },
   drinnen: { hoehe: 50, richtung: 200, truebe: 2, rayleigh: 1, nebel: 0x8a7a6a, nebelWeit: 60, licht: 1.6, himmel: 0.9, belicht: 0.9 },
 };
-export const stimmung = def => STIMMUNG[def.welt.zeit] || STIMMUNG.mittag;
+// Eine Strecke darf einzelne Angaben ändern (welt.stimmung), z. B. weiter sehen im Gebirge oder gelber Dunst in der Wüste.
+export const stimmung = def => ({ ...(STIMMUNG[def.welt.zeit] || STIMMUNG.mittag), ...(def.welt.stimmung || {}) });
+// Ist es dunkel? Dann leuchten Fenster, Laternen und Scheinwerfer.
+export const istDunkel = def => def.welt.zeit === 'abend' || def.welt.zeit === 'nacht';
+
+// Die Landschaften der Rennstrecken (welt.art). Für jede steht hier, wie hügelig sie ist und was dort wächst:
+//   amp = Höhe der Hügel (m), mass = Größe der Hügel (m), gross = dazu große Bergrücken weiter weg,
+//   fern = so viel steigt das Land nach außen an (Talkessel), meer = Meer im Norden oder Süden, see = Bergsee in den Senken,
+//   boden = Bild für den Boden, bergH/bergFarbe = Hügelkette am Horizont, bergArt = Gebirge mit Schnee oder Tafelberge,
+//   baumZahl, schwelle (kleiner = mehr Wald), baeume = [Art, Farbe, Anteil, Größe], herbst = bunte Blätter,
+//   felsen = 'tafel' (Tafelberge und rote Felsen) oder 'brocken' (graue Felsbrocken)
+const LAND = {
+  kueste: { amp: 34, meer: 'nord', bergH: 260, bergFarbe: 0x8a8f7a, baumZahl: 3500, schwelle: 0.15, baeume: [['pinie', 0x3d5f2c, 0.5, 1], ['zypresse', 0x2a4a26, 0.3, 1], ['laub', 0x587a35, 0.2, 0.8]] },
+  wald: { amp: 70, gross: 120, bergH: 420, bergFarbe: 0x4a6a4a, baumZahl: 9000, schwelle: -0.25, baeume: [['nadel', 0x2c4f2a, 0.65, 1], ['laub', 0x3f6b2e, 0.35, 0.9]] },
+  hafen: { amp: 4, meer: 'sued', baumZahl: 0, baeume: [] },
+  wueste: { amp: 16, mass: 300, gross: 70, boden: 'sand', bergArt: 'tafel', baumZahl: 1100, schwelle: 0.3, einzeln: 0.006, baeume: [['palme', 0x4a6a2c, 0.75, 1], ['pinie', 0x5a6a34, 0.25, 0.75]], felsen: 'tafel' },
+  alpen: { amp: 46, gross: 240, fern: 260, boden: 'grau', see: true, bergArt: 'schnee', baumZahl: 7500, schwelle: -0.05, baumGrenze: 150, baeume: [['nadel', 0x2c4f2a, 0.85, 1.05], ['laub', 0x4a7a34, 0.15, 0.8]], felsen: 'brocken' },
+  nacht: { amp: 3, boden: 'beton', baumZahl: 0, baeume: [] },
+  park: { amp: 9, mass: 520, boden: 'grau', bergH: 170, bergFarbe: 0x6f6a3c, baumZahl: 15000, schwelle: 0.02, einzeln: 0.1, allee: 0.3, herbst: true, baeume: [['laub', 0xb8702a, 0.8, 1.1], ['nadel', 0x2c4f2a, 0.2, 1]] },
+};
+const landVon = art => LAND[art] || LAND.kueste;
 
 // Räumliches Gitter für "wie weit ist der nächste Streckenpunkt?" (für Gelände und Bäume)
 export function naeheGitter(T, zelle) {
@@ -202,9 +224,11 @@ export function baueWelt(T, szene, { qualitaet = 'hoch' } = {}) {
 
   // ---------------------------------------------------------------- Auslauf (Gras, Kies, Gehweg)
   const grasT = TX.rasenStreifen(), kiesT = TX.kies(), betonT = TX.beton();
+  const wueste = art === 'wueste' || def.welt.land === 'wueste';
   // kleine Bahnen: grüner Filz statt Gras, heller Auslauf-Streifen statt Kies (einfarbig, die großen Bilder wären dort unscharf)
   const grasMat = modell ? new THREE.MeshStandardMaterial({ color: def.drift ? 0x8d9097 : 0x3f8a4a, roughness: 1 })   // Drift-Matte: heller Rand
-    : new THREE.MeshStandardMaterial({ map: grasT.map, roughness: 0.95, color: art === 'kueste' ? 0xd6e0a8 : 0xffffff });
+    : wueste ? new THREE.MeshStandardMaterial({ map: TX.sand().map, roughness: 1, color: 0xf2dcae })   // in der Wüste liegt Sand neben der Straße
+    : new THREE.MeshStandardMaterial({ map: grasT.map, roughness: 0.95, color: art === 'kueste' || def.welt.land === 'kueste' ? 0xd6e0a8 : art === 'park' ? 0xd8d49a : 0xffffff });
   const kiesMat = modell ? new THREE.MeshStandardMaterial({ color: def.slot ? 0xb8bcc2 : 0xd8c79a, roughness: 1 })
     : new THREE.MeshStandardMaterial({ map: kiesT.map, normalMap: kiesT.normalMap, roughness: 1 });
   const randMat = modell
@@ -237,6 +261,13 @@ export function baueWelt(T, szene, { qualitaet = 'hoch' } = {}) {
     baueGelaende(T, gruppe, welt, art, viel, r);
     baueTribuenen(T, gruppe, welt, viel, r);
     if (art === 'hafen') baueStadt(T, gruppe, welt, viel, r);
+    if (art === 'nacht') {
+      // Großstadt bei Nacht: niedrige Häuser direkt an der Strecke, dahinter Hochhäuser mit leuchtenden Fenstern
+      baueStadt(T, gruppe, welt, viel, r, { hafen: false, bis: 120 });
+      const g = welt.grenzen;
+      grossstadt(T, gruppe, naeheGitter(T, 60), { x: g.mx, z: g.mz, r: Math.hypot(g.maxx - g.minx, g.maxz - g.minz) / 2 + 650 }, r, 'nacht', viel, 120);
+    }
+    if (art === 'park') baueSchloss(T, gruppe, welt, r);
   }
   return welt;
 }
@@ -422,13 +453,18 @@ function baueAmpel(T, gruppe, welt, modell) {
 
 function baueGelaende(T, gruppe, welt, art, viel, r) {
   const { minx, maxx, minz, maxz } = welt.grenzen;
+  const P = landVon(art);
   const rand = 900;
   const x0 = minx - rand, x1 = maxx + rand, z0 = minz - rand, z1 = maxz + rand;
   const N = qualitaetsGitter(viel);
   const nah = naeheGitter(T, 60);
   const rs = TX.rauschen(art.length * 17);
-  const amp = art === 'wald' ? 70 : art === 'kueste' ? 34 : 4;
-  const meer = art === 'kueste' ? minz - 70 : art === 'hafen' ? maxz + 60 : null;
+  const amp = P.amp, mass = P.mass || 700;
+  const meer = P.meer === 'nord' ? minz - 70 : P.meer === 'sued' ? maxz + 60 : null;
+  // höchste und tiefste Stelle der Strecke: danach richten sich Bergsee, Baumgrenze und Schnee
+  let yMin = Infinity, yMax = -Infinity; for (let i = 0; i < T.n; i++) { yMin = Math.min(yMin, T.y[i]); yMax = Math.max(yMax, T.y[i]); }
+  const seeY = P.see ? yMin - 5 : null;
+  const wasserY = meer !== null ? 0.5 : seeY !== null ? seeY + 0.6 : null;   // darunter wächst nichts
   const pos = [], cols = [], idx = [];
   const gruen = new THREE.Color(0x5c8a3a), trocken = new THREE.Color(0xa7a35a), fels = new THREE.Color(0x8b8173), sandC = new THREE.Color(0xd8c48e), stadt = new THREE.Color(0x7d7d78), wald = new THREE.Color(0x2f5a2a);
   const hoehe = (x, z) => {
@@ -438,21 +474,48 @@ function baueGelaende(T, gruppe, welt, art, viel, r) {
     const d = f.i >= 0 ? f.d : 1e4;
     const w = Math.min(1, Math.max(0, (d - frei) / 260));
     const glatt = w * w * (3 - 2 * w);
-    let h = ty - 0.35 + glatt * (rs(x / 700, z / 700, 4) * amp + amp * 0.35 + (art === 'wald' ? Math.max(0, rs(x / 1800 + 5, z / 1800, 2)) * 120 * glatt : 0));
+    let h = ty - 0.35 + glatt * (rs(x / mass, z / mass, 4) * amp + amp * 0.35 + (P.gross ? Math.max(0, rs(x / 1800 + 5, z / 1800, 2)) * P.gross * glatt : 0));
+    // Talkessel: Je weiter weg von der Strecke, desto höher steigt das Land
+    if (P.fern) { const u = Math.min(1.25, Math.max(0, (d - 120) / 800)); h += P.fern * u * u * Math.max(0.15, 0.9 + 1.5 * rs(x / 420 + 9, z / 420, 4)); }
+    // Bergsee: In manchen Senken liegt das Land tiefer als der Wasserspiegel
+    if (seeY !== null) { const senke = Math.min(1, Math.max(0, (-0.12 - rs(x / 800 + 3, z / 800 + 7, 2)) / 0.2)); h -= glatt * senke * (h - seeY + 9); }
     if (meer !== null) {
       const ab = art === 'kueste' ? (meer - z) : (z - meer);   // wie weit im Meer
       if (ab > 0) h = Math.min(h, ty - 0.35 - Math.min(1, ab / 25) * 14);
     }
-    return { h, d, glatt };
+    return { h, d, glatt, ty };
   };
+  // erst alle Höhen ausrechnen (daraus ergibt sich, wo es steil ist), dann die Farben
+  const W = N + 1, H = new Float32Array(W * W), G = new Float32Array(W * W), TY = new Float32Array(W * W);
+  const dx = (x1 - x0) / N, dz = (z1 - z0) / N;
   for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
-    const x = x0 + (x1 - x0) * i / N, z = z0 + (z1 - z0) * j / N;
-    const { h, d, glatt } = hoehe(x, z);
+    const e = hoehe(x0 + dx * i, z0 + dz * j);
+    H[j * W + i] = e.h; G[j * W + i] = e.glatt; TY[j * W + i] = e.ty;
+  }
+  const sandHell = new THREE.Color(0xe6cf9c), sandDunkel = new THREE.Color(0xcf9f62), rotFels = new THREE.Color(0xb86a3e);
+  const alm = new THREE.Color(0x5a8c34), almWald = new THREE.Color(0x2f5226), grauFels = new THREE.Color(0x8d8f90), schnee = new THREE.Color(0xf3f6f9), nachtBoden = new THREE.Color(0x4a4c52), laubBoden = new THREE.Color(0x8a7a2c), parkGruen = new THREE.Color(0x4f8230);
+  const c = new THREE.Color();
+  for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
+    const x = x0 + dx * i, z = z0 + dz * j, k = j * W + i;
+    const h = H[k], glatt = G[k];
     pos.push(x, h, z);
-    const c = new THREE.Color();
     const v = rs(x / 90, z / 90, 3) * 0.5 + 0.5;
+    // wie steil ist es hier? (Höhenunterschied zu den Nachbarn)
+    const steil = Math.max(Math.abs(H[j * W + Math.min(N, i + 1)] - H[j * W + Math.max(0, i - 1)]) / (2 * dx), Math.abs(H[Math.min(N, j + 1) * W + i] - H[Math.max(0, j - 1) * W + i]) / (2 * dz));
     if (art === 'hafen') c.copy(stadt).lerp(gruen, glatt * 0.4 * v);
     else if (art === 'kueste') { c.copy(gruen).lerp(trocken, 0.35 + v * 0.5); if (h < 1.2) c.copy(sandC); if (h < -2) c.copy(fels); }
+    else if (art === 'wueste') { c.copy(sandHell).lerp(sandDunkel, v * 0.8); if (steil > 0.45) c.lerp(rotFels, Math.min(1, (steil - 0.45) * 4)); }
+    else if (art === 'alpen') {
+      const rel = h - TY[k];
+      c.copy(alm).lerp(almWald, glatt * 0.5 * v).lerp(trocken, v * 0.12);
+      const felsig = Math.max(Math.min(1, Math.max(0, (steil - 0.55) * 3)), Math.min(1, Math.max(0, (rel - 170) / 90)));
+      c.lerp(grauFels, felsig);
+      const weiss = Math.min(1, Math.max(0, (h - (yMax + 230 + v * 60)) / 50));
+      c.lerp(schnee, weiss);
+      if (seeY !== null && h < seeY + 0.4) c.copy(grauFels).lerp(sandC, 0.4);
+    }
+    else if (art === 'nacht') c.copy(nachtBoden);
+    else if (art === 'park') c.copy(parkGruen).lerp(laubBoden, glatt * (0.15 + v * 0.5));
     else { c.copy(gruen).lerp(wald, glatt * 0.7).lerp(trocken, v * 0.25); }
     if (meer !== null && h < -3) c.copy(fels);
     cols.push(c.r, c.g, c.b);
@@ -467,49 +530,93 @@ function baueGelaende(T, gruppe, welt, art, viel, r) {
   const uvs = []; for (let k = 0; k < pos.length; k += 3) uvs.push(pos[k] / 12, pos[k + 2] / 12);
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   g.setIndex(idx); g.computeVertexNormals();
-  const gt = TX.gras();
-  const gm = new THREE.MeshStandardMaterial({ map: gt.map, vertexColors: true, roughness: 1, color: 0xcfcfcf });
+  const gt = P.boden === 'sand' ? TX.sand() : P.boden === 'beton' ? TX.beton() : P.boden === 'grau' ? TX.bodenGrau() : TX.gras();
+  const gm = new THREE.MeshStandardMaterial({ map: gt.map, vertexColors: true, roughness: 1, color: P.boden ? 0xffffff : 0xcfcfcf });
   const boden = mesh(g, gm, false, true);
   gruppe.add(boden);
 
   // ferne Berge rundherum (gehen im Dunst unter)
-  if (art !== 'hafen') {
+  if (P.bergArt) {
+    // richtiges Gebirge mit Schnee oder Tafelberge aus rotem Fels (dieselben wie bei den Straßen-Strecken)
+    berge(T, gruppe, welt, P.bergArt === 'schnee' ? { hoch: 1500, weg: 1500, schneeAb: 0.42 }
+      : { hoch: 380, weg: 1700, tafel: true, fuss: 0xd2b47c, fels: 0xb86a3e, boden: 0xd9c08e });
+  } else if (P.bergH) {
     const ring = new THREE.CylinderGeometry(5200, 5200, 1, 64, 1, true);
     const bpos = [], bidx = [], M = 128, rsB = TX.rauschen(5);
     const cx = (minx + maxx) / 2, cz = (minz + maxz) / 2;
     for (let k = 0; k <= M; k++) {
       const a = k / M * Math.PI * 2;
-      const hh = (art === 'wald' ? 420 : 260) * (0.55 + 0.45 * rsB(Math.cos(a) * 3, Math.sin(a) * 3, 4));
+      const hh = P.bergH * (0.55 + 0.45 * rsB(Math.cos(a) * 3, Math.sin(a) * 3, 4));
       const meerSeite = art === 'kueste' && Math.sin(a) < -0.2;
       bpos.push(cx + Math.cos(a) * 4200, -20, cz + Math.sin(a) * 4200, cx + Math.cos(a) * 4600, meerSeite ? -10 : hh, cz + Math.sin(a) * 4600);
     }
     for (let k = 0; k < M; k++) { const a = k * 2; bidx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
     ring.dispose();
     const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(bpos, 3)); bg.setIndex(bidx); bg.computeVertexNormals();
-    gruppe.add(new THREE.Mesh(bg, new THREE.MeshStandardMaterial({ color: art === 'wald' ? 0x4a6a4a : 0x8a8f7a, roughness: 1, side: THREE.DoubleSide })));
+    gruppe.add(new THREE.Mesh(bg, new THREE.MeshStandardMaterial({ color: P.bergFarbe, roughness: 1, side: THREE.DoubleSide })));
   }
 
-  // Meer
-  if (meer !== null) {
+  // Meer oder Bergsee
+  if (meer !== null || seeY !== null) {
     const w = TX.wellen();
     const nm = w.normalMap.clone(); nm.needsUpdate = true; nm.repeat.set(60, 60);
-    const wm = new THREE.MeshPhysicalMaterial({ color: art === 'kueste' ? 0x1d5f86 : 0x23465a, roughness: 0.08, metalness: 0.1, normalMap: nm, normalScale: new THREE.Vector2(0.35, 0.35), clearcoat: 0.6 });
+    const wm = new THREE.MeshPhysicalMaterial({ color: seeY !== null ? 0x2f7f8a : art === 'kueste' ? 0x1d5f86 : 0x23465a, roughness: 0.08, metalness: 0.1, normalMap: nm, normalScale: new THREE.Vector2(0.35, 0.35), clearcoat: 0.6 });
     const wasser = new THREE.Mesh(new THREE.PlaneGeometry(12000, 12000), wm);
-    wasser.rotation.x = -Math.PI / 2; wasser.position.set((minx + maxx) / 2, -1.2, (minz + maxz) / 2);
+    wasser.rotation.x = -Math.PI / 2; wasser.position.set((minx + maxx) / 2, seeY !== null ? seeY : -1.2, (minz + maxz) / 2);
     wasser.receiveShadow = true;
     gruppe.add(wasser);
     welt.wasser.push(nm);
   }
 
+  // Felsen: Tafelberge und rote Brocken in der Wüste, graue Felsbrocken im Gebirge
+  if (P.felsen) {
+    const liste = [], tafel = P.felsen === 'tafel';
+    const zahl = Math.round((tafel ? 520 : 520) * viel);
+    for (let k = 0, versuche = 0; k < zahl && versuche < zahl * 20; versuche++) {
+      const x = x0 + r() * (x1 - x0), z = z0 + r() * (z1 - z0);
+      const e = hoehe(x, z), f = nah(x, z, 3);
+      const frei = f.i >= 0 ? T.hb[f.i] + Math.max(T.ausL[f.i], T.ausR[f.i]) + 10 : 0;
+      if (e.d < frei || (wasserY !== null && e.h < wasserY)) continue;
+      const gross = tafel && e.d > 120 && r() < 0.22;
+      if (gross) { const b = 30 + r() * 70; liste.push([x, e.h - 6, z, b, 22 + r() * 46, b * (0.6 + r() * 0.7), r() * 6.28, 1]); }
+      else { const b = 0.8 + r() * r() * (tafel ? 5 : 7); liste.push([x, e.h - b * 0.25, z, b * (0.8 + r() * 0.6), b * (0.55 + r() * 0.5), b * (0.8 + r() * 0.6), r() * 6.28, 0]); }
+      k++;
+    }
+    baueFelsen(gruppe, liste, tafel ? 0xb86a3e : 0x8d8f90, r);
+  }
+
   // Bäume
-  baueBaeume(T, gruppe, art, viel, nah, hoehe, x0, x1, z0, z1, r, meer);
+  baueBaeume(T, gruppe, art, viel, nah, hoehe, x0, x1, z0, z1, r, wasserY, P, yMax);
+}
+
+// Felsen als Instanzen. liste = [x, y, z, Breite, Höhe, Tiefe, Drehung, 1 = Tafelberg (oben flach)]
+export function baueFelsen(gruppe, liste, farbe, r) {
+  if (!liste.length) return;
+  // Brocken: eine Kugel aus wenigen Flächen, jede Ecke etwas verschoben, damit sie kantig aussieht
+  const brocken = new THREE.IcosahedronGeometry(1, 1);
+  { const p = brocken.getAttribute('position'), rz = TX.rauschen(23); for (let k = 0; k < p.count; k++) { const m = 0.78 + 0.4 * rz(p.getX(k) * 2.1, p.getY(k) * 2.1 + p.getZ(k) * 1.7, 2); p.setXYZ(k, p.getX(k) * m, Math.max(-0.3, p.getY(k) * m), p.getZ(k) * m); } brocken.computeVertexNormals(); }
+  // Tafelberg: unten breit, oben flach
+  const tafel = new THREE.CylinderGeometry(0.72, 1, 1, 9, 2); tafel.translate(0, 0.5, 0);
+  { const p = tafel.getAttribute('position'), rz = TX.rauschen(29); for (let k = 0; k < p.count; k++) { const m = 0.86 + 0.3 * rz(p.getX(k) * 3, p.getZ(k) * 3 + p.getY(k), 2); p.setX(k, p.getX(k) * m); p.setZ(k, p.getZ(k) * m); } tafel.computeVertexNormals(); }
+  const mat = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), Y = new THREE.Vector3(0, 1, 0), c = new THREE.Color();
+  for (const [art, geo] of [[0, brocken], [1, tafel]]) {
+    const teil = liste.filter(f => f[7] === art); if (!teil.length) continue;
+    const im = new THREE.InstancedMesh(geo, mat, teil.length);
+    teil.forEach(([x, y, z, b, h, t, dreh], k) => {
+      q.setFromAxisAngle(Y, dreh); m4.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(b, h, t)); im.setMatrixAt(k, m4);
+      c.setHex(farbe).offsetHSL((r() - 0.5) * 0.03, (r() - 0.5) * 0.12, (r() - 0.5) * 0.14); im.setColorAt(k, c);
+    });
+    im.castShadow = true; im.receiveShadow = true;
+    gruppe.add(im);
+  }
 }
 
 const qualitaetsGitter = viel => viel >= 1 ? 220 : viel > 0.5 ? 160 : 110;
 
-function baueBaeume(T, gruppe, art, viel, nah, hoehe, x0, x1, z0, z1, r, meer) {
-  if (art === 'hafen') return;
-  const anzahl = Math.round((art === 'wald' ? 9000 : 3500) * viel);
+function baueBaeume(T, gruppe, art, viel, nah, hoehe, x0, x1, z0, z1, r, wasserY, P, yMax) {
+  if (!P.baumZahl) return;
+  const anzahl = Math.round(P.baumZahl * viel);
   const rs = TX.rauschen(77);
   // Baumarten: Nadelbaum (Kegel), Laubbaum (Kugeln), Pinie (Schirm), Zypresse (schmal)
   const stamm = new THREE.CylinderGeometry(0.18, 0.28, 1, 6); stamm.translate(0, 0.5, 0);
@@ -519,13 +626,16 @@ function baueBaeume(T, gruppe, art, viel, nah, hoehe, x0, x1, z0, z1, r, meer) {
     pinie: () => { const a = new THREE.SphereGeometry(3.4, 10, 6); a.scale(1, 0.38, 1); a.translate(0, 7.8, 0); return a; },
     zypresse: () => { const a = new THREE.SphereGeometry(1, 8, 8); a.scale(1.1, 5, 1.1); a.translate(0, 5.2, 0); return a; },
   };
-  const arten = art === 'wald' ? [['nadel', 0x2c4f2a, 0.65, 1], ['laub', 0x3f6b2e, 0.35, 0.9]] : [['pinie', 0x3d5f2c, 0.5, 1], ['zypresse', 0x2a4a26, 0.3, 1], ['laub', 0x587a35, 0.2, 0.8]];
-  const stammHoehe = { nadel: 3, laub: 4, pinie: 7.4, zypresse: 1.5 };
+  formen.palme = formen.pinie;
+  const arten = P.baeume;
+  const stammHoehe = { nadel: 3, laub: 4, pinie: 7.4, zypresse: 1.5, palme: 7.4 };
+  // Herbst: Die Bilder der Laubbäume werden gelb, orange und rot eingefärbt (Zahlen über 1 machen eine Farbe kräftiger)
+  const HERBST = [[1.9, 1.0, 0.45], [2.2, 0.72, 0.35], [1.7, 1.35, 0.4], [2.0, 0.9, 0.3], [1.15, 1.1, 0.85], [1.5, 1.2, 0.5]];
   const kroneMat = new THREE.MeshStandardMaterial({ roughness: 0.95, flatShading: true });
   const stammMat = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 1 });
   // fertige Baum-Modelle (Kenney Nature Kit, CC0), wenn geladen; die Pinie bleibt selbst gebaut
   const MODELL = { nadel: ['baum_tanne', 11.5], laub: ['baum_laub', 8.5], zypresse: ['baum_zypresse', 10.2] };
-  const BILD = { nadel: ['fichte', 12], laub: ['laub', 9.5], pinie: ['pinie', 9.5], zypresse: ['zypresse', 10.5] };
+  const BILD = { nadel: ['fichte', 12], laub: ['laub', 9.5], pinie: ['pinie', 9.5], zypresse: ['zypresse', 10.5], palme: ['palme', 9] };
   for (const [name, farbe, anteil, groesse] of arten) {
     const zahl = Math.round(anzahl * anteil);
     // am liebsten flache Bilder echter Bäume (4 Dreiecke je Baum), sonst Kenney-Modell, sonst selbst gebaut
@@ -537,21 +647,26 @@ function baueBaeume(T, gruppe, art, viel, nah, hoehe, x0, x1, z0, z1, r, meer) {
     let k = 0, versuche = 0;
     while (k < zahl && versuche < zahl * 30) {
       versuche++;
-      const x = x0 + r() * (x1 - x0), z = z0 + r() * (z1 - z0);
+      let x = x0 + r() * (x1 - x0), z = z0 + r() * (z1 - z0);
+      // Allee: Ein Teil der Bäume steht in Reihen links und rechts der Strecke (Park)
+      const allee = P.allee && r() < P.allee;
+      if (allee) { const i = Math.floor(r() * T.n), sd = r() < 0.5 ? 1 : -1, l = sd * (T.hb[i] + (sd > 0 ? T.ausL[i] : T.ausR[i]) + 9 + r() * 16); x = T.x[i] + T.tz[i] * l; z = T.z[i] - T.tx[i] * l; }
       const f = nah(x, z, 3);
       if (f.i >= 0 && f.d < T.hb[f.i] + Math.max(T.ausL[f.i], T.ausR[f.i]) + 9) continue;
       // Wälder in Gruppen (wo das Rauschen hoch ist), sonst nur vereinzelt
       const dicht = rs(x / 260, z / 260, 3);
-      if (dicht < (art === 'wald' ? -0.25 : 0.15) && r() > 0.08) continue;
+      if (!allee && dicht < P.schwelle && r() > (P.einzeln ?? 0.08)) continue;
       const hh = hoehe(x, z);
-      if (meer !== null && hh.h < 0.5) continue;
+      if (wasserY !== null && hh.h < wasserY) continue;
+      if (P.baumGrenze && hh.h > yMax + P.baumGrenze - 40 * r()) continue;   // über der Baumgrenze wächst nichts mehr
       const s = (0.75 + r() * 0.6) * groesse;
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * 6.28);
       m4.compose(new THREE.Vector3(x, hh.h - 0.2, z), q, new THREE.Vector3(s, s, s));
       krone.setMatrixAt(k, m4);
       if (!bm) m4.compose(new THREE.Vector3(x, hh.h - 0.2, z), q, new THREE.Vector3(s, s * stammHoehe[name], s));
       if (st) st.setMatrixAt(k, m4);
-      if (bb) { const v = 0.78 + r() * 0.3; c.setRGB(v, v, v * 0.94); }       // Bild behält seine Farben, nur etwas heller oder dunkler
+      if (bb && P.herbst && name === 'laub') { const f = HERBST[Math.floor(r() * HERBST.length)], v = 0.8 + r() * 0.3; c.setRGB(f[0] * v, f[1] * v, f[2] * v); }
+      else if (bb) { const v = 0.78 + r() * 0.3; c.setRGB(v, v, v * 0.94); }       // Bild behält seine Farben, nur etwas heller oder dunkler
       else c.setHex(farbe).offsetHSL((r() - 0.5) * 0.04, (r() - 0.5) * 0.1, (r() - 0.5) * 0.08);
       krone.setColorAt(k, c);
       k++;
@@ -662,18 +777,20 @@ function baueTribuenen(T, gruppe, welt, viel, r) {
 
 // ---------------------------------------------------------------- Stadt am Hafen (Häuser zwischen den Straßen)
 
-function baueStadt(T, gruppe, welt, viel, r) {
+// hafen = mit Booten im Wasser, bis = nur so weit von der Strecke weg stehen diese Häuser (dahinter kommt die Großstadt)
+function baueStadt(T, gruppe, welt, viel, r, { hafen = true, bis = Infinity } = {}) {
   const nah = naeheGitter(T, 40);
   const { minx, maxx, minz, maxz } = welt.grenzen;
   const tex = TX.fassade('abend');
   const farben = [0xe8d8c0, 0xd9b38c, 0xc98f6a, 0xf0e6d2, 0xb7c4cf, 0xe3c99b, 0xd7a8a0];
   const geos = farben.map(() => []);
   const block = 26;
-  for (let x = minx - 300; x < maxx + 300; x += block) for (let z = minz - 300; z < maxz + 60; z += block) {
+  for (let x = minx - 300; x < maxx + 300; x += block) for (let z = minz - 300; z < maxz + (hafen ? 60 : 300); z += block) {
     const px = x + (r() - 0.5) * 4, pz = z + (r() - 0.5) * 4;
     const f = nah(px, pz, 3);
     const frei = f.i >= 0 ? T.hb[f.i] + Math.max(T.ausL[f.i], T.ausR[f.i]) + 13 : 0;
     if (f.i >= 0 && f.d < frei) continue;
+    if (f.d > bis) continue;
     if (r() < 0.12) continue;
     const w = 14 + r() * 8, d = 14 + r() * 8, h = 9 + Math.floor(r() * 6) * 3.2 + (f.d > 200 ? r() * 20 : 0);
     const g = new THREE.BoxGeometry(w, h, d);
@@ -697,7 +814,7 @@ function baueStadt(T, gruppe, welt, viel, r) {
   // Boote im Hafen
   const rumpfMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.4 });
   const mastMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.4, metalness: 0.5 });
-  for (let k = 0; k < 40 * viel; k++) {
+  for (let k = 0; hafen && k < 40 * viel; k++) {
     const b = new THREE.Group();
     const l = 8 + r() * 14;
     const rumpf = new THREE.Mesh(new THREE.CylinderGeometry(l * 0.18, l * 0.12, l, 8, 1), rumpfMat);
@@ -721,6 +838,43 @@ function baueStadt(T, gruppe, welt, viel, r) {
   const m4 = new THREE.Matrix4();
   pos.forEach(([x, y, z], k) => { m4.makeTranslation(x, y, z); mi.setMatrixAt(k, m4); ki.setMatrixAt(k, m4); });
   gruppe.add(mi, ki);
+}
+
+// ---------------------------------------------------------------- Schloss im Park (Königspark-Ring)
+
+// Ein Schloss mitten im Park: langer Bau mit zwei Flügeln, vier Türmen mit spitzem Dach und einem Kiesplatz davor.
+// Es steht an der Stelle innerhalb der Strecke, die am weitesten von der Fahrbahn weg ist.
+function baueSchloss(T, gruppe, welt, r) {
+  const nah = naeheGitter(T, 60);
+  let minx = Infinity, maxx = -Infinity, minz = Infinity, maxz = -Infinity;
+  for (let i = 0; i < T.n; i++) { minx = Math.min(minx, T.x[i]); maxx = Math.max(maxx, T.x[i]); minz = Math.min(minz, T.z[i]); maxz = Math.max(maxz, T.z[i]); }
+  let best = null;
+  for (let a = 1; a < 30; a++) for (let b = 1; b < 16; b++) {
+    const x = minx + (maxx - minx) * a / 30, z = minz + (maxz - minz) * b / 16, f = nah(x, z, 8);
+    if (f.i >= 0 && (!best || f.d > best.d)) best = { x, z, d: f.d, i: f.i };
+  }
+  if (!best || best.d < 110) return;
+  welt.schloss = best;
+  const M = hausMaterialien(false), teile = new Map();
+  const dazu = (mat, g) => { if (!teile.has(mat)) teile.set(mat, []); teile.get(mat).push(g); };
+  const y = T.y[best.i] - 0.5, { x, z } = best;
+  // das Schloss schaut zur nächsten Stelle der Strecke
+  const dreh = Math.atan2(T.x[best.i] - x, T.z[best.i] - z);
+  const ort = (lx, lz) => [x + lx * Math.cos(dreh) + lz * Math.sin(dreh), z - lx * Math.sin(dreh) + lz * Math.cos(dreh)];
+  const wand = M.putz[1], dach = new THREE.MeshStandardMaterial({ color: 0x4a5560, roughness: 0.7, flatShading: true });
+  const bau = (lx, lz, b, h, t) => { const [px, pz] = ort(lx, lz); dazu(wand, kiste(b, h, t, px, y, pz, dreh, [7, 25.6])); dazu(dach, giebel(t + 1, b + 1, Math.min(b, t) * 0.45, px, y + h, pz, dreh + Math.PI / 2)); };
+  bau(0, 0, 84, 17, 18);                                   // Hauptbau
+  for (const s of [-1, 1]) {
+    const [px, pz] = ort(s * 36, 22); dazu(wand, kiste(16, 14, 34, px, y, pz, dreh, [7, 25.6])); dazu(dach, giebel(17, 35, 7, px, y + 14, pz, dreh));   // Flügel nach vorn
+    for (const lz of [-9, 39]) {
+      const [tx, tz] = ort(s * 44, lz);
+      const turm = new THREE.CylinderGeometry(5, 5, 26, 14); turm.translate(tx, y + 13, tz); dazu(M.putz[0], turm);
+      const spitze = new THREE.ConeGeometry(6.2, 13, 14); spitze.translate(tx, y + 32.5, tz); dazu(dach, spitze);
+    }
+  }
+  // Kiesplatz vor dem Schloss
+  { const [px, pz] = ort(0, 34); const platz = new THREE.CylinderGeometry(26, 26, 0.5, 24); platz.translate(px, y + 0.3, pz); dazu(new THREE.MeshStandardMaterial({ map: TX.kies().map, roughness: 1 }), platz); }
+  for (const [mat, liste] of teile) gruppe.add(mesh(mergeGeometries(liste.map(g => g.index ? g.toNonIndexed() : g)), mat, true, true));
 }
 
 // ---------------------------------------------------------------- Wohnzimmer (Modellauto)

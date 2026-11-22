@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { baueWelt, gummiAuftragen, linieZeigen, stimmung } from './streckebau.js';
+import { baueWelt, gummiAuftragen, linieZeigen, stimmung, istDunkel } from './streckebau.js';
 import { baueAuto, autoStellen } from './autobau.js';
 import { baueRallye } from './rallyebau.js';
 import { MASSSTAB } from './strecke.js';
@@ -13,6 +13,20 @@ import { VerkehrBild } from './verkehrbau.js';
 import { baueWpWelt } from './wpbau.js';
 import { Spritzer } from './partikel.js';
 import { Funken, baueTurboFelder } from './funken.js';
+
+// Sternenhimmel für die Nacht: viele kleine helle Punkte auf einer großen Kugel um die Kamera
+function baueSterne() {
+  const pos = [], n = 1400; let a = 12345;
+  const zufall = () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; };
+  for (let k = 0; k < n; k++) {
+    const hoch = 0.06 + zufall() * 0.94, w = zufall() * Math.PI * 2, rr = Math.sqrt(1 - hoch * hoch);   // nur über dem Horizont
+    pos.push(Math.cos(w) * rr * 3000, hoch * 3000, Math.sin(w) * rr * 3000);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const p = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xdfe8ff, size: 2.2, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.85, depthWrite: false }));
+  p.frustumCulled = false;
+  return p;
+}
 
 export class Buehne {
   constructor(canvas, qualitaet = 'hoch') {
@@ -67,6 +81,7 @@ export class Buehne {
   // verkehr = der Verkehr aus dem Rennen (Supercar-Strecken), sonst null
   laden(T, autos, L, { linie = false, verkehr = null, etappe = null, felder = [] } = {}) {
     if (this.szene) this.aufraeumen();
+    this.sterne = null;
     const s = this.szene = new THREE.Scene();
     const def = T.def, st = stimmung(def), modell = !!def.modell;
     this.T = T; this.modell = modell;
@@ -84,7 +99,14 @@ export class Buehne {
       u.turbidity.value = st.truebe; u.rayleigh.value = st.rayleigh; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.85;
       u.sunPosition.value.copy(sonne);
       // trüber Tag (Rallye im Nebelwald): grauer Himmel statt Sonne und Blau
-      if (st.grau) s.background = new THREE.Color(st.nebel); else s.add(himmel);
+      if (st.grau) s.background = new THREE.Color(st.nebel);
+      else if (st.nacht) {
+        // Nacht: dunkler Himmel mit Sternen. Für die Spiegelungen im Lack steht die Sonne knapp unter dem Horizont (letztes Dämmerlicht).
+        s.background = new THREE.Color(st.nebel);
+        u.sunPosition.value.setFromSphericalCoords(1, THREE.MathUtils.degToRad(91.5), theta);
+        this.sterne = baueSterne(); s.add(this.sterne);
+      }
+      else s.add(himmel);
       // Spiegelungen im Lack kommen vom Himmel
       const hs = new THREE.Scene(); const h2 = new Sky(); h2.scale.setScalar(1000); h2.material = himmel.material; hs.add(h2);
       this.umgebung = pmrem.fromScene(hs, 0, 0.1, 2000).texture;
@@ -101,9 +123,9 @@ export class Buehne {
     pmrem.dispose();
 
     // Licht: Sonne (mit Schatten) und Himmelslicht
-    const hemi = new THREE.HemisphereLight(modell ? 0xfff4e6 : 0xcfe3ff, modell ? 0x6a5040 : 0x4a5a3a, modell ? 0.9 : 0.55 * st.himmel);
+    const hemi = new THREE.HemisphereLight(modell ? 0xfff4e6 : st.nacht ? 0x8fa6d8 : 0xcfe3ff, modell ? 0x6a5040 : st.nacht ? 0x3a3a48 : 0x4a5a3a, modell ? 0.9 : 0.55 * st.himmel);
     s.add(hemi);
-    const licht = this.licht = new THREE.DirectionalLight(def.welt.zeit === 'abend' ? 0xffb27a : 0xfff3e0, st.licht);
+    const licht = this.licht = new THREE.DirectionalLight(def.welt.zeit === 'abend' ? 0xffb27a : st.nacht ? 0xdfe8ff : 0xfff3e0, st.licht);
     licht.castShadow = r.shadowMap.enabled;
     const sm = this.qualitaet === 'hoch' ? 2048 : 1024;
     licht.shadow.mapSize.set(sm, sm);
@@ -128,7 +150,7 @@ export class Buehne {
       s.fog = new THREE.Fog(st.nebel, 900, weit * 0.95);
       this.kamera.far = weit; this.kamera.updateProjectionMatrix();
     }
-    this.verkehrBild = verkehr ? new VerkehrBild(s, verkehr, { abend: def.welt.zeit === 'abend', kamera: this.kamera }) : null;
+    this.verkehrBild = verkehr ? new VerkehrBild(s, verkehr, { abend: istDunkel(def), kamera: this.kamera }) : null;
     if (L) gummiAuftragen(this.welt, T, L);
     if (L && linie && !modell) linieZeigen(this.welt, T, L);
     if (modell) {
@@ -145,7 +167,7 @@ export class Buehne {
         : baueAuto({ farbe: c.farbe, zweit: c.zweit, num: c.nummer, massstab: T.sc });
       if (m.auge) c.a.auge = m.auge;   // für die Cockpit-Kamera
       if (m.blickTief) c.a.blickTief = m.blickTief;   // so weit schaut der Fahrer nach unten (damit man Lenkrad und Anzeige sieht)
-      if (m.scheinwerfer) m.scheinwerfer.emissiveIntensity = def.welt.zeit === 'abend' ? 3 : 1.2;
+      if (m.scheinwerfer) m.scheinwerfer.emissiveIntensity = istDunkel(def) ? 3 : 1.2;
       s.add(m.gruppe);
       return { c, m };
     });
@@ -205,6 +227,7 @@ export class Buehne {
 
     // Himmel wandert mit der Kamera mit (die Straßen-Strecken sind größer als der Himmel)
     if (this.himmel && this.T.strasse) this.himmel.position.copy(this.kamera.position);
+    if (this.sterne && this.szene === this.sterne.parent) this.sterne.position.copy(this.kamera.position);
     // Geist
     if (geistLage) {
       const g = this.geist; g.gruppe.visible = true;

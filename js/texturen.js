@@ -61,7 +61,7 @@ function normalAus(ctx, w, h, staerke = 2) {
 // ---------------------------------------------------------------- Fotos aus bilder/
 const FOTOS = {
   gras: 'bilder/gras.jpg', asphalt: 'bilder/asphalt.jpg',
-  baum_fichte: 'bilder/baum_fichte.webp', baum_laub: 'bilder/baum_laub.webp', baum_pinie: 'bilder/baum_pinie.webp', baum_zypresse: 'bilder/baum_zypresse.webp',
+  baum_fichte: 'bilder/baum_fichte.webp', baum_laub: 'bilder/baum_laub.webp', baum_pinie: 'bilder/baum_pinie.webp', baum_zypresse: 'bilder/baum_zypresse.webp', baum_palme: 'bilder/baum_palme.webp',
 };
 const fotos = {};
 let fotosLaufen = null;
@@ -124,6 +124,19 @@ export const gras = () => merk('gras', () => {
     x.globalAlpha = 0.5; x.fillRect(r() * w, r() * w, 1 + r() * 2, 2 + r() * 4);
   }
   x.globalAlpha = 1;
+  return { map: textur(c) };
+});
+
+// Dasselbe Gras-Bild ohne Farbe (nur hell und dunkel). Damit bestimmt allein die Farbe des Geländes, wie eine Stelle aussieht:
+// grüne Wiese, grauer Fels oder weißer Schnee. (Mit dem grünen Bild würde auch Schnee grün.)
+export const bodenGrau = () => merk('bodenGrau', () => {
+  const w = 256, [c, x] = leinwand(w);
+  x.drawImage(gras().map.image, 0, 0, w, w);
+  const d = x.getImageData(0, 0, w, w), p = d.data;
+  let summe = 0; for (let i = 0; i < p.length; i += 4) summe += p[i] * 0.3 + p[i + 1] * 0.59 + p[i + 2] * 0.11;
+  const mal = 205 / (summe / (p.length / 4));   // im Schnitt hellgrau, damit die Geländefarbe kaum dunkler wird
+  for (let i = 0; i < p.length; i += 4) { const g = Math.min(255, (p[i] * 0.3 + p[i + 1] * 0.59 + p[i + 2] * 0.11) * mal); p[i] = p[i + 1] = p[i + 2] = g; }
+  x.putImageData(d, 0, 0);
   return { map: textur(c) };
 });
 
