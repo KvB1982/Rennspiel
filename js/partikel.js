@@ -91,9 +91,12 @@ export class Spritzer {
 
   // Das Auto wirft hinter den Rädern etwas hoch – je nach Untergrund und Tempo
   auto(a, dt) {
-    const sh = Math.sin(a.h), ch = Math.cos(a.h);
-    const vx = sh * a.u + ch * a.v, vz = ch * a.u - sh * a.v, v = Math.hypot(vx, vz);
+    const sh0 = Math.sin(a.h), ch0 = Math.cos(a.h);
+    const vx = sh0 * a.u + ch0 * a.v, vz = ch0 * a.u - sh0 * a.v, v = Math.hypot(vx, vz);
     const p = a.p, b = p.b || 1.3, aa = p.a || 1.2;
+    // Im Drift steht das Auto im Bild quer (um die Vorderachse gedreht): Staub und Steine kommen von dort, wo die Räder zu sehen sind
+    const dw = a.drift || 0, sh = Math.sin(a.h + dw), ch = Math.cos(a.h + dw);
+    const ax = a.x + (dw ? aa * (sh0 - sh) : 0), az = a.z + (dw ? aa * (ch0 - ch) : 0);
     // gelandet nach einem Sprung: eine große Staubwolke
     if (this.warLuft && !a.luft && v > 8) this.wolke(a, Math.min(1, v / 35));
     this.warLuft = !!a.luft;
@@ -103,7 +106,7 @@ export class Spritzer {
     const zahl = (rate) => { const m = rate * dt * this.viel; return Math.floor(m) + (Math.random() < m % 1 ? 1 : 0); };
     for (const seite of [-1, 1]) {
       // Hinterrad (in der Welt)
-      const hx = a.x - sh * b + ch * seite * 0.78, hz = a.z - ch * b - sh * seite * 0.78, y = a.y + 0.15;
+      const hx = ax - sh * b + ch * seite * 0.78, hz = az - ch * b - sh * seite * 0.78, y = a.y + 0.15;
       const zuf = s => (Math.random() - 0.5) * s;
       if (grund === BELAG.schotter || grund === BELAG.kies) {
         for (let k = zahl(Math.min(60, v * 1.1) * (0.5 + dreh)); k--;) this.neu('staub', hx + zuf(0.6), y + 0.2, hz + zuf(0.6), vx * 0.5 + zuf(2), 0.6 + Math.random() * 1.2, vz * 0.5 + zuf(2));
@@ -115,7 +118,7 @@ export class Spritzer {
         // Wasser: zu beiden Seiten hoch hinaus (wie Flügel), vorne und hinten
         const st = Math.min(1.6, v / 18);
         for (const vorn of [1, 0]) {
-          const ox = vorn ? a.x + sh * aa + ch * seite * 0.8 : hx, oz = vorn ? a.z + ch * aa - sh * seite * 0.8 : hz;
+          const ox = vorn ? ax + sh * aa + ch * seite * 0.8 : hx, oz = vorn ? az + ch * aa - sh * seite * 0.8 : hz;
           for (let k = zahl(v * 5 * st); k--;) {
             const raus = 2 + Math.random() * 4 * st;
             this.neu('wasser', ox, a.y + 0.2, oz, vx * 0.55 + ch * seite * raus + zuf(1.5), 2 + Math.random() * 4.5 * st, vz * 0.55 - sh * seite * raus + zuf(1.5));
