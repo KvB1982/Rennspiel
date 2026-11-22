@@ -1,13 +1,19 @@
 // Rennspiel – wo die Kamera steht.
 //   hinten   = hinter dem Auto, schräg von oben (folgt weich)
 //   weit     = wie hinten, aber höher und weiter weg
-//   cockpit  = du sitzt im Auto am Lenkrad
+//   cockpit  = du sitzt im Auto am Lenkrad (Rennwagen, Supercars und Rallyeautos)
 //   stand    = Modellauto: du stehst an einer Stelle neben der Bahn und drehst nur den Kopf
 
 import * as THREE from 'three';
 import { MASSSTAB } from './strecke.js';
 
-export const SICHTEN = { hinten: 'Hinter dem Auto', weit: 'Hinter dem Auto (weit)', haube: 'Auf der Motorhaube', cockpit: 'Im Cockpit', stand: 'Neben der Bahn stehen' };
+export const SICHTEN = { hinten: 'Hinter dem Auto', weit: 'Hinter dem Auto (weit)', cockpit: 'Im Cockpit', stand: 'Neben der Bahn stehen' };
+
+// Kopfneigung: In der Kurve legt sich das Bild schräg, als würde man den Kopf in die Kurve legen.
+// KOPF = so viel pro "g" Kurvenkraft (rad), KOPF_MAX = höchstens (0,13 rad sind gut 7 Grad).
+// Im Cockpit ist sie immer an. Hinter dem Auto ist sie etwas sanfter und im Menü abschaltbar ("Kopf neigt sich in die Kurve").
+const KOPF = { super: 0.09, formel: 0.045, rallye: 0.06 }, KOPF_MAX = 0.13, KOPF_MAX_RALLYE = 0.09;   // Rallye: weniger, dort geht es dauernd links und rechts
+const KOPF_HINTEN = 0.8, KOPF_HINTEN_MAX = 0.1, KOPF_WEICH = 5;   // hinter dem Auto: Anteil, höchstens (rad), wie schnell das Bild folgt
 
 export class Kamera {
   constructor(cam) {
@@ -18,10 +24,11 @@ export class Kamera {
     this.frisch = true;
     this.standNr = 0;
     this.wackeln = 0;
+    this.kopf = 0;              // so schräg steht das Bild gerade (hinter dem Auto)
   }
-  setze(modus) { this.modus = modus; this.frisch = true; }
+  setze(modus) { this.modus = modus === 'haube' ? 'cockpit' : modus; this.frisch = true; }   // die Motorhauben-Kamera gibt es nicht mehr
 
-  update(dt, a, { modell = false, standorte = [], massstab = MASSSTAB } = {}) {
+  update(dt, a, { modell = false, standorte = [], massstab = MASSSTAB, kopfNeigen = true } = {}) {
     const cam = this.cam, sc = modell ? massstab : 1;
     const sh = Math.sin(a.h), ch = Math.cos(a.h);
     const speed = Math.abs(a.u) / a.p.vMax;
@@ -54,24 +61,30 @@ export class Kamera {
       return;
     }
 
-    if (this.modus === 'cockpit' || this.modus === 'haube') {
+    // So stark drückt die Kurve zur Seite (in "g", plus = Linkskurve) – daraus wird die Kopfneigung
+    const kurveG = a.u * a.r / 9.81;
+    const kopfJeG = rallye ? KOPF.rallye : a.p.super ? KOPF.super : KOPF.formel;
+
+    if (this.modus === 'cockpit') {
       // Augen des Fahrers: hinter dem Lenkrad, knapp über dem Rand
       // Supercar: Augen links im Auto, höher (a.auge kommt vom 3D-Modell)
-      // Motorhaube (Rallye): Kamera vorn auf der Haube, ganz tief – so wirkt das Tempo am stärksten
-      const haube = this.modus === 'haube';
-      // Motorhaube im Drift: Die Kamera sitzt auf dem Auto und dreht sich mit ihm quer (um die Vorderachse)
-      const dw = haube ? (a.drift || 0) : 0, sh = Math.sin(a.h + dw), ch = Math.cos(a.h + dw);
-      const [ex, ey, ez] = haube ? [0, 1.66, 0.55] : a.auge ? [a.auge[0], a.auge[1], a.auge[2]] : [0, 0.92, -0.12];
+      // Rallye im Drift: Das Auto dreht sich im Bild um seine Vorderachse (siehe autoStellen) – du sitzt drin und drehst dich mit.
+      // Der Kopf schaut dabei halb zurück in Fahrtrichtung (DRIFT_BLICK), so wie ein Fahrer im Drift durch die Seite der Scheibe schaut.
+      const DRIFT_BLICK = 0.5;
+      const dw = a.drift || 0, vorn = dw ? (a.p.a || 0) : 0;
+      const sh = Math.sin(a.h + dw), ch = Math.cos(a.h + dw);
+      const bx = a.x + vorn * (Math.sin(a.h) - sh), bz = a.z + vorn * (Math.cos(a.h) - ch);   // hier steht das Auto im Bild
+      const bh = a.h + dw * (1 - DRIFT_BLICK), bs = Math.sin(bh), bc = Math.cos(bh);           // dorthin schaut der Kopf
+      const [ex, ey, ez] = a.auge ? [a.auge[0], a.auge[1], a.auge[2]] : [0, 0.92, -0.12];
       // Der Kopf des Fahrers neigt sich in die Kurve hinein (bis etwa 7 Grad) – so spürt man die Kurve im Cockpit
-      const nick = a.neigung, roll = Math.max(-0.13, Math.min(0.13, a.u * a.r / 9.81 * (a.p.super ? 0.09 : 0.045)));
-      cam.position.set(a.x + sh * ez + ch * ex, a.y + ey, a.z + ch * ez - sh * ex).multiplyScalar(1);
+      const nick = a.neigung, kMax = rallye ? KOPF_MAX_RALLYE : KOPF_MAX, roll = Math.max(-kMax, Math.min(kMax, kurveG * kopfJeG));
+      cam.position.set(bx + sh * ez + ch * ex, a.y + ey, bz + ch * ez - sh * ex);
       if (modell) { cam.position.set(a.x + sh * ez * sc, a.y + ey * sc, a.z + ch * ez * sc); }
       cam.position.x += zit(); cam.position.y += zit();
-      const vorX = a.x + sh * 30 * sc, vorZ = a.z + ch * 30 * sc;
-      cam.up.set(Math.cos(a.h) * roll, 1, -Math.sin(a.h) * roll);
-      cam.lookAt(vorX + ch * ex, a.y + (ey - (haube ? 1.6 : a.auge ? 1.2 : 1.6) - nick * 20 + (a.nick || 0) * 30) * sc, vorZ - sh * ex);
+      cam.up.set(bc * roll, 1, -bs * roll);
+      cam.lookAt(cam.position.x + bs * 30 * sc, a.y + (ey - (a.auge ? 1.2 : 1.6) - nick * 20 + (a.nick || 0) * 30) * sc, cam.position.z + bc * 30 * sc);
       cam.up.set(0, 1, 0);
-      const fov = (haube ? 64 + speed * 24 : 60 + speed * (rallye ? 14 : 10)) + this.schub * 5;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
+      const fov = 60 + speed * (rallye ? 20 : 10) + this.schub * 5;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
       cam.fov += (fov - cam.fov) * Math.min(1, dt * 3); cam.near = modell ? 0.002 : 0.05;
       cam.updateProjectionMatrix();
       this.frisch = false;
@@ -89,7 +102,12 @@ export class Kamera {
     if (this.frisch) this.pos.copy(ziel); else this.pos.lerp(ziel, 1 - Math.exp(-dt * 20));
     // nicht unter die Fahrbahn
     cam.position.copy(this.pos); cam.position.x += zit(); cam.position.y += zit();
+    // Kopfneigung auch hinter dem Auto (nur große Autos, abschaltbar): Das Bild legt sich weich in die Kurve
+    const kopfZiel = kopfNeigen && !modell ? Math.max(-KOPF_HINTEN_MAX, Math.min(KOPF_HINTEN_MAX, kurveG * kopfJeG * KOPF_HINTEN)) : 0;
+    this.kopf = this.frisch ? kopfZiel : this.kopf + (kopfZiel - this.kopf) * Math.min(1, dt * KOPF_WEICH);
+    cam.up.set(rc * this.kopf, 1, -rs * this.kopf);
     cam.lookAt(a.x + rs * 3.5 * sc, a.y + (weit ? 0.3 : 0.75) * sc, a.z + rc * 3.5 * sc);
+    cam.up.set(0, 1, 0);
     const fov = (weit ? 46 : 48) + speed * (rallye ? 32 : 15) + this.schub * 7;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
     cam.fov += (fov - cam.fov) * Math.min(1, dt * 3);
     cam.near = modell ? 0.005 : 0.1;
