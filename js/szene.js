@@ -144,6 +144,7 @@ export class Buehne {
       const m = sup ? baueSupercar(c.a.art, { farbe: c.farbe }) : c.a.art === 'drift' ? baueRallye({ farbe: c.farbe, zweit: c.zweit, num: c.nummer, massstab: T.sc })
         : baueAuto({ farbe: c.farbe, zweit: c.zweit, num: c.nummer, massstab: T.sc });
       if (m.auge) c.a.auge = m.auge;   // für die Cockpit-Kamera
+      if (m.blickTief) c.a.blickTief = m.blickTief;   // so weit schaut der Fahrer nach unten (damit man Lenkrad und Anzeige sieht)
       if (m.scheinwerfer) m.scheinwerfer.emissiveIntensity = def.welt.zeit === 'abend' ? 3 : 1.2;
       s.add(m.gruppe);
       return { c, m };
@@ -194,7 +195,9 @@ export class Buehne {
       m.helm[0].visible = m.helm[1].visible = !imAuto;
       for (const h of m.halo) h.visible = !imAuto;   // der Bügel wäre sonst genau vor den Augen
       if (m.innen) m.innen.visible = imAuto;
+      if (imAuto && m.zeige) m.zeige(c.a, this.modell ? 1 / this.T.sc : 1);   // Anzeige im Cockpit: Tempo, Gang, Drehzahl
       if (m.dachHaut) m.dachHaut.visible = !imAuto;
+      if (m.huelle) m.huelle.visible = !imAuto;        // die Hülle läge sonst mitten im Innenraum (die Haube gibt es innen noch einmal)
       if (m.sicht) m.sicht(imAuto);                    // fertiges Modell von außen, selbst gebautes Auto im Cockpit           // Supercar: Armaturenbrett und Lenkrad nur von innen
     }
     if (this.verkehrBild) this.verkehrBild.update();
