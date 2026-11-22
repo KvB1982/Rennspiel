@@ -85,7 +85,7 @@ export class Kamera {
       if (modell) { cam.position.set(a.x + (sh * ez + ch * ex) * sc, a.y + ey * sc, a.z + (ch * ez - sh * ex) * sc); }
       cam.position.x += zit(); cam.position.y += zit();
       cam.up.set(bc * roll, 1, -bs * roll);
-      cam.lookAt(cam.position.x + bs * 30 * sc, a.y + (ey - (a.auge ? 1.2 : 1.6) - nick * 20 + (a.nick || 0) * 30) * sc, cam.position.z + bc * 30 * sc);
+      cam.lookAt(cam.position.x + bs * 30 * sc, a.y + (ey - (a.blickTief ?? (a.auge ? 1.2 : 1.6)) - nick * 20 + (a.nick || 0) * 30) * sc, cam.position.z + bc * 30 * sc);
       cam.up.set(0, 1, 0);
       const fov = 60 + speed * (rallye ? 20 : 10) + this.schub * 5;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
       cam.fov += (fov - cam.fov) * Math.min(1, dt * 3); cam.near = modell ? 0.002 : 0.05;

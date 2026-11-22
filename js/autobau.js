@@ -5,6 +5,7 @@
 // Vorn ist +z, links ist +x (so passt es zur Fahrphysik). Der Nullpunkt liegt zwischen den Achsen (Schwerpunkt).
 
 import * as THREE from 'three';
+import { baueLenkrad, stab, klotz } from './cockpit.js';
 import { nummer } from './texturen.js';
 import { echtesAuto, lackMaterial } from './automodelle.js';
 
@@ -163,16 +164,31 @@ export function baueAuto({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massstab
   // Rückspiegel
   for (const s of [-1, 1]) { add(stange([s * 0.33, 0.6, 0.45], [s * 0.55, 0.66, 0.5], 0.012, karbon)); add(kiste(0.13, 0.055, 0.035, lack, s * 0.58, 0.67, 0.5)); }
 
-  // Lenkrad (sieht man nur aus dem Cockpit gut)
-  const lenkrad = new THREE.Group();
-  const lr = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.13, 0.04), karbon); lenkrad.add(lr);
-  for (const s of [-1, 1]) { const griff = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.12, 8), mats.reifen); griff.position.x = s * 0.15; lenkrad.add(griff); }
-  const anzeige = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.05), new THREE.MeshStandardMaterial({ color: 0x0a0a0a, emissive: 0x2a8f2a, emissiveIntensity: 0.6 }));
-  anzeige.position.set(0, 0.01, 0.021); anzeige.rotation.y = Math.PI; lenkrad.add(anzeige);
-  const knoepfe = [0xff3030, 0x30a0ff, 0xffc020, 0x30d060];
-  knoepfe.forEach((c, k) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.01, 8), new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.3 })); b.rotation.x = Math.PI / 2; b.position.set((k < 2 ? -1 : 1) * 0.085, (k % 2 ? -1 : 1) * 0.035, 0.022); lenkrad.add(b); });
-  lenkrad.position.set(0, 0.71, 0.36); lenkrad.rotation.x = -0.35;
-  add(lenkrad);
+  // ---------- Cockpit (nur zu sehen, wenn die Kamera im Auto sitzt) ----------
+  // Lenkrad mit eigenem Bildschirm (zeigt wirklich Gang, Tempo und Drehzahl), Hände in Handschuhen,
+  // gepolsterter Rand rund um den Fahrer, kleine Windschutzscheibe, Glas in den Rückspiegeln.
+  const innen = new THREE.Group(); koerper.add(innen);
+  const lenk = baueLenkrad('formel', { naht: zweit, handschuh: 0x1a1b1e, aermel: 0x22252b, arm: [0.03, -0.15, -0.1], armDick: 0.85, weit: 1.25 });
+  const lenkrad = lenk.gruppe; lenk.halter.position.set(0, 0.81, 0.3); lenk.halter.rotation.x = 0.3; innen.add(lenk.halter);
+  innen.add(stab([0, 0.8, 0.32], [0, 0.74, 0.62], 0.022, karbon));                 // Lenksäule
+  const polster = new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.95 });
+  const rand = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.28, 0.785, -0.5), new THREE.Vector3(0.3, 0.775, -0.05), new THREE.Vector3(0.26, 0.77, 0.4), new THREE.Vector3(0.14, 0.77, 0.66),
+    new THREE.Vector3(0, 0.775, 0.72), new THREE.Vector3(-0.14, 0.77, 0.66), new THREE.Vector3(-0.26, 0.77, 0.4), new THREE.Vector3(-0.3, 0.775, -0.05), new THREE.Vector3(-0.28, 0.785, -0.5)]);
+  innen.add(new THREE.Mesh(new THREE.TubeGeometry(rand, 40, 0.026, 8), polster));
+  innen.add(klotz(0.5, 0.012, 0.95, karbon, 0, 0.745, 0));                        // dunkle Wanne unter dem Rand (statt Lack)
+  // Windschutzscheibe: ein kleiner dunkler Bogen vor dem Lenkrad
+  const scheibe = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.07, 16, 1, true, -0.9, 1.8),
+    new THREE.MeshStandardMaterial({ color: 0x10151c, roughness: 0.1, metalness: 0.5, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
+  scheibe.position.set(0, 0.835, 0.55); innen.add(scheibe);
+  // Glas in den Rückspiegeln und zwei Kopfpolster in Teamfarbe
+  const glas = new THREE.MeshStandardMaterial({ color: 0xcfd6de, roughness: 0.08, metalness: 1 });
+  for (const s of [-1, 1]) {
+    innen.add(klotz(0.11, 0.042, 0.004, glas, s * 0.58, 0.67, 0.481));
+    innen.add(klotz(0.07, 0.12, 0.5, akzent, s * 0.25, 0.86, -0.42));
+  }
+  innen.traverse(o => { o.castShadow = false; });
+  innen.visible = false;
 
   // Startnummer oben auf der Nase
   const nr = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), new THREE.MeshStandardMaterial({ map: nummer(num, '#fff'), transparent: true, roughness: 0.4 }));
@@ -213,7 +229,8 @@ export function baueAuto({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massstab
 
   auto.scale.setScalar(massstab);
   auto.traverse(o => { if (o.isMesh) o.castShadow = true; });
-  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, licht, helm: [helm, visier], halo, massstab, sicht };
+  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, lenkStellen: lenk.stelle, zeige: (a, mal) => lenk.anzeige.male(a, mal), innen, auge: [0, 0.93, -0.2], blickTief: 2.4,
+    licht, helm: [helm, visier], halo, massstab, sicht };
 }
 
 // Das Auto im Bild auf den Stand der Physik bringen
@@ -229,6 +246,6 @@ export function autoStellen(m, a, uhr = 0) {
   for (const v of m.lenkVorn) v.rotation.y = a.lenk - dw;   // im Drift zeigen die Vorderräder dorthin, wo es hingeht (Gegenlenken)
   const dreh = a.radDreh;
   for (const r of m.raeder) r.rotation.x = dreh;
-  m.lenkrad.rotation.z = -a.lenk * 6;
+  if (m.lenkStellen) m.lenkStellen(-a.lenk * 6); else m.lenkrad.rotation.z = -a.lenk * 6;   // neue Lenkräder: Die Arme gehen mit
   m.licht.material.emissiveIntensity = a.brems > 0.1 ? 3 : 0.3;
 }
