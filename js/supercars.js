@@ -29,7 +29,8 @@ const BASIS = {
   // Arcade-Hilfe (nur für dich, siehe physik.js): lenk = bei Tempo so viel mehr Lenkeinschlag, folgen = so schnell folgen die Räder,
   // griff = so viel Drehen lässt der Lenk-Helfer zu, ein/fang = wie stark er beim Einlenken hilft / das Heck fängt,
   // frei = so viel Driften (Winkel) bleibt ohne Reifen-Helfer, halt = wie stark er das Rutschen zurückholt, rand = Strecken-Helfer
-  arcade: { lenk: 1.6, folgen: 24, griff: 1.3, ein: 9, fang: 4, frei: 0.14, halt: 1.6, rand: 3.5 },
+  // zug = so viel Zugkraft bleibt auch mitten in der Kurve und im Drift, kurve = so viel schneller als der Tempo-Plan lässt die Bremshilfe in die Kurve
+  arcade: { lenk: 1.6, folgen: 24, griff: 1.3, ein: 9, fang: 4, frei: 0.14, halt: 1.6, rand: 3.5, zug: 0.6, kurve: 1.06 },
   gaenge: 7, drehzahlMax: 8500, rueck: 8, abregeln: true,
   schritte: 8, unten: 3,
   tcRest: 0.82,                     // Traktionskontrolle lässt mehr Haftung für die Kurve übrig als beim Rennwagen
