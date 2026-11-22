@@ -28,13 +28,15 @@ const STANDARD = {
   rallyeauto: 'sturmfalke', lack_rallye: 0, beifahrer: 'beides', kamera_rallye: 'hinten',
   supercar: 'falkner', lack: 0, verkehr: 'normal', runden_super: 1, gegner_super: 5,
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
+  kamera_klein: 'hinten',   // kleine Autos: hinter dem Auto, im Cockpit oder neben der Bahn stehen ('stand')
   bremshilfe: true, lenkhilfe: false, traktion: true, arcade: true, autogas: false, grafik: 'hoch', linie: true, boxen: true,
   neigStufe: 3,    // wie weit man das Gerät dafür neigen muss (2 = weit … 5 = ganz wenig; Grad stehen in VOLL in neigung.js)
   neigen: false,   // dieses Gerät selbst neigen (Gas und Bremse auf dem Bildschirm), wenn kein Handy-Lenkrad verbunden ist
 };
-// Höchsttempo der kleinen Autos in Metern pro Sekunde. 3 m/s sehen beim Maßstab 1:30 aus wie 325 km/h.
+// Höchsttempo der kleinen Autos in Metern pro Sekunde. 1,8 m/s sehen beim Maßstab 1:30 aus wie knapp 200 km/h.
+// (Ferngesteuertes Auto: Das ist das Tempo auf der Geraden – in den Kurven bestimmt die Haftung, wie schnell es geht.)
 // Drift-Rallye (Maßstab 1:43): 1,2 m/s sehen aus wie gut 180 km/h – langsam genug, um das Auto quer zu halten.
-const TEMPO = { modell: { langsam: 0.8, mittel: 1.1, schnell: 1.5 }, slot: { langsam: 2.6, mittel: 3.5, schnell: 4.5 }, drift: { langsam: 0.7, mittel: 0.9, schnell: 1.15 } };
+const TEMPO = { modell: { langsam: 1.2, mittel: 1.8, schnell: 2.4 }, slot: { langsam: 2.6, mittel: 3.5, schnell: 4.5 }, drift: { langsam: 0.7, mittel: 0.9, schnell: 1.15 } };
 const streckenFeld = () => E.fahrzeug === 'modell' ? 'strecke_modell' : E.fahrzeug === 'slot' ? 'strecke_slot' : E.fahrzeug === 'drift' ? 'strecke_drift' : E.fahrzeug === 'super' ? 'strecke_super' : E.fahrzeug === 'rallye' ? 'strecke_rallye' : 'strecke';
 // Wie viel Verkehr: Zahl für verkehr.js (0 = keiner)
 const VERKEHR = { aus: 0, wenig: 0.5, normal: 1, viel: 1.6 };
@@ -51,7 +53,7 @@ const ladeGeist = (id, art) => { try { return JSON.parse(localStorage.getItem(be
 const speichereGeist = (id, art, g) => { try { localStorage.setItem(bestKey(id, art), JSON.stringify(g)); } catch (e) {} };
 
 // Bestzeiten der kleinen Autos gelten je Höchsttempo (sonst wären sie nicht vergleichbar)
-const geistArt = () => E.fahrzeug === 'f1' ? '' : E.fahrzeug === 'super' ? '.' + E.supercar : E.fahrzeug === 'rallye' ? '.' + E.rallyeauto : '.' + E.tempo + (E.fahrzeug === 'slot' ? '' : '.2');   // .2: seit die kleinen Autos langsamer fahren, zählen die alten Bestzeiten nicht mehr
+const geistArt = () => E.fahrzeug === 'f1' ? '' : E.fahrzeug === 'super' ? '.' + E.supercar : E.fahrzeug === 'rallye' ? '.' + E.rallyeauto : '.' + E.tempo + (E.fahrzeug === 'slot' ? '' : '.3');   // .3: seit es Turbo und die Arcade-Hilfe für die kleinen Autos gibt, zählen die alten Bestzeiten nicht mehr
 // Die ganze Rallye: drei Prüfungen nacheinander
 const RALLYE_FOLGE = ['wp_seen', 'wp_nebel', 'wp_pass'];
 const streckenCache = new Map();
@@ -137,13 +139,14 @@ export function starteSpiel() {
       zeile('Runden', 'runden', (modell ? [3, 5, 10, 20] : [1, 3, 5, 10]).map(n => [n, String(n)]), rennenAn);
     }
     if (!modell && !rallye) zeile('Kamera', 'kamera', [['hinten', 'hinter dem Auto'], ['weit', 'weiter weg'], ['cockpit', 'im Cockpit']]);
+    zeile('Kamera', 'kamera_klein', [['hinten', 'hinter dem Auto'], ['cockpit', 'im Cockpit'], ['stand', 'neben der Bahn']], modell);
     zeile('Höchsttempo', 'tempo', [['langsam', 'langsam'], ['mittel', 'mittel'], ['schnell', 'schnell']], modell);
     zeile('Tanken und Reifen', 'boxen', [[true, 'an'], [false, 'aus']], modell && rennenAn && !drift);
     zeile('Ideallinie und Bremszonen', 'linie', [[true, 'an'], [false, 'aus']], !modell && !rallye);
     zeile('Bremshilfe', 'bremshilfe', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Lenkhilfe', 'lenkhilfe', [[true, 'an'], [false, 'aus']], !slot);
     // Arcade-Hilfe (Rennwagen und Supercars): direkte Lenkung, und der Computer hilft unsichtbar, auf der Straße zu bleiben
-    zeile('Fahrgefühl', 'arcade', [[true, 'Arcade'], [false, 'echter']], !modell);
+    zeile('Fahrgefühl', 'arcade', [[true, 'Arcade'], [false, 'echter']], !modell || E.fahrzeug === 'modell');
     zeile('Traktionskontrolle', 'traktion', [[true, 'an'], [false, 'aus']], !slot && !drift);
     // Drift-Hilfe: dreht das Auto zurück, bevor es sich ganz quer stellt (gleiche Einstellung wie die Traktionskontrolle)
     zeile('Drift-Hilfe', 'traktion', [[true, 'an'], [false, 'aus (schwer)']], drift);
@@ -174,9 +177,9 @@ export function starteSpiel() {
     ton.querySelectorAll('button').forEach((b, k) => b.addEventListener('click', () => { klang.schalten(k === 0); menueBauen(); }));
     ein.appendChild(ton);
     $('mBest').textContent = rallye ? 'Rallye: Du fährst allein gegen die Uhr, die anderen Fahrer sind schon gefahren. Hör auf deinen Beifahrer: Die Zahl sagt, wie eng die Kurve ist (1 = Haarnadel, 6 = fast gerade), „und“ heißt, die nächste kommt gleich danach. Auf Schotter driftet das Auto – lenk dagegen und gib Gas. Handbremse: Leertaste oder Gas und Bremse zugleich. Nicht schneiden: Innen liegen Felsen!'
-      : drift ? 'Drift-Rallye: Du lenkst, wohin das Auto fährt. Je mehr du einlenkst und Gas gibst, desto schräger stellt es sich – Gas weg oder gerade lenken, und es fängt sich wieder. Handbremse für Haarnadeln: Gas und Bremse gleichzeitig (Tastatur: Leertaste). Je schräger und schneller du rutschst, desto mehr Drift-Punkte. Hängst du Drifts aneinander, steigt der Faktor bis x5. In die Bande = Drift verloren. Mit 🎥 wechselst du die Stelle, an der du stehst.'
-      : slot ? 'Slotcar: Du gibst nur Gas. Vor der Kurve vom Gas gehen, sonst fliegt das Auto raus! Spur wechseln: an einer gelben Weiche nach links oder rechts lenken. Boxengasse: auf der rechten Spur an der Einfahrt nach rechts lenken und im blauen Feld anhalten. Mit 🎥 wechselst du die Stelle, an der du stehst.'
-      : modell ? 'Ferngesteuertes Auto: Du stehst neben der Bahn. Tanken und Reifen wechseln: in der Boxengasse rechts neben der Startgeraden im blauen Feld anhalten. Mit 🎥 wechselst du die Stelle, an der du stehst.'
+      : drift ? 'Drift-Rallye: Du lenkst, wohin das Auto fährt. Je mehr du einlenkst und Gas gibst, desto schräger stellt es sich – Gas weg oder gerade lenken, und es fängt sich wieder. Handbremse für Haarnadeln: Gas und Bremse gleichzeitig (Tastatur: Leertaste). Je schräger und schneller du rutschst, desto mehr Drift-Punkte. Hängst du Drifts aneinander, steigt der Faktor bis x5. In die Bande = Drift verloren. Drift-Turbo: Beim Driften sprühen Funken – erst blau, dann orange, dann rosa. Stellst du das Auto wieder gerade und gibst Gas, zündet der Turbo! Die leuchtenden Pfeile auf der Matte sind Turbo-Felder. Mit 🎥 wechselst du die Kamera.'
+      : slot ? 'Slotcar: Du gibst nur Gas. Vor der Kurve vom Gas gehen, sonst fliegt das Auto raus! Spur wechseln: an einer gelben Weiche nach links oder rechts lenken. Boxengasse: auf der rechten Spur an der Einfahrt nach rechts lenken und im blauen Feld anhalten. Mit 🎥 wechselst du die Kamera.'
+      : modell ? 'Ferngesteuertes Auto: Es fährt wie ein kleiner Rennwagen – auf der Geraden schaltet es bis in den 6. Gang, vor der Kurve bremst die Bremshilfe. Drift-Turbo: Fährst du hart durch die Kurve, stellt sich das Auto quer und Funken sprühen (blau, orange, rosa). Am Kurvenausgang zündet der Turbo! Noch weiter quer: Gas und Bremse gleichzeitig (Tastatur: Leertaste). Leuchtende Pfeile auf der Bahn sind Turbo-Felder. Tanken und Reifen wechseln: in der Boxengasse rechts neben der Startgeraden im blauen Feld anhalten. Mit 🎥 wechselst du die Kamera: hinter dem Auto, im Cockpit oder neben der Bahn.'
       : sup ? 'Supercar: Rechts fährt der Verkehr in deine Richtung, links kommt dir Gegenverkehr entgegen. Auf der Autobahn ist der Gegenverkehr hinter der Mittelmauer. Überhol vorsichtig!' : '';
   };
   // Karten der Supercars: Bild des Autos in der gewählten Lackfarbe, Name, Vorbild, Leistung
@@ -257,8 +260,8 @@ export function starteSpiel() {
       rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
       if (rennen.ich) { rennen.ich.a.tc = E.traktion ? true : false; rennen.ich.a.arcade = E.arcade !== false; }
       eingabe.autoGas = E.autogas && !slot;
-      eingabe.sanft = E.fahrzeug === 'modell' ? 0.5 : 1;
-      eingabe.handbremseDa = drift || rallye;
+      eingabe.sanft = 1;   // (früher lenkten die Tasten beim ferngesteuerten Auto langsamer – jetzt soll es direkt einlenken)
+      eingabe.handbremseDa = drift || rallye || E.fahrzeug === 'modell';
       if (E.modus === 'zeit' || rallye) {
         const g = ladeGeist(id, E.fahrzeug + geistArt());
         if (g) { rennen.setzeGeist(g); }
@@ -269,21 +272,22 @@ export function starteSpiel() {
       }
       rennen.wennBestzeit = rennen.wennBestzeit || null;
       if (!buehne || buehne.qualitaet !== E.grafik) { buehne = new Buehne($('bild'), E.grafik); app.buehne = buehne; }
-      buehne.laden(T, rennen.autos, rennen.L, { linie: E.linie, verkehr: rennen.verkehr, etappe: rallye ? rennen : null });
+      buehne.laden(T, rennen.autos, rennen.L, { linie: E.linie, verkehr: rennen.verkehr, etappe: rallye ? rennen : null, felder: rennen.felder || [] });
       $('hEinheit').textContent = modell ? 'km/h im Maßstab' : 'km/h';
       kamera = new Kamera(buehne.kamera);
-      kamera.setze(modell ? 'stand' : rallye ? E.kamera_rallye : E.kamera);
+      kamera.setze(modell ? E.kamera_klein : rallye ? E.kamera_rallye : E.kamera);
       groesse();
       zeige('menue', false); zeige('laden', false); zeige('ergebnis', false); zeige('pause', false); zeige('hud', true);
       eingabe.neigung.kalibrieren();   // so wie man das Gerät beim Start hält, ist „geradeaus“
       pedaleZeigen();
-      $('hHilfe').textContent = eingabe.quelle === 'handy' || empfang.verbunden ? (slot ? 'Spur wechseln: an einer gelben Weiche nach links oder rechts lenken' : drift || rallye ? 'Handbremse: Gas und Bremse gleichzeitig' : '')
+      $('hHilfe').textContent = eingabe.quelle === 'handy' || empfang.verbunden ? (slot ? 'Spur wechseln: an einer gelben Weiche nach links oder rechts lenken' : drift || rallye ? 'Handbremse: Gas und Bremse gleichzeitig' : E.fahrzeug === 'modell' ? 'Quer stellen: Gas und Bremse gleichzeitig' : '')
         : eingabe.neigung.an && (drift || rallye) ? 'Gerät wie ein Lenkrad drehen   Gas rechts, Bremse links   Handbremse: beide zugleich'
         : eingabe.neigung.an ? (slot ? 'Gerät neigen = Spur wechseln (an einer gelben Weiche)   Gas rechts, Bremse links' : 'Gerät wie ein Lenkrad drehen   Gas rechts, Bremse links (im Stand: rückwärts)   Mitte neu setzen: Pause ⏸')
         : E.neigen && neigenGeht ? 'Der Bewegungssensor ist nicht erlaubt – Seite neu laden und „Erlauben“ tippen'
-        : drift ? 'Lenken ← →   Gas ↑   Bremse ↓   Handbremse Leertaste   Standort C   Pause P   Zurück auf die Matte R'
+        : drift ? 'Lenken ← →   Gas ↑   Bremse ↓   Handbremse Leertaste   Kamera C   Pause P   Zurück auf die Matte R'
+        : E.fahrzeug === 'modell' ? 'Lenken ← →   Gas ↑   Bremse ↓ (im Stand: rückwärts)   Quer stellen Leertaste   Kamera C   Pause P   Zurück auf die Strecke R'
         : rallye ? 'Lenken ← →   Gas ↑   Bremse ↓   Handbremse Leertaste   Kamera C   Pause P   Zurück auf den Weg R'
-        : slot ? 'Gas ↑   Bremse ↓   Spur wechseln ← → (an einer gelben Weiche)   Standort C   Pause P'
+        : slot ? 'Gas ↑   Bremse ↓   Spur wechseln ← → (an einer gelben Weiche)   Kamera C   Pause P'
         : sup ? 'Lenken ← →   Gas ↑   Bremse ↓ (im Stand: rückwärts)   Kamera C   Pause P   Zurück auf die Straße R'
         : 'Lenken ← →   Gas ↑   Bremse ↓ (im Stand: rückwärts)   Kamera C   Pause P   Zurück auf die Strecke R';
       kartenGrund = null;
@@ -303,7 +307,17 @@ export function starteSpiel() {
   function pauseAus() { pausiert = false; zeige('pause', false); letzteZeit = performance.now(); }
   function kameraWeiter() {
     if (!kamera) return;
-    if (kamera.modus === 'stand') { kamera.standNr = (kamera.standNr + 1) % Math.max(1, buehne.welt.standorte.length); kamera.frisch = true; melden(buehne.welt.standorte[kamera.standNr].name); return; }
+    // Kleine Autos: hinter dem Auto → im Cockpit → neben der Bahn (dort nacheinander alle Stellen zum Stehen) → wieder von vorn
+    if (T.def.modell) {
+      const orte = buehne.welt.standorte;
+      if (kamera.modus === 'hinten') kamera.setze('cockpit');
+      else if (kamera.modus === 'cockpit' && orte.length) { kamera.setze('stand'); kamera.standNr = 0; }
+      else if (kamera.modus === 'stand' && kamera.standNr + 1 < orte.length) { kamera.standNr++; kamera.frisch = true; }
+      else kamera.setze('hinten');
+      E.kamera_klein = kamera.modus; merken();
+      melden(kamera.modus === 'stand' ? 'Neben der Bahn: ' + orte[kamera.standNr].name : SICHTEN[kamera.modus]);
+      return;
+    }
     const folge = rennen && rennen.rallye ? ['hinten', 'weit', 'haube'] : ['hinten', 'weit', 'cockpit'];
     kamera.setze(folge[(folge.indexOf(kamera.modus) + 1) % folge.length]);
     melden(SICHTEN[kamera.modus]);
@@ -371,8 +385,8 @@ export function starteSpiel() {
     // Tacho
     // Kleine Autos: Tempo auf ein großes Auto hochgerechnet (mal 30), damit man es vergleichen kann
     $('hKmh').textContent = Math.round(kmh(a) / T.sc);
-    $('hGang').textContent = R.slot ? (c.slot.raus > 0 ? '💥' : c.slot.spur > 0 ? '◀ links' : 'rechts ▶') : modell ? (a.u < -0.05 ? 'R' : '') : (a.u < -0.5 ? 'R' : Math.abs(a.u) < 0.3 && a.gas < 0.05 ? 'N' : a.gang);
-    $('hDz').firstChild.style.width = (modell ? Math.min(1, Math.abs(a.u) / a.p.vMax) * 100 : Math.max(0, (a.drehzahl - 4000) / (a.p.drehzahlMax - 4000)) * 100).toFixed(1) + '%';
+    $('hGang').textContent = R.slot ? (c.slot.raus > 0 ? '💥' : c.slot.spur > 0 ? '◀ links' : 'rechts ▶') : modell ? (a.u < -0.05 ? 'R' : a.p.gaenge > 1 ? (Math.abs(a.u) < 0.02 && a.gas < 0.05 ? 'N' : a.gang) : '') : (a.u < -0.5 ? 'R' : Math.abs(a.u) < 0.3 && a.gas < 0.05 ? 'N' : a.gang);
+    $('hDz').firstChild.style.width = (modell && a.p.gaenge < 2 ? Math.min(1, Math.abs(a.u) / a.p.vMax) * 100 : Math.max(0, (a.drehzahl - 4000) / (a.p.drehzahlMax - 4000)) * 100).toFixed(1) + '%';
     // Hinweis über dem Tacho: beim Rennwagen der Gang für die nächste Kurve, bei den kleinen Autos Tank und Reifen
     let hin = '';
     if (kurven && R.phase === 'los') {
@@ -390,7 +404,13 @@ export function starteSpiel() {
       const D = c.drift || { gesamt: 0, laufend: 0, faktor: 1, winkel: 0, an: false };
       hin = `<span class="drift">🌀 ${D.gesamt.toLocaleString('de-DE')}</span>` + (D.an ? `<b>+${Math.round(D.laufend * D.faktor)}${D.faktor > 1 ? ' x' + D.faktor : ''} · ${Math.round(D.winkel)}°</b>` : (D.faktor > 1 ? `<span>Faktor x${D.faktor}</span>` : ''));
     }
+    // Turbo: Ladung als Blitze (blau, orange, rosa), brennt er, steht es groß da
+    if (R.turbo && c.tb) {
+      const st = c.tb.stufe;
+      hin += a.turbo > 0 ? '<b class="turbo an">🔥 TURBO</b>' : st > 0 ? `<b class="turbo s${st}">${'⚡'.repeat(st)}</b>` : '';
+    }
     if (hin !== app.hinAlt) { $('hKurve').innerHTML = hin; app.hinAlt = hin; }
+    $('hud').classList.toggle('turbo', a.turbo > 0);
     // Ampel
     const amp = $('hAmpel');
     amp.classList.toggle('an', R.phase === 'ampel');
@@ -398,9 +418,10 @@ export function starteSpiel() {
     // Meldungen aus dem Rennen
     while (R.ereignisse.length) {
       const m = R.ereignisse.shift();
-      melden(m.text, m.art, m.art === 'ziel' ? 4 : 2);
+      melden(m.text, m.art, m.art === 'ziel' ? 4 : m.art === 'turbo' ? 1 : 2);
       if (m.art === 'start') klang.piep(1100, 0.4, 0.3);
       if (m.art === 'beste') klang.piep(880, 0.25, 0.2);
+      if (m.art === 'turbo') klang.turbo(R.ich.a.turboStufe || 1);
     }
     if (performance.now() > meldungBis) $('hMeldung').className = '';
     // Karte
@@ -569,7 +590,7 @@ export function starteSpiel() {
     if (infoTakt <= 0 && empfang.verbunden) {
       infoTakt = 0.1;
       const a = R.ich.a, rueck = (a.grund === 1 ? 0.6 : a.grund >= 2 ? 0.8 : 0) * Math.min(1, Math.abs(a.u) / (a.p.vMax * 0.2)) + Math.min(1, a.stoss * 0.1);
-      empfang.senden({ t: 'i', v: kmh(a) / T.sc, gang: T.def.modell ? 0 : a.gang, dz: Math.max(0, (a.drehzahl - 4000) / (a.p.drehzahlMax - 4000)), platz: R.modus === 'rennen' ? R.ich.platz : 0, von: R.autos.length, runde: R.ich.runde, runden: R.modus === 'rennen' ? R.runden : 0, r: +rueck.toFixed(2) });
+      empfang.senden({ t: 'i', v: kmh(a) / T.sc, gang: T.def.modell && a.p.gaenge < 2 ? 0 : a.gang, dz: Math.max(0, (a.drehzahl - 4000) / (a.p.drehzahlMax - 4000)), platz: R.modus === 'rennen' ? R.ich.platz : 0, von: R.autos.length, runde: R.ich.runde, runden: R.modus === 'rennen' ? R.runden : 0, r: +rueck.toFixed(2) });
     }
   }
 

@@ -30,10 +30,12 @@ export class Kamera {
     const rallye = !!a.p.rallye, holper = rallye && a.landung > 3 ? Math.min(1.5, a.landung * 0.12) : rallye && a.grund >= 2 && !a.luft ? (a.grund === 7 ? 0.7 : 0.22 + (a.grund === 2 ? 0.25 : 0)) * Math.min(1, speed * 1.4) : 0;
     // Tempogefühl (Rennwagen und Supercars): Beim Beschleunigen wird der Blick kurz weiter und die Kamera bleibt etwas
     // zurück (als würde man in den Sitz gedrückt), ganz schnell zittert das Bild ein wenig.
-    const schnell = !!a.p.arcade;
-    this.schub = (this.schub || 0) + ((schnell ? Math.max(-0.4, Math.min(1, (a.ax || 0) / 14)) : 0) - (this.schub || 0)) * Math.min(1, dt * 4);
+    const schnell = !!a.p.arcade || !!a.p.turbo;
+    // (kleine Autos: Ihre Beschleunigung ist kleiner, und im Turbo reißt es den Blick ganz auf)
+    const schubZiel = a.turbo > 0 ? 1.6 : schnell ? Math.max(-0.4, Math.min(1, (a.ax || 0) / (modell ? 2.2 : 14))) : 0;
+    this.schub = (this.schub || 0) + (schubZiel - (this.schub || 0)) * Math.min(1, dt * (a.turbo > 0 ? 8 : 4));
     const zittern = schnell ? Math.max(0, speed - 0.55) * 0.35 : 0;
-    this.wackeln = Math.max(this.wackeln * Math.exp(-dt * 6), (a.grund === 1 ? 0.5 * speed : 0) + holper + zittern + Math.min(1, a.stoss * 0.15 / sc));
+    this.wackeln = Math.max(this.wackeln * Math.exp(-dt * 6), (a.grund === 1 ? 0.5 * speed : 0) + holper + zittern + (a.turbo > 0 ? 0.35 : 0) + Math.min(1, a.stoss * 0.15 / sc));
     const w = this.wackeln * (this.modus === 'cockpit' ? 0.012 : 0.05) * sc;
     const zit = () => (Math.random() - 0.5) * w;
 
@@ -63,13 +65,14 @@ export class Kamera {
       const dw = haube ? (a.drift || 0) : 0, sh = Math.sin(a.h + dw), ch = Math.cos(a.h + dw);
       const [ex, ey, ez] = haube ? [0, 1.66, 0.55] : a.auge ? [a.auge[0], a.auge[1], a.auge[2]] : [0, 0.92, -0.12];
       // Der Kopf des Fahrers neigt sich in die Kurve hinein (bis etwa 7 Grad) – so spürt man die Kurve im Cockpit
-      const nick = a.neigung, roll = Math.max(-0.13, Math.min(0.13, a.u * a.r / 9.81 * (a.p.super ? 0.09 : 0.045)));
+      // (kleine Autos: Ihre Kurvenkräfte sind kleiner, der Kopf soll sich trotzdem sichtbar neigen)
+      const nick = a.neigung, roll = Math.max(-0.13, Math.min(0.13, a.u * a.r / 9.81 * (modell ? 0.4 : a.p.super ? 0.09 : 0.045)));
       cam.position.set(a.x + sh * ez + ch * ex, a.y + ey, a.z + ch * ez - sh * ex).multiplyScalar(1);
-      if (modell) { cam.position.set(a.x + sh * ez * sc, a.y + ey * sc, a.z + ch * ez * sc); }
+      if (modell) { cam.position.set(a.x + (sh * ez + ch * ex) * sc, a.y + ey * sc, a.z + (ch * ez - sh * ex) * sc); }
       cam.position.x += zit(); cam.position.y += zit();
       const vorX = a.x + sh * 30 * sc, vorZ = a.z + ch * 30 * sc;
       cam.up.set(Math.cos(a.h) * roll, 1, -Math.sin(a.h) * roll);
-      cam.lookAt(vorX + ch * ex, a.y + (ey - (haube ? 1.6 : a.auge ? 1.2 : 1.6) - nick * 20 + (a.nick || 0) * 30) * sc, vorZ - sh * ex);
+      cam.lookAt(vorX + ch * ex * sc, a.y + (ey - (haube ? 1.6 : a.auge ? 1.2 : 1.6) - nick * 20 + (a.nick || 0) * 30) * sc, vorZ - sh * ex * sc);
       cam.up.set(0, 1, 0);
       const fov = (haube ? 64 + speed * 24 : 60 + speed * (rallye ? 14 : 10)) + this.schub * 5;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
       cam.fov += (fov - cam.fov) * Math.min(1, dt * 3); cam.near = modell ? 0.002 : 0.05;
@@ -81,16 +84,19 @@ export class Kamera {
     // hinter dem Auto: Richtung folgt dem Auto mit etwas Verzögerung (so sieht man das Driften)
     const weit = this.modus === 'weit';
     // Rallye: etwas tiefer und näher am Auto, damit man den Weg und das Driften gut sieht
-    const ab = (weit ? 11 : rallye ? 5.9 : 7.2) * sc * (1 + this.schub * 0.12), hoch = (weit ? 4.4 : rallye ? 1.9 : 2.35) * sc;
-    let d = a.h - this.richtung; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
-    if (this.frisch) this.richtung = a.h; else this.richtung += d * Math.min(1, dt * (Math.abs(a.u) < 3 * sc ? 2.5 : 5));
+    // (kleine Autos: auch etwas näher dran – das kleine Auto soll groß im Bild sein)
+    const ab = (weit ? 11 : rallye ? 5.9 : modell ? 6.3 : 7.2) * sc * (1 + this.schub * 0.12), hoch = (weit ? 4.4 : rallye ? 1.9 : modell ? 2.1 : 2.35) * sc;
+    // Drift-Rallye: Die Kamera schaut eher dorthin, wohin das Auto rutscht – so sieht man es von hinten schön quer stehen
+    const wohin = a.h + (a.p.leicht && a.u > 0.05 ? Math.atan2(a.v, a.u) * 0.55 : 0);
+    let d = wohin - this.richtung; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+    if (this.frisch) this.richtung = wohin; else this.richtung += d * Math.min(1, dt * (Math.abs(a.u) < 3 * sc ? 2.5 : 5));
     const rs = Math.sin(this.richtung), rc = Math.cos(this.richtung);
     const ziel = new THREE.Vector3(a.x - rs * ab, a.y + hoch, a.z - rc * ab);
     if (this.frisch) this.pos.copy(ziel); else this.pos.lerp(ziel, 1 - Math.exp(-dt * 20));
     // nicht unter die Fahrbahn
     cam.position.copy(this.pos); cam.position.x += zit(); cam.position.y += zit();
     cam.lookAt(a.x + rs * 3.5 * sc, a.y + (weit ? 0.3 : 0.75) * sc, a.z + rc * 3.5 * sc);
-    const fov = (weit ? 46 : 48) + speed * (rallye ? 32 : 15) + this.schub * 7;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
+    const fov = (weit ? 46 : 48) + speed * (rallye ? 32 : modell ? 24 : 15) + this.schub * 7;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
     cam.fov += (fov - cam.fov) * Math.min(1, dt * 3);
     cam.near = modell ? 0.005 : 0.1;
     cam.updateProjectionMatrix();

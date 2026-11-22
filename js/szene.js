@@ -12,6 +12,7 @@ import { AUTOS } from './physik.js';
 import { VerkehrBild } from './verkehrbau.js';
 import { baueWpWelt } from './wpbau.js';
 import { Spritzer } from './partikel.js';
+import { Funken, baueTurboFelder } from './funken.js';
 
 export class Buehne {
   constructor(canvas, qualitaet = 'hoch') {
@@ -64,7 +65,7 @@ export class Buehne {
 
   // Strecke T laden und Autos (Liste aus dem Rennen) hinstellen
   // verkehr = der Verkehr aus dem Rennen (Supercar-Strecken), sonst null
-  laden(T, autos, L, { linie = false, verkehr = null, etappe = null } = {}) {
+  laden(T, autos, L, { linie = false, verkehr = null, etappe = null, felder = [] } = {}) {
     if (this.szene) this.aufraeumen();
     const s = this.szene = new THREE.Scene();
     const def = T.def, st = stimmung(def), modell = !!def.modell;
@@ -166,6 +167,9 @@ export class Buehne {
       im.count = 0; im.frustumCulled = false; s.add(im);
       this.spuren = { im, n: 0, max: SPUREN, m4: new THREE.Matrix4(), q: new THREE.Quaternion(), achse: new THREE.Vector3(0, 1, 0), v: new THREE.Vector3(), eins: new THREE.Vector3(1, 1, 1) };
     }
+    // Turbo der kleinen Autos: Funken, Flamme und die leuchtenden Turbo-Felder auf der Bahn
+    this.funken = modell && !def.slot ? new Funken(s, T.sc) : null;
+    this.turboFelder = baueTurboFelder(s, T, felder);
     this.uhr = 0;
   }
 
@@ -173,6 +177,8 @@ export class Buehne {
   schritt(dt, ziel) {
     if (!this.szene) return;
     if (this.welt.update) this.welt.update(dt, ziel, this.etappe);
+    if (this.funken && dt > 0) { if (ziel) this.funken.auto(ziel, dt); this.funken.update(dt); }
+    if (this.turboFelder) this.turboFelder(dt);
     if (this.spritzer && dt > 0) {
       for (const { c } of this.autos) this.spritzer.auto(c.a, dt);
       this.spritzer.update(dt, this.kamera, this.h || 720, this.licht.intensity / 3 * 1.2 + 0.35);

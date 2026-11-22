@@ -46,6 +46,8 @@ export const STRECKEN = [
     text: 'Eine Rennstrecke aus Matten quer durchs Wohnzimmer. Du stehst daneben und lenkst das kleine Auto aus der Ferne.',
     modell: true, ds: 0.03, breite: 0.46, glatt: 10, kerbAb: 1 / 1.4,
     kiesBreite: 0.38, grasBreite: 0.14,   // außen in den Kurven ein Kiesbett als Auslauf, sonst ein schmaler Filzstreifen
+    // Turbo-Felder: [Anteil der Runde, Seite (−1 = rechts … 1 = links)] – leuchtende Pfeile, die einen Schub geben
+    turbo: [[0.95, 0.5], [0.247, 0], [0.535, 0]],
     ecken: [
       [3.5, 0, 0.75], [3.5, 2.12, 0.69], [1.94, 2.5, 0.56], [1.44, 1.31, 0.5], [0.19, 1.31, 0.5], [-0.31, 2.81, 0.62], [-2, 2.94, 0.62], [-2.5, 1.56, 0.53], [-3.62, 1.44, 0.56], [-3.62, 0, 0.75],
     ],
@@ -89,6 +91,7 @@ export const STRECKEN = [
     text: 'Kurze, breite Matte mit zwei Kehren und einem Haken in der Mitte. Hier lernst du driften: Gas in der Kurve, gegenlenken!',
     modell: true, drift: true, massstab: 1 / 43, ds: 0.02, breite: 0.6, glatt: 8, kerbAb: 1 / 0.6,
     aus: 'gras', grasBreite: 0.12,
+    turbo: [[0.93, 0], [0.24, 0.5], [0.612, -0.5]],
     ecken: [
       [1.9, 0, 0.5], [1.9, 1.9, 0.5], [0.75, 1.9, 0.38], [0.25, 1.05, 0.36], [-0.35, 1.9, 0.38], [-1.9, 1.9, 0.5], [-1.9, 0, 0.5],
     ],
@@ -100,6 +103,7 @@ export const STRECKEN = [
     text: 'Lange, offene Strecke mit schnellen Bögen, einer Wechselkurven-Schlange und zwei engen Kehren zum Querstellen.',
     modell: true, drift: true, massstab: 1 / 43, ds: 0.02, breite: 0.54, glatt: 8, kerbAb: 1 / 0.6,
     aus: 'gras', grasBreite: 0.12,
+    turbo: [[0.91, 0], [0.225, 0.4], [0.75, -0.4]],
     ecken: [
       [3.1, 0, 0.55], [3.1, 2.2, 0.6], [1.7, 2.9, 0.5], [0.9, 2.0, 0.42], [0.1, 2.9, 0.42], [-0.7, 2.0, 0.42], [-1.6, 3.0, 0.5],
       [-3.1, 2.6, 0.45], [-2.3, 1.2, 0.4], [-3.1, 0, 0.5],

@@ -147,3 +147,11 @@ html.app #lbNah { display: block; }
 #hListe div.rallye { min-width: 210px; justify-content: space-between; }
 #hListe div.rallye span { opacity: .85; }
 #eTabelle tr.kopf td { font-weight: bold; padding-top: 10px; color: var(--gelb); }
+
+/* Turbo der kleinen Autos: Ladung (Blitze in der Farbe der Funken) und der Turbo selbst */
+#hKurve b.turbo.s1 { color: #4fb8ff; } #hKurve b.turbo.s2 { color: #ff9a2e; } #hKurve b.turbo.s3 { color: #ff4fd0; }
+#hKurve b.turbo.an { color: #ffd24a; text-shadow: 0 0 12px #ff7a00; }
+#hMeldung.turbo { color: #ffd24a; text-shadow: 0 0 18px #ff7a00; }
+/* Solange der Turbo brennt, glühen die Bildränder */
+#hud::after { content: ''; position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s; box-shadow: inset 0 0 140px 30px rgba(255, 150, 30, .55); }
+#hud.turbo::after { opacity: 1; }

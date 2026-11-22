@@ -8,6 +8,7 @@ import { boxNeu, verbrauch, boxDienst, boxFahrt, boxRel, reifenHalt } from './bo
 import { ideallinie, neuerFahrer, fahren, bremsHilfe, lenkZurLinie } from './ki.js';
 import { SUPERCARS, supercar } from './supercars.js';
 import { Verkehr } from './verkehr.js';
+import { turboFelder, turboSchritt } from './turbo.js';
 
 // Ausgedachte Rennställe und Fahrer (keine echten Teams, Farben frei gewählt)
 export const TEAMS = [
@@ -42,6 +43,9 @@ export class Rennen {
     this.sc = T.sc;
     this.slot = art === 'slot';
     this.drift = art === 'drift';   // Drift-Rallye: es gibt Drift-Punkte (siehe driftZaehlen)
+    // Turbo (ferngesteuertes Auto und Drift-Rallye): Drift-Turbo und Turbo-Felder auf der Bahn (siehe turbo.js)
+    this.turbo = art === 'drift' || art === 'modell';
+    this.felder = this.turbo ? turboFelder(T) : [];
     // Tanken und Reifenwechsel: nur bei den kleinen Autos, nur im Rennen, nur wenn die Strecke eine Boxengasse hat
     this.boxen = !!(boxen && T.box && modus === 'rennen');
     const muster = neuesAuto(this.super ? supercar(auto).id : art, tempo).p;
@@ -60,7 +64,9 @@ export class Rennen {
     this.geistAlt = null;    // Bestrunde zum Hinterherfahren (Zeitfahren)
 
     const anzahl = modus === 'zeit' ? 0 : gegner;
-    const [lo, hi] = STAERKE[staerke] || STAERKE.mittel;
+    // (Ferngesteuertes Auto: Die Computerfahrer haben keinen Turbo und fahren etwas vorsichtiger – sonst wären sie mit der
+    //  Arcade-Hilfe, die auch für sie gilt, selbst auf „leicht“ kaum zu schlagen)
+    const [lo, hi] = (STAERKE[staerke] || STAERKE.mittel).map(v => v * (art === 'modell' ? 0.88 : 1));
     // Startaufstellung: hinter der Linie, versetzt links und rechts, alle 8 m (beim Modellauto passend kleiner)
     const reihe = 8 * this.sc, seite = Math.min(3, T.hb[0] * 0.45) * (this.sc === 1 ? 1 : 1 / 3);
     const slots = [];
@@ -129,8 +135,11 @@ export class Rennen {
       if (c.ich) {
         a.lenkWunsch = eingabe.lenk; a.gas = eingabe.gas; a.brems = eingabe.brems;
         // Handbremse: eigene Taste, oder Gas und Bremse gleichzeitig (so geht es auch mit dem Handy-Lenkrad und den Pedalen)
-        a.handbremse = !!(this.drift && (eingabe.hand || (eingabe.gas > 0.5 && eingabe.brems > 0.5)));
-        if (a.handbremse) a.brems = 0;
+        const hand = !!(eingabe.hand || (eingabe.gas > 0.5 && eingabe.brems > 0.5));
+        a.handbremse = this.drift && hand;
+        // Ferngesteuertes Auto: Die „Handbremse“ wirft nur das Heck herum (Drift im Bild) – die Reifen halten weiter
+        a.driftHand = this.art === 'modell' && hand;
+        if (hand && this.turbo) a.brems = 0;
         if (this.hilfe.lenken) a.lenkWunsch = Math.max(-1, Math.min(1, eingabe.lenk * 0.6 + lenkZurLinie(a, T, this.L) * 0.55));
         c.hilfeBremst = this.hilfe.bremsen ? bremsHilfe(a, T, this.L) : false;
         if (c.ziel !== null && this.modus === 'rennen') { fahren(c.auslauf || (c.auslauf = neuerFahrer(0.7)), a, T, this.L, andere, dt); }
@@ -143,6 +152,11 @@ export class Rennen {
       if (steht) { a.u = 0; a.v = 0; a.r = 0; a.drehzahl = 5000 + a.gas * 6000; continue; }
       schritt(a, T, dt);
       if (this.drift && c.ich && this.phase === 'los') this.driftZaehlen(c, dt);
+      if (this.turbo && c.ich && this.phase === 'los') {
+        const was = turboSchritt(a, c.tb || (c.tb = { ladung: 0, stufe: 0, ruhe: 0, zahl: 0 }), this.felder, T, dt);
+        if (was === 'zuenden') this.melden(['', 'Turbo!', 'Super-Turbo!', 'Mega-Turbo!'][a.turboStufe], 'turbo');
+        else if (was === 'feld') this.melden('Turbo-Feld!', 'turbo');
+      }
       // Computerfahrer, die festhängen (an der Mauer, im Kies), setzt ein Streckenposten zurück auf die Strecke
       if (c.fahrer && this.phase === 'los') {
         c.steckt = Math.abs(a.u) < 2 * this.sc ? (c.steckt || 0) + dt : 0;
