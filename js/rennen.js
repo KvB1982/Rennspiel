@@ -281,7 +281,8 @@ export class Rennen {
       const zurueckUeber = c.prevS < Lg * 0.25 && s > Lg * 0.75;
       // Strecke verlassen (alle vier Räder neben der Fahrbahn): Runde zählt im Zeitfahren nicht
       // (Drift-Matte: Wer quer rutscht, kommt weiter hinaus – erst ab der Mitte des Rand-Streifens zählt es)
-      if (!this.slot && !T.strasse && c.ich && this.modus === 'zeit' && c.runde > 0 && Math.abs(c.a.d) > T.hb[c.a.idx] + (this.drift ? 0.07 : 1.6 * this.sc + (T.kerbL[c.a.idx] || T.kerbR[c.a.idx] ? 1.2 * this.sc : 0))) {
+      // Beim Formel-Rennwagen ist das abgeschaltet (Kristians Wunsch): Dort zählt jede Runde, auch mit einem Ausflug ins Gras.
+      if (this.art !== 'f1' && !this.slot && !T.strasse && c.ich && this.modus === 'zeit' && c.runde > 0 && Math.abs(c.a.d) > T.hb[c.a.idx] + (this.drift ? 0.07 : 1.6 * this.sc + (T.kerbL[c.a.idx] || T.kerbR[c.a.idx] ? 1.2 * this.sc : 0))) {
         if (c.gueltig) this.melden('Strecke verlassen – Runde zählt nicht', 'warn');
         c.gueltig = false;
       }
