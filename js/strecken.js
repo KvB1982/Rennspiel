@@ -157,7 +157,7 @@ export const STRECKEN = [
   {
     id: 'wp_seen', name: 'WP 1 · Seenland-Sprünge', ort: 'Schnelle Schotterwege im Kiefernwald, Nachmittag',
     text: 'Breite, schnelle Schotterwege mit vielen Kuppen und Sprüngen – wie in Finnland. Voll auf dem Gas bleiben und dem Beifahrer glauben!',
-    rallye: true, belag: 'schotter', breite: 8.5, glatt: 16, kerbAb: 99, aus: 'gras', grasBreite: 6,
+    rallye: true, belag: 'schotter', breite: 10.5, glatt: 16, kerbAb: 99, aus: 'gras', grasBreite: 6,
     ecken: [
       [0, 0, 70], [300, -150, 140], [700, -100, 200], [1000, -300, 90], [1250, -200, 55], [1400, 100, 160], [1300, 450, 45], [1500, 700, 110],
       [1350, 1000, 70], [1000, 1050, 180], [650, 900, 50], [450, 1100, 80], [100, 1150, 140], [-200, 950, 60], [-350, 600, 120], [-250, 300, 38], [-400, 100, 90],
@@ -171,7 +171,7 @@ export const STRECKEN = [
   {
     id: 'wp_nebel', name: 'WP 2 · Nebelwald', ort: 'Enger Matsch-Pfad im Laubwald, trüber Morgen',
     text: 'Schmal, kurvig und nass – wie in Wales. Matsch, tiefe Pfützen, eine Wasserdurchfahrt und enge Kehren. Hier gewinnt, wer sauber fährt.',
-    rallye: true, belag: 'schotter', breite: 7, glatt: 10, kerbAb: 99, aus: 'gras', grasBreite: 4.5,
+    rallye: true, belag: 'schotter', breite: 9, glatt: 10, kerbAb: 99, aus: 'gras', grasBreite: 4.5,
     ecken: [
       [0, 0, 25], [150, -80, 40], [300, -60, 15], [320, 120, 30], [480, 200, 60], [600, 100, 18], [750, 150, 35], [800, 350, 12], [650, 420, 25],
       [700, 600, 50], [550, 750, 20], [350, 700, 35], [250, 850, 14], [50, 800, 45], [-100, 650, 22], [0, 500, 30], [-150, 350, 16], [-250, 200, 40], [-150, 80, 25],
@@ -185,7 +185,7 @@ export const STRECKEN = [
   {
     id: 'wp_pass', name: 'WP 3 · Bergpass', ort: 'Asphalt mit Kehren am Berg, Abendsonne',
     text: 'Auf Asphalt in Kehren den Berg hinauf, über den Kamm und schnell wieder hinunter – wie bei der Rallye in den Seealpen. Links Fels, rechts der Abgrund.',
-    rallye: true, belag: 'asphalt', breite: 7.5, glatt: 10, kerbAb: 99, aus: 'gras', grasBreite: 4,
+    rallye: true, belag: 'asphalt', breite: 9.5, glatt: 10, kerbAb: 99, aus: 'gras', grasBreite: 4,
     ecken: [
       [0, 0, 40], [220, 60, 14], [40, 150, 14], [260, 240, 14], [60, 330, 14], [280, 420, 30], [520, 470, 90], [760, 380, 60],
       [800, 150, 110], [700, -100, 50], [450, -180, 80], [200, -150, 45], [-100, -160, 60],
