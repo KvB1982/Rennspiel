@@ -299,7 +299,7 @@ export function starteSpiel() {
     laeuft = false; pausiert = false; app.rallyeStand = null;
     if (sprecher) sprecher.stopp();
     zeige('hud', false); zeige('pause', false); zeige('ergebnis', false); zeige('menue', true);
-    if (klang.ctx) klang.update({ ...rennen.ich.a, u: 0, gas: 0 }, null, false, false);
+    klang.ruhe();   // im Menü ist alles still
     menueBauen();
   }
   function pauseAn() { if (!laeuft) return; pausiert = true; zeige('pause', true); if (sprecher) sprecher.stopp(); }

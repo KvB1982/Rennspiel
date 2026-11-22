@@ -46,7 +46,9 @@ export class Klang {
     const c = this.ctx = new AC();
     this.haupt = c.createGain(); this.haupt.gain.value = this.an ? 0.6 : 0; this.haupt.connect(c.destination);
     // Motor (selbst erzeugt): zwei Sägezahn-Schwingungen, durch einen "Verzerrer" und einen Filter
-    this.motor = this.baueMotor(0.5);
+    // Beide Motoren fangen stumm an. Laut werden sie erst, wenn gefahren wird (update).
+    // (Früher fing der eigene Motor laut an: Dann brummte im Menü nach dem ersten Klick ein Dauerton.)
+    this.motor = this.baueMotor(0);
     this.gegner = this.baueMotor(0);
     // Rauschen für Reifen und Wind
     const len = c.sampleRate * 2, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
@@ -131,6 +133,17 @@ export class Klang {
     o1.connect(verz); o2.connect(verz); o3.connect(g3); g3.connect(verz); verz.connect(f); f.connect(g); g.connect(this.haupt);
     o1.start(); o2.start(); o3.start();
     return { o1, o2, o3, f, g };
+  }
+
+  // Alles still: Motoren, Reifen, Wind, Rumpeln. Für das Menü, dort fährt ja niemand.
+  ruhe() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const aus = g => { if (g) g.gain.setTargetAtTime(0, t, 0.05); };
+    aus(this.motor.g); aus(this.gegner.g);
+    for (const m of [this.motorA, this.gegnerA]) if (m) { aus(m.leer.g); aus(m.hoch.g); aus(m.elektro.g); }
+    if (this.quietsch) aus(this.quietsch.g);
+    aus(this.reifen); aus(this.wind); aus(this.rumpel); aus(this.knirsch); aus(this.platscher);
   }
 
   schalten(an) {
