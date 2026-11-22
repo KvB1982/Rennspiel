@@ -34,7 +34,7 @@ const STANDARD = {
 };
 // Höchsttempo der kleinen Autos in Metern pro Sekunde. 3 m/s sehen beim Maßstab 1:30 aus wie 325 km/h.
 // Drift-Rallye (Maßstab 1:43): 1,2 m/s sehen aus wie gut 180 km/h – langsam genug, um das Auto quer zu halten.
-const TEMPO = { modell: { langsam: 1.6, mittel: 2.3, schnell: 3.0 }, slot: { langsam: 2.6, mittel: 3.5, schnell: 4.5 }, drift: { langsam: 0.9, mittel: 1.2, schnell: 1.5 } };
+const TEMPO = { modell: { langsam: 0.8, mittel: 1.1, schnell: 1.5 }, slot: { langsam: 2.6, mittel: 3.5, schnell: 4.5 }, drift: { langsam: 0.7, mittel: 0.9, schnell: 1.15 } };
 const streckenFeld = () => E.fahrzeug === 'modell' ? 'strecke_modell' : E.fahrzeug === 'slot' ? 'strecke_slot' : E.fahrzeug === 'drift' ? 'strecke_drift' : E.fahrzeug === 'super' ? 'strecke_super' : E.fahrzeug === 'rallye' ? 'strecke_rallye' : 'strecke';
 // Wie viel Verkehr: Zahl für verkehr.js (0 = keiner)
 const VERKEHR = { aus: 0, wenig: 0.5, normal: 1, viel: 1.6 };
@@ -51,7 +51,7 @@ const ladeGeist = (id, art) => { try { return JSON.parse(localStorage.getItem(be
 const speichereGeist = (id, art, g) => { try { localStorage.setItem(bestKey(id, art), JSON.stringify(g)); } catch (e) {} };
 
 // Bestzeiten der kleinen Autos gelten je Höchsttempo (sonst wären sie nicht vergleichbar)
-const geistArt = () => E.fahrzeug === 'f1' ? '' : E.fahrzeug === 'super' ? '.' + E.supercar : E.fahrzeug === 'rallye' ? '.' + E.rallyeauto : '.' + E.tempo;
+const geistArt = () => E.fahrzeug === 'f1' ? '' : E.fahrzeug === 'super' ? '.' + E.supercar : E.fahrzeug === 'rallye' ? '.' + E.rallyeauto : '.' + E.tempo + (E.fahrzeug === 'slot' ? '' : '.2');   // .2: seit die kleinen Autos langsamer fahren, zählen die alten Bestzeiten nicht mehr
 // Die ganze Rallye: drei Prüfungen nacheinander
 const RALLYE_FOLGE = ['wp_seen', 'wp_nebel', 'wp_pass'];
 const streckenCache = new Map();
@@ -146,7 +146,7 @@ export function starteSpiel() {
     zeile('Fahrgefühl', 'arcade', [[true, 'Arcade'], [false, 'echter']], !modell);
     zeile('Traktionskontrolle', 'traktion', [[true, 'an'], [false, 'aus']], !slot && !drift);
     // Drift-Hilfe: dreht das Auto zurück, bevor es sich ganz quer stellt (gleiche Einstellung wie die Traktionskontrolle)
-    zeile('Drift-Hilfe', 'traktion', [[true, 'an'], [false, 'aus']], drift);
+    zeile('Drift-Hilfe', 'traktion', [[true, 'an'], [false, 'aus (schwer)']], drift);
     zeile('Gas von allein', 'autogas', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Dieses Gerät neigen', 'neigen', [[true, 'an'], [false, 'aus']], neigenGeht);
     zeile('Lenken beim Neigen', 'neigStufe', [[2, 'ruhig'], [3, 'normal'], [4, 'direkt'], [5, 'sehr direkt']], neigenGeht && E.neigen);
@@ -174,7 +174,7 @@ export function starteSpiel() {
     ton.querySelectorAll('button').forEach((b, k) => b.addEventListener('click', () => { klang.schalten(k === 0); menueBauen(); }));
     ein.appendChild(ton);
     $('mBest').textContent = rallye ? 'Rallye: Du fährst allein gegen die Uhr, die anderen Fahrer sind schon gefahren. Hör auf deinen Beifahrer: Die Zahl sagt, wie eng die Kurve ist (1 = Haarnadel, 6 = fast gerade), „und“ heißt, die nächste kommt gleich danach. Auf Schotter driftet das Auto – lenk dagegen und gib Gas. Handbremse: Leertaste oder Gas und Bremse zugleich. Nicht schneiden: Innen liegen Felsen!'
-      : drift ? 'Drift-Rallye: Gib in der Kurve Gas, dann kommt das Heck – lenk dagegen und halte das Auto quer. Handbremse: Gas und Bremse gleichzeitig (Tastatur: Leertaste). Je schräger und schneller du rutschst, desto mehr Drift-Punkte. Hängst du Drifts aneinander, steigt der Faktor bis x5. In die Bande = Drift verloren. Mit 🎥 wechselst du die Stelle, an der du stehst.'
+      : drift ? 'Drift-Rallye: Du lenkst, wohin das Auto fährt. Je mehr du einlenkst und Gas gibst, desto schräger stellt es sich – Gas weg oder gerade lenken, und es fängt sich wieder. Handbremse für Haarnadeln: Gas und Bremse gleichzeitig (Tastatur: Leertaste). Je schräger und schneller du rutschst, desto mehr Drift-Punkte. Hängst du Drifts aneinander, steigt der Faktor bis x5. In die Bande = Drift verloren. Mit 🎥 wechselst du die Stelle, an der du stehst.'
       : slot ? 'Slotcar: Du gibst nur Gas. Vor der Kurve vom Gas gehen, sonst fliegt das Auto raus! Spur wechseln: an einer gelben Weiche nach links oder rechts lenken. Boxengasse: auf der rechten Spur an der Einfahrt nach rechts lenken und im blauen Feld anhalten. Mit 🎥 wechselst du die Stelle, an der du stehst.'
       : modell ? 'Ferngesteuertes Auto: Du stehst neben der Bahn. Tanken und Reifen wechseln: in der Boxengasse rechts neben der Startgeraden im blauen Feld anhalten. Mit 🎥 wechselst du die Stelle, an der du stehst.'
       : sup ? 'Supercar: Rechts fährt der Verkehr in deine Richtung, links kommt dir Gegenverkehr entgegen. Auf der Autobahn ist der Gegenverkehr hinter der Mittelmauer. Überhol vorsichtig!' : '';
@@ -425,7 +425,7 @@ export function starteSpiel() {
     const sieger = R.reihenfolge[0];
     if (R.drift) {
       const D = R.ich.drift || { gesamt: 0, bester: 0 };
-      const key = 'rennspiel.drift.' + T.def.id + '.' + E.tempo;
+      const key = 'rennspiel.drift2.' + T.def.id + '.' + E.tempo;
       let alt = 0; try { alt = +localStorage.getItem(key) || 0; } catch (e) {}
       if (D.gesamt > alt) { try { localStorage.setItem(key, String(D.gesamt)); } catch (e) {} }
       $('eTitel').textContent += ` · 🌀 ${D.gesamt.toLocaleString('de-DE')} Drift-Punkte` + (D.gesamt > alt && alt > 0 ? ' (neuer Rekord!)' : '');
