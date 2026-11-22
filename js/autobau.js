@@ -219,12 +219,14 @@ export function baueAuto({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massstab
 // Das Auto im Bild auf den Stand der Physik bringen
 export function autoStellen(m, a, uhr = 0) {
   const g = m.gruppe;
-  g.position.set(a.x, a.y, a.z);
+  // Drift (Rallye): Das Auto dreht sich im Bild um seine Vorderachse – das Heck schwenkt nach außen
+  const dw = a.drift || 0, vorn = dw ? (a.p.a || 0) : 0;
+  g.position.set(a.x + vorn * (Math.sin(a.h) - Math.sin(a.h + dw)), a.y, a.z + vorn * (Math.cos(a.h) - Math.cos(a.h + dw)));
   // Bergauf hebt sich die Nase (a.nick = Steigung, nur bei Strecken mit Sprüngen ausgerechnet)
   g.rotation.order = 'YXZ';
-  g.rotation.set(-Math.atan(a.nick || 0), a.h, 0);
+  g.rotation.set(-Math.atan(a.nick || 0), a.h + dw, 0);
   m.koerper.rotation.x = a.neigung; m.koerper.rotation.z = a.kippen;
-  for (const v of m.lenkVorn) v.rotation.y = a.lenk;
+  for (const v of m.lenkVorn) v.rotation.y = a.lenk - dw;   // im Drift zeigen die Vorderräder dorthin, wo es hingeht (Gegenlenken)
   const dreh = a.radDreh;
   for (const r of m.raeder) r.rotation.x = dreh;
   m.lenkrad.rotation.z = -a.lenk * 6;

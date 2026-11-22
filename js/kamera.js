@@ -59,6 +59,8 @@ export class Kamera {
       // Supercar: Augen links im Auto, höher (a.auge kommt vom 3D-Modell)
       // Motorhaube (Rallye): Kamera vorn auf der Haube, ganz tief – so wirkt das Tempo am stärksten
       const haube = this.modus === 'haube';
+      // Motorhaube im Drift: Die Kamera sitzt auf dem Auto und dreht sich mit ihm quer (um die Vorderachse)
+      const dw = haube ? (a.drift || 0) : 0, sh = Math.sin(a.h + dw), ch = Math.cos(a.h + dw);
       const [ex, ey, ez] = haube ? [0, 1.66, 0.55] : a.auge ? [a.auge[0], a.auge[1], a.auge[2]] : [0, 0.92, -0.12];
       // Der Kopf des Fahrers neigt sich in die Kurve hinein (bis etwa 7 Grad) – so spürt man die Kurve im Cockpit
       const nick = a.neigung, roll = Math.max(-0.13, Math.min(0.13, a.u * a.r / 9.81 * (a.p.super ? 0.09 : 0.045)));
