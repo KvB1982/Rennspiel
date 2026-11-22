@@ -29,6 +29,7 @@ const STANDARD = {
   supercar: 'falkner', lack: 0, verkehr: 'normal', runden_super: 1, gegner_super: 5,
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
   bremshilfe: true, lenkhilfe: false, traktion: true, arcade: true, autogas: false, grafik: 'hoch', linie: true, boxen: true,
+  hud: false,      // Gang und Kurven-Gang groß in der Bildmitte (wie in der Scheibe eines echten Autos) statt unten rechts
   neigStufe: 3,    // wie weit man das Gerät dafür neigen muss (2 = weit … 5 = ganz wenig; Grad stehen in VOLL in neigung.js)
   neigen: false,   // dieses Gerät selbst neigen (Gas und Bremse auf dem Bildschirm), wenn kein Handy-Lenkrad verbunden ist
 };
@@ -143,6 +144,8 @@ export function starteSpiel() {
     zeile('Höchsttempo', 'tempo', [['langsam', 'langsam'], ['mittel', 'mittel'], ['schnell', 'schnell']], modell);
     zeile('Tanken und Reifen', 'boxen', [[true, 'an'], [false, 'aus']], modell && rennenAn && !drift);
     zeile('Ideallinie und Bremszonen', 'linie', [[true, 'an'], [false, 'aus']], !modell && !rallye);
+    // HUD: Gang, Tempo und der Gang für die nächste Kurve stehen mitten im Bild
+    zeile('Gang-Anzeige', 'hud', [[false, 'unten rechts'], [true, 'HUD in der Mitte']], !modell);
     zeile('Bremshilfe', 'bremshilfe', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Lenkhilfe', 'lenkhilfe', [[true, 'an'], [false, 'aus']], !slot);
     // Arcade-Hilfe (Rennwagen und Supercars): direkte Lenkung, und der Computer hilft unsichtbar, auf der Straße zu bleiben
@@ -351,6 +354,19 @@ export function starteSpiel() {
     const m = $('hMeldung'); m.textContent = text; m.className = 'an ' + art; meldungBis = performance.now() + dauer * 1000;
   };
   let kartenGrund = null;
+  // HUD in der Bildmitte (Einstellung „Gang-Anzeige“): Gang groß, links das Tempo, rechts der Gang für die nächste Kurve.
+  // gang = was in der Mitte steht, tempo = km/h, dz = Drehzahl von 0 bis 1, kurve = Text rechts (oder '')
+  function hudMitte(gang, tempo, dz, kurve) {
+    const an = !!E.hud && !T.def.modell && rennen.phase !== 'ampel';   // an der Startampel ist dort oben die Ampel
+    if (an !== app.hudAn) { $('hHud').hidden = !an; $('hHud').classList.toggle('rallye', !!rennen.rallye); $('hud').classList.toggle('mitte', an); app.hudAn = an; }
+    if (!an) return;
+    $('hudGang').textContent = gang;
+    $('hudKmh').firstChild.textContent = tempo;
+    const b = $('hudDz');
+    b.firstChild.style.width = (dz * 100).toFixed(1) + '%';
+    b.className = dz > 0.9 ? 'rot' : dz > 0.72 ? 'hoch' : '';   // kurz vor dem Schalten wird der Balken gelb, dann rot
+    if (kurve !== app.hudKurveAlt) { $('hudKurve').innerHTML = kurve; app.hudKurveAlt = kurve; }
+  }
   function hudMalen() {
     if (rennen.rallye) return hudRallye();
     const R = rennen, c = R.ich, a = c.a;
@@ -377,14 +393,21 @@ export function starteSpiel() {
     $('hGang').textContent = R.slot ? (c.slot.raus > 0 ? '💥' : c.slot.spur > 0 ? '◀ links' : 'rechts ▶') : modell ? (a.u < -0.05 ? 'R' : '') : (a.u < -0.5 ? 'R' : Math.abs(a.u) < 0.3 && a.gas < 0.05 ? 'N' : a.gang);
     $('hDz').firstChild.style.width = (modell ? Math.min(1, Math.abs(a.u) / a.p.vMax) * 100 : Math.max(0, (a.drehzahl - 4000) / (a.p.drehzahlMax - 4000)) * 100).toFixed(1) + '%';
     // Hinweis über dem Tacho: beim Rennwagen der Gang für die nächste Kurve, bei den kleinen Autos Tank und Reifen
-    let hin = '';
+    let hin = '', mitte = '';
     if (kurven && R.phase === 'los') {
       const k = kurven.naechste[a.idx >= 0 ? a.idx : 0];
       if (k >= 0) {
         let weg = T.s[k] - a.s; if (weg < 0) weg += T.laenge;
-        if (weg < 450) hin = `<span class="kurve">Kurve in ${Math.round(weg / 10) * 10} m</span><b class="${a.gang > kurven.gang[k] ? 'runter' : ''}">Gang ${kurven.gang[k]}</b>`;
+        if (weg < 450) {
+          const runter = a.gang > kurven.gang[k], m = Math.round(weg / 10) * 10;
+          hin = `<span class="kurve">Kurve in ${m} m</span><b class="${runter ? 'runter' : ''}">Gang ${kurven.gang[k]}</b>`;
+          mitte = `<b class="${runter ? 'runter' : ''}">${runter ? '▼' : '▸'} ${kurven.gang[k]}</b><small>Kurve in ${m} m</small>`;
+        }
       }
     }
+    // Mit HUD steht der Kurven-Gang in der Bildmitte, das Kästchen über dem Tacho bleibt dann leer
+    if (E.hud && !modell) hin = '';
+    hudMitte($('hGang').textContent, $('hKmh').textContent, modell ? 0 : Math.min(1, Math.max(0, (a.drehzahl - 4000) / (a.p.drehzahlMax - 4000))), mitte);
     if (R.boxen) {
       const pr = v => Math.round(v * 100), kl = v => v < 0.25 ? 'knapp' : '';
       hin = `<span class="${kl(c.sprit)}">⛽ ${pr(c.sprit)} %</span><span class="${kl(c.reifen)}">🛞 ${pr(c.reifen)} %</span>` + (c.dienst > 0 ? '<b>Boxenstopp …</b>' : '');
@@ -475,6 +498,7 @@ export function starteSpiel() {
     $('hGang').textContent = a.u < -0.5 ? 'R' : Math.abs(a.u) < 0.3 && a.gas < 0.05 ? 'N' : a.gang;
     $('hDz').firstChild.style.width = (Math.max(0, (a.drehzahl - 3000) / (a.p.drehzahlMax - 3000)) * 100).toFixed(1) + '%';
     if (app.hinAlt !== '') { $('hKurve').innerHTML = ''; app.hinAlt = ''; }
+    hudMitte($('hGang').textContent, $('hKmh').textContent, Math.min(1, Math.max(0, (a.drehzahl - 3000) / (a.p.drehzahlMax - 3000))), '');
     $('hAmpel').classList.remove('an');
     // Ansagen des Beifahrers als Bild
     const kommend = E.beifahrer === 'aus' ? [] : R.kommende(3);
