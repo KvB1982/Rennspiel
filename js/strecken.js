@@ -333,7 +333,8 @@ export const STRECKEN = [
   // ---------------------------------------------------------------- Rallye: Wertungsprüfungen (WP)
   // Rallyestrecken sind Wege durchs Gelände: schmal, ohne Leitplanken, mit Wald direkt am Rand.
   // belag = was auf der Fahrbahn liegt ('schotter' oder 'asphalt'), wellen = kleines Auf und Ab,
-  // spruenge = Kuppen, über die man fliegt, matsch / wasser / pfuetzen siehe strecke.js (rallyeBelag).
+  // spruenge = Kuppen, über die man fliegt, wasser / pfuetzen siehe strecke.js (rallyeBelag).
+  // Matsch (matsch: [[von, bis]]) gibt es auf keiner Prüfung mehr: Er hat das Auto zu sehr gebremst (Kristian, 22.11.2026).
   // Gefahren wird eine Runde: Start an der Startlinie, Ziel ("fliegendes Ziel") 300 m davor, dahinter das Stopp-Schild.
   {
     id: 'wp_seen', name: 'WP 1 · Seenland-Sprünge', ort: 'Schnelle Schotterwege im Kiefernwald, Nachmittag',
@@ -346,12 +347,12 @@ export const STRECKEN = [
     hoehe: [[0, 10], [0.15, 30], [0.3, 16], [0.38, 28], [0.47, 48], [0.6, 25], [0.75, 38], [0.9, 15]],
     wellen: [[420, 2.2], [190, 1.0]], schlaengeln: [[260, 14], [130, 4]],
     spruenge: [[0.07, 2.0, 60], [0.16, 1.6, 50], [0.27, 2.4, 58], [0.33, 1.7, 48], [0.52, 2.6, 62], [0.63, 1.9, 52], [0.77, 2.2, 56], [0.87, 1.6, 46]],
-    pfuetzen: 10, matsch: [[0.41, 0.46]], wasser: [[0.71, 14]],
+    pfuetzen: 10, wasser: [[0.71, 14]],
     welt: { art: 'rallye', zeit: 'nachmittag', wald: 'kiefer' },
   },
   {
-    id: 'wp_nebel', name: 'WP 2 · Nebelwald', ort: 'Enger Matsch-Pfad im Laubwald, trüber Morgen',
-    text: 'Schmal, kurvig und nass – wie in Wales. Matsch, tiefe Pfützen, eine Wasserdurchfahrt und Haarnadelkurven den Hang hinauf. Hier gewinnt, wer sauber fährt.',
+    id: 'wp_nebel', name: 'WP 2 · Nebelwald', ort: 'Enger, nasser Schotterpfad im Laubwald, trüber Morgen',
+    text: 'Schmal, kurvig und nass – wie in Wales. Pfützen, eine Wasserdurchfahrt und Haarnadelkurven den Hang hinauf. Hier gewinnt, wer sauber fährt.',
     rallye: true, belag: 'schotter', breite: 9, glatt: 10, kerbAb: 99, aus: 'gras', grasBreite: 4.5,
     ecken: [
       [0, 0, 25], [150, -80, 40], [300, -60, 15], [320, 120, 30], [480, 200, 60], [600, 100, 18], [750, 150, 35], [800, 350, 12], [650, 420, 25],
@@ -360,7 +361,7 @@ export const STRECKEN = [
     hoehe: [[0, 20], [0.2, 32], [0.4, 22], [0.6, 36], [0.74, 24], [0.86, 40], [0.95, 24]],
     wellen: [[260, 1.4], [120, 0.6]], schlaengeln: [[150, 7], [70, 2]],
     spruenge: [[0.33, 1.6, 30], [0.62, 1.8, 32]],
-    pfuetzen: 32, matsch: [[0.1, 0.28], [0.44, 0.62], [0.78, 0.9]], wasser: [[0.53, 16]],
+    pfuetzen: 18, wasser: [[0.53, 16]],
     welt: { art: 'rallye', zeit: 'trueb', wald: 'laub' },
   },
   {
@@ -392,7 +393,7 @@ export const STRECKEN = [
     hoehe: [[0, 20], [0.14, 26], [0.2, 48], [0.27, 76], [0.33, 104], [0.39, 132], [0.45, 158], [0.52, 172], [0.6, 166], [0.68, 134], [0.76, 98], [0.84, 62], [0.92, 32]],
     wellen: [[240, 1.0], [110, 0.5]], schlaengeln: [[170, 6], [80, 2]],
     spruenge: [[0.08, 1.5, 36], [0.56, 1.6, 34]],
-    pfuetzen: 8, matsch: [[0.7, 0.74]],
+    pfuetzen: 8,
     felder: [[0.96, 1], [0, 0.15], [0.5, 0.6]],
     welt: { art: 'rallye', zeit: 'nachmittag', wald: 'berg' },
   },

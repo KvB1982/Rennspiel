@@ -33,10 +33,15 @@ const BASIS = {
   // "sauber": Die Räder drehen bei Tempo nur so weit, wie es etwas bringt (sonst bremst voller Einschlag das Auto fast bis zum Stand).
   // "fall": In der Luft fällt das Auto 2,2-mal so schnell (kurze Sprünge), "abheben": erst an deutlichen Kuppen abheben.
   arcade: { lenk: 1.3, folgen: 20, griff: 1.35, ein: 8, fang: 8, frei: 0.06, freiHand: 0.62, halt: 8, rand: 3.2, belag: 0.6, sauber: 0.1, kreis: 7, spur: 1.5, ruhe: 1, fall: 2.2, abheben: 1.5,
-    drift: { winkel: 0.45, hand: 0.85, ab: 0.45, lang: 3, abTempo: 7, lose: 1.0, feder: 38, ruhe: 8 } },
+    // "zug": So viel Zugkraft bleibt auch mitten in der Kurve und im Drift (sonst nimmt die Traktionskontrolle dort fast alles
+    // Gas weg und das Auto wird in der Kehre immer langsamer). "kurve": Die Bremshilfe lässt das Auto etwas schneller in die Kurve.
+    // "hand": Die Handbremse wirft das Heck herum, bremst aber nur halb so stark ("brems"), und die Hälfte der Zugkraft bleibt ("zug").
+    zug: 0.6, kurve: 1.1, hand: { brems: 0.5, zug: 0.5 },
+    drift: { winkel: 0.5, hand: 0.95, ab: 0.4, lang: 4.5, abTempo: 4, lose: 1.0, feder: 60, ruhe: 10, eng: 0.3, engAb: 0.7 } },
   // Drift zum Selber-Steuern (siehe physik.js): "winkel" = so weit stellt sich das Auto in einer harten Kurve quer (rad),
   // "hand" = mit Handbremse, "ab" = ab so viel Kurvenkraft beginnt es (Anteil der Grenze), "abTempo" = erst ab diesem Tempo (m/s),
   // "lose" = wie viel mehr auf losem Boden, "feder"/"ruhe" = wie schnell das Heck kommt und wie schnell es sich beruhigt.
+  // "eng"/"engAb" = in Haarnadelkurven (das Auto dreht sich schneller als engAb rad/s) kommt das Heck noch einmal so viel weiter herum.
   tcRest: 0.9,                       // Traktionskontrolle (wenn an) lässt nur wenig Haftung für die Kurve übrig
   lenkMax: 0.62, lenkTempo: 24,
   gaenge: 6, drehzahlMax: 8200, rueck: 7, abregeln: true,

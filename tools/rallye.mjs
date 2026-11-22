@@ -24,8 +24,15 @@ function menschFahrer(a, T, L) {
   const fw = Math.atan2(dx * ch - dz * sh, Math.max(1, dx * sh + dz * ch));
   const plan = L.tempo[T.index(a.s + Math.abs(a.u) * 0.5)];
   puffer.push({ lenk: Math.max(-1, Math.min(1, fw / 0.18)), gas: a.u < plan * 1.02 ? 1 : 0, brems: a.u > plan * 1.2 ? 1 : 0 });
+  // VOLLGAS=1: wie ein Spieler mit Bremshilfe – immer Vollgas, gebremst wird nur von der Bremshilfe
+  if (vollgas) { const e = puffer[puffer.length - 1]; e.gas = 1; e.brems = 0; }
+  // HAND=1: zieht in jeder Haarnadelkurve die Handbremse
+  if (process.env.HAND) puffer[puffer.length - 1].hand = Math.abs(T.k[a.idx]) > KEHRE;
   return puffer.length > VERZUG ? puffer.shift() : { lenk: 0, gas: 1, brems: 0 };
 }
+const vollgas = !!process.env.VOLLGAS;
+// Kehren messen: Wie schnell geht es durch die Haarnadelkurven (Halbmesser unter 22 m), wie weit und wie schnell stellt sich das Auto quer?
+const KEHRE = 1 / 22;
 
 function wilderFahrer(a, T, L) {
   const sh = Math.sin(a.h), ch = Math.cos(a.h), i = T.index(a.s + 0.5 * Math.abs(a.u) + 6);
@@ -60,6 +67,8 @@ for (const def of STRECKEN.filter(s => s.rallye && (!nur || s.id === nur))) {
   E.countdown = 0;
   const a = E.ich.a; a.tc = true; a.arcade = !ohneHilfe;
   let zurueck = 0;
+  if (vollgas) E.hilfe.bremsen = true;
+  const kehren = []; let keh = null;
   let flug = 0, maxFlug = 0, stoesse = 0, neben = 0, maxQuer = 0, querZeit = 0; puffer.length = 0;
   for (let k = 0; k < 400 * 60 && E.phase !== 'fertig' && E.ich.ziel === null; k++) {
     E.update(1 / 60, (mensch ? menschFahrer : wild ? wilderFahrer : testFahrer)(a, T, E.L));
@@ -69,7 +78,18 @@ for (const def of STRECKEN.filter(s => s.rallye && (!nur || s.id === nur))) {
     if (a.stoss > 2) stoesse++;
     if (Math.abs(a.d) > T.hb[a.idx] + 0.3) neben++;
     const quer = Math.abs(Math.atan2(a.v, Math.abs(a.u) + 0.1)); if (quer > maxQuer) maxQuer = quer; if (quer > 0.5) querZeit++;
+    if (Math.abs(T.k[a.idx]) > KEHRE) {
+      if (!keh) kehren.push(keh = { t: 0, min: 999, plan: 0, drift: 0, bis20: null, rein: a.u });
+      keh.t += 1 / 60; keh.drift = Math.max(keh.drift, Math.abs(a.drift || 0));
+      if (a.u < keh.min) { keh.min = a.u; keh.plan = E.L.tempo[a.idx]; }
+      if (keh.bis20 === null && Math.abs(a.drift || 0) > 0.35) keh.bis20 = keh.t;
+      keh.raus = a.u;
+    } else keh = null;
     if (process.env.SPUR && neben % 30 === 1 && Math.abs(a.d) > T.hb[a.idx] + 0.3) console.log(`    neben bei ${Math.round(E.weg)} m, ${Math.round(a.u * 3.6)} km/h, Luft ${a.luft}, Kurve ${T.k[a.idx].toFixed(3)}, Kuppe ${T.kv[a.idx].toFixed(4)}`);
   }
   console.log(`  ${mensch ? 'Mensch (0,22 s Verzug)' : wild ? 'Wilder Fahrer' : 'Testfahrer (' + Math.round(tempo * 100) + ' % vom Plan)'}${ohneHilfe ? ' ohne Hilfe' : ''}: ${zurueck}-mal zurückgesetzt, ${E.ich.ziel !== null ? zeitText(E.ich.ziel) + ', Platz ' + E.ich.platz : 'nicht im Ziel (' + Math.round(E.weg) + ' m)'}, ${(flug / 60).toFixed(1)} s in der Luft, längster Sprung ${maxFlug.toFixed(2)} s, ${stoesse} Bilder mit Anstoß, ${(neben / 60).toFixed(1)} s neben dem Weg, ${(querZeit / 60).toFixed(1)} s mehr als 29° quer`);
+  if (kehren.length) {
+    const m = f => (kehren.reduce((s, k) => s + f(k), 0) / kehren.length);
+    console.log(`  ${kehren.length} Kehren: langsamste Stelle im Schnitt ${(m(k => k.min) * 3.6).toFixed(0)} km/h (${Math.round(m(k => k.min / k.plan) * 100)} % vom Plan, kleinste ${(Math.min(...kehren.map(k => k.min)) * 3.6).toFixed(0)} km/h), ${m(k => k.t).toFixed(2)} s je Kehre, Drift im Bild bis ${(m(k => k.drift) * 57.3).toFixed(0)}° (über 20° nach ${m(k => k.bis20 ?? k.t).toFixed(2)} s, in ${kehren.filter(k => k.bis20 !== null).length} Kehren)`);
+  }
 }

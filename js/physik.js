@@ -237,7 +237,10 @@ export function schritt(a, T, dt) {
     const muF = mu * Fzf, muR = muH * Fzr;
     // Handbremse: Die Hinterräder blockieren, der Antrieb ist ausgekuppelt. Blockierte Räder halten zur Seite kaum noch: Das Heck rutscht weg.
     const hand = a.handbremse && u > 0.05;
-    if (hand) Fx = 0;
+    // Rallye mit Arcade-Hilfe (hand): Die Handbremse wirft nur das Heck herum – sie bremst das Auto kaum ("brems"),
+    // und ein Teil der Zugkraft bleibt ("zug"). So kommt man mit Schwung um die Kehre, statt fast stehen zu bleiben.
+    const AH = hand && A && A.hand;
+    if (hand) Fx = AH ? Fx * AH.zug : 0;
     // Beim Bremsen halten die Reifen längs mehr aus (bremsGriff). Das macht die Bremse kräftiger,
     // ohne dass die Reifen in der Kurve mehr halten.
     const bg = p.bremsGriff || 1;
@@ -251,7 +254,7 @@ export function schritt(a, T, dt) {
         Fx = -a.brems * p.schubMax * 0.7 * Math.max(0, Math.min(1, (p.rueck + u) / (p.rueck * 0.25)));
       }
     }
-    if (hand) Fbr = Math.max(Fbr, muR * 0.92 * bg);
+    if (hand) Fbr = Math.max(Fbr, muR * 0.92 * bg * (AH ? AH.brems : 1));
     if (u < -0.3 && a.gas > 0) { Fbf = Math.min(a.gas * muF * 0.5, muF); Fbr = Math.min(a.gas * muR * 0.5, muR); }
     // Hinterrad kann nicht mehr ziehen, als es Haftung hat. Die Traktionskontrolle (tc) lässt dazu noch Haftung
     // für die Kurve übrig: 0,7 = sicher, 0,95 = fast alles fürs Beschleunigen (dann bricht das Heck leicht aus)
@@ -282,7 +285,8 @@ export function schritt(a, T, dt) {
     const alR = -Math.atan2(v - p.b * r, us);
     // Haftkreis: was zum Bremsen/Ziehen gebraucht wird, fehlt für die Kurve
     // (Die geschenkte Zugkraft der Arcade-Hilfe kostet die Hinterreifen keine Haftung zur Seite.)
-    const lfx = Fbf / bg + Math.abs(Fxf) / zg, lrx = Math.min(Math.abs(Fx), zugGrenze) / zg + Fbr / bg;
+    // (Handbremse mit Arcade-Hilfe: Die Hinterräder rutschen zur Seite weiter so, als wären sie ganz blockiert.)
+    const lfx = Fbf / bg + Math.abs(Fxf) / zg, lrx = AH ? Math.max(muR * 0.92, Fbr / bg) : Math.min(Math.abs(Fx), zugGrenze) / zg + Fbr / bg;
     const DF = Math.sqrt(Math.max(0, muF * muF - lfx * lfx));
     const DR = Math.sqrt(Math.max(0, muR * muR - lrx * lrx));
     // Ganz langsam rollt das Auto einfach dorthin, wohin die Räder zeigen (siehe unten "leicht").
@@ -449,7 +453,9 @@ export function schritt(a, T, dt) {
       const hart = Math.min(1, Math.max(0, (Math.abs(a.driftQ) - DR.ab) / (1 - DR.ab)));
       const lose = 1 + (1 - Math.min(1, gr.haft)) * DR.lose;             // loser Boden: mehr Drift
       const schnell = Math.min(1, (tempo - DR.abTempo) / DR.abTempo);
-      ziel = Math.sign(a.driftQ) * DR.winkel * hart * lose * (0.65 + 0.35 * a.gas) * schnell;
+      // Enge Kurve (Haarnadel): Das Auto dreht sich dort schnell – dann kommt das Heck noch weiter herum (eng)
+      const eng = DR.eng ? 1 + DR.eng * Math.min(1, Math.abs(a.r) / DR.engAb) : 1;
+      ziel = Math.sign(a.driftQ) * DR.winkel * hart * lose * eng * (0.65 + 0.35 * a.gas) * schnell;
       if ((a.handbremse || a.driftHand) && Math.abs(a.lenkWunsch) > 0.1) ziel = Math.sign(a.lenkWunsch) * DR.hand * schnell;
       ziel = Math.max(-DR.hand, Math.min(DR.hand, ziel));
     }
