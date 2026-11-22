@@ -38,7 +38,8 @@ export const AUTOS = {
     schritte: 8, unten: 3,
   },
   // Ferngesteuertes Auto im Maßstab 1:30. Das Tempo ist mit heruntergerechnet:
-  // 3 m/s beim kleinen Auto sehen so schnell aus wie 325 km/h beim großen.
+  // 1,1 m/s beim kleinen Auto sehen so schnell aus wie 120 km/h beim großen. Mit Absicht langsam: Man steht daneben
+  // und sieht die ganze Strecke – bei mehr Tempo ist das Auto durch die Kurve, bevor man lenken kann.
   modell: {
     name: 'Ferngesteuertes Auto 1:30',
     masse: 0.32, traeg: 0.00075,
@@ -46,35 +47,51 @@ export const AUTOS = {
     haft: 1.0, hinten: 1.12, B: 8, C: 1.4,
     abtrieb: 0, abtriebVorn: 0.45, widerstand: 0.0015,
     rollen: 0.008, motorBremse: 0.22,   // rollt ohne Gas weich aus (Motorbremse wächst mit dem Tempo)
-    leistung: 2.2, schubMax: 0.9,
+    leistung: 2.2, schubMax: 0.6,
     bremse: 0.55, bremseVorn: 0.55,
-    lenkMax: 0.4, lenkTempo: 2.6,
-    gaenge: 1, drehzahlMax: 30000, vMax: 2.3, abregeln: true, rueck: 0.7,
+    lenkMax: 0.36, lenkTempo: 1.9,      // voller Einschlag = ein Kreis von gut 40 cm bei mittlerem Tempo: eng genug für jede Kurve, aber nicht zappelig
+    esp: { beta: 0.1, dreh: 8, quer: 0.3, ab: 0.3 },   // Schleuderschutz: Das kleine Auto dreht sich nicht mehr um die eigene Achse
+    gaenge: 1, drehzahlMax: 30000, vMax: 1.1, abregeln: true, rueck: 0.5,
     prall: 0.55,                        // so stark springt es von der Bande zurück (0 = gar nicht, 1 = wie ein Flummi)
     schritte: 16, unten: 0.35,
   },
   // Drift-Rallyeauto im Maßstab 1:43 (wie die kleinen Drift-Autos, die man mit dem Handy steuert: etwa 10,7 cm lang).
-  // Vorbild ist ein Rallyeauto mit Allrad, das meiste der Kraft geht nach hinten. Die Hinterreifen haften etwas schlechter
-  // als die vorderen: Gibt man in der Kurve Gas, bricht das Heck aus und das Auto driftet. Mit der Handbremse geht es noch leichter.
-  // Langsam genug zum Kontrollieren: 1,2 m/s sieht bei 1:43 aus wie gut 180 km/h.
-  // Maßstabsgetreu heißt auch: Die Kräfte sind mit verkleinert. Ein echtes Auto schafft in einer Kehre mit 20 m Halbmesser
-  // etwa 50 km/h – im Maßstab 1:43 sind das 0,47 m Halbmesser und gut 0,3 m/s. Deshalb haften die Reifen hier viel weniger
-  // als bei einem normalen Spielzeugauto (haft 0,075 statt etwa 1): Das Auto rutscht so, wie ein großes Auto rutschen würde.
+  // Langsam genug zum Kontrollieren: 0,9 m/s sieht bei 1:43 aus wie knapp 140 km/h.
+  // Maßstabsgetreu heißt auch: Die Kräfte sind mit verkleinert. Deshalb haften die Reifen viel weniger als bei einem
+  // normalen Spielzeugauto (haft 0,14 statt etwa 1): Das Auto rutscht so, wie ein großes Auto rutschen würde.
+  //
+  // Für dich fährt das Auto mit der Drift-Hilfe „leicht“ (siehe driftLeicht unten): Du lenkst, wohin es fährt –
+  // und je mehr du einlenkst und Gas gibst, desto schräger stellt sich das Auto. Der Drift gehört also dir,
+  // aber das Auto dreht sich nie von allein weg. Ohne Drift-Hilfe (Menü) rechnet das Spiel die Reifen wie bei den
+  // anderen Autos: Dann muss man selbst gegenlenken – das ist schwer.
   drift: {
     name: 'Drift-Rallyeauto 1:43',
     masse: 0.065, traeg: 0.00004,
     a: 0.028, b: 0.031, hoehe: 0.012,
-    haft: 0.075, hinten: 0.92, B: 6.5, C: 1.5,    // weiche Reifenkurve: das Rutschen kommt sanft, nicht plötzlich
+    haft: 0.14, hinten: 0.92, B: 6.5, C: 1.5,     // weiche Reifenkurve: das Rutschen kommt sanft, nicht plötzlich
     abtrieb: 0, abtriebVorn: 0.45, widerstand: 0.0002,
     rollen: 0.004, motorBremse: 0.12,
-    leistung: 0.07, schubMax: 0.07, allrad: 0.3,  // mehr Kraft, als die Reifen halten: Vollgas in der Kurve = Heck kommt
+    leistung: 0.07, schubMax: 0.085, allrad: 0.3, // mehr Kraft, als die Reifen halten: Vollgas in der Kurve = Heck kommt
     durchdrehen: 0.8,                             // keine Traktionskontrolle: Die Räder dürfen durchdrehen (sonst kein Drift), bis 80 % der Haftung
-    bremse: 0.6, bremseVorn: 0.6,
+    bremse: 0.8, bremseVorn: 0.6,
     lenkMax: 0.6, lenkTempo: 1.8,                 // viel Lenkeinschlag, damit man gut gegenlenken kann
-    // Drift-Hilfe (an, solange im Menü „Drift-Hilfe“ an ist): Wird der Drift-Winkel größer als beta (knapp 30 Grad),
-    // dreht das Auto sanft zurück. So dreht man sich nicht so leicht um die eigene Achse.
+    // Ohne „leicht“: Wird der Drift-Winkel größer als beta (knapp 30 Grad), dreht das Auto sanft zurück.
     esp: { beta: 0.5, dreh: 5, quer: 0.02, ab: 0.25, nurWinkel: true },
-    gaenge: 1, drehzahlMax: 30000, vMax: 1.2, abregeln: true, rueck: 0.4,
+    // Drift-Hilfe „leicht“ (alles Spiel-Werte, geschätzt):
+    leicht: {
+      eng: 5.5,          // engster Kreis bei wenig Tempo: 1 / eng Meter (etwa 18 cm)
+      winkel: 0.62,      // so schräg steht das Auto bei vollem Lenken und Vollgas (rad, etwa 35 Grad)
+      ab: 0.22,          // erst ab so viel Lenken stellt es sich quer (darunter fährt es sauber)
+      ohneGas: 0.4,      // ohne Gas bleibt nur dieser Teil des Winkels: Gas weg = Auto wird gerade
+      ein: 4.5, aus: 3.2, // so schnell stellt es sich quer / wieder gerade (pro Sekunde)
+      hand: 1.05,        // Winkel mit Handbremse (etwa 60 Grad)
+      handEng: 1.7,      // mit Handbremse dreht es so viel mal enger (für Haarnadeln)
+      handBremst: 0.55,  // und wird dabei langsamer (m/s²)
+      zug: 1.25, bremse: 1.5,   // Beschleunigen und Bremsen (m/s²)
+      rollen: 0.06, motor: 0.5, // Ausrollen ohne Gas
+      reibt: 0.5,        // quer rutschen kostet Tempo (m/s² bei 90 Grad)
+    },
+    gaenge: 1, drehzahlMax: 30000, vMax: 0.9, abregeln: true, rueck: 0.35,
     prall: 0.5,
     schritte: 24, unten: 0.15,
   },
@@ -136,7 +153,7 @@ export const lenkGrenze = (p, u) => p.lenkMax / (1 + (Math.abs(u) / p.lenkTempo)
 
 // Einen Zeitschritt rechnen. T = Strecke (für Untergrund, Höhe, Begrenzung).
 export function schritt(a, T, dt) {
-  const p = a.p, n = p.schritte, h = dt / n;
+  const p = a.p, leichtAn = !!p.leicht && a.tc === true, n = leichtAn ? 0 : p.schritte, h = dt / p.schritte;
   // Wo auf der Strecke? (einmal pro Bild reicht)
   const f = T.finde(a.x, a.z, a.idx);
   a.idx = f.i; a.d = f.d; a.s = f.s;
@@ -335,6 +352,7 @@ export function schritt(a, T, dt) {
   }
   a.rutschVorn = Math.min(1, Math.max(0, maxRutschV - 0.75) * 2.5);
   a.rutschHinten = Math.min(1, Math.max(0, maxRutschH - 0.75) * 2.5);
+  if (leichtAn) driftLeicht(a, gr, dt);
 
   // 3. Strecken-Helfer (Arcade-Hilfe): Fährt das Auto auf den Rand der Fahrbahn zu, lenkt die Straße es unsichtbar
   //    etwas zurück: Fahrtrichtung und Auto drehen sich gemeinsam ein Stück in Richtung der Straße. Je näher am Rand
@@ -416,6 +434,62 @@ export function schritt(a, T, dt) {
   const [jeG, hoechstens] = p.super ? [0.045, 0.07] : [0.014, 0.038];
   a.kippen += (Math.max(-hoechstens, Math.min(hoechstens, querG * jeG)) - a.kippen) * Math.min(1, dt * 6);
   a.neigung += (((a.brems > 0 && a.u > 1 ? 1 : 0) * 0.012 - a.gas * 0.006) - a.neigung) * Math.min(1, dt * 5);
+}
+
+// DRIFT-HILFE „leicht“ (Drift-Rallye, nur für dich): ein gespielter Drift, den du selbst steuerst.
+// Statt die Reifen genau zu rechnen, gilt hier:
+//   1. Das Lenkrad bestimmt, wohin das Auto FÄHRT (die Fahrtrichtung dreht sich so schnell, wie du lenkst –
+//      höchstens so schnell, wie es die Haftung bei diesem Tempo hergibt).
+//   2. Das Lenkrad und das Gas bestimmen, wie SCHRÄG das Auto dabei steht: wenig lenken = sauber,
+//      viel lenken und Gas = quer. Gas weg oder Lenkrad gerade = Auto wird wieder gerade.
+//   3. Quer rutschen kostet etwas Tempo, die Handbremse stellt das Auto ganz quer und dreht es um die Haarnadel.
+// So dreht sich das Auto nie von allein um die eigene Achse – aber der Drift fühlt sich an wie selbst gemacht.
+function driftLeicht(a, gr, dt) {
+  const p = a.p, D = p.leicht, w = a.lenkWunsch || 0;
+  const cl = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  let s = Math.hypot(a.u, a.v);
+  a.Fyr = a.Fyf = 0;
+  if (a.u < 0 || (s < 0.03 && a.gas <= 0)) {
+    // rückwärts oder im Stand: ganz einfach rollen, wohin die Räder zeigen
+    let u = a.u;
+    if (a.gas > 0) u = Math.min(0.031, u + D.bremse * a.gas * dt);
+    else if (a.brems > 0) u = Math.max(-p.rueck, u - D.zug * 0.7 * a.brems * dt);
+    else u *= Math.exp(-dt * 3);
+    a.v *= Math.exp(-dt * 12);
+    a.r = u * w * D.eng; a.h += a.r * dt; a.u = u; a.ax = 0;
+    a.x += (Math.sin(a.h) * a.u + Math.cos(a.h) * a.v) * dt; a.z += (Math.cos(a.h) * a.u - Math.sin(a.h) * a.v) * dt;
+    a.lenk = w * p.lenkMax; a.rutschVorn = a.rutschHinten = 0;
+    return;
+  }
+  const hand = !!a.handbremse;
+  const beta = Math.atan2(a.v, a.u);           // so schräg steht das Auto zur Fahrtrichtung (plus = Nase zeigt nach rechts davon)
+  let kurs = a.h + beta;                       // Fahrtrichtung
+  // Tempo: Gas, Bremse, Ausrollen, Untergrund – und das Rutschen selbst bremst
+  let acc = 0;
+  if (a.gas > 0 && !hand) acc += a.gas * D.zug * cl((p.vMax * 1.03 - s) / (p.vMax * 0.15), 0, 1) * Math.min(1, gr.haft * 1.4);
+  acc -= a.brems * D.bremse * gr.haft;
+  if (hand) acc -= D.handBremst;
+  acc -= D.rollen + (a.gas > 0 ? 0 : D.motor * s) + gr.zieh * G * Math.min(1, s / 0.3);
+  acc -= D.reibt * Math.abs(Math.sin(beta));
+  s = Math.max(0, s + acc * dt);
+  // Fahrtrichtung: volles Lenken = die engste Kurve, die bei diesem Tempo geht
+  const quer = p.haft * G * gr.haft * (hand ? D.handEng : 1);
+  const dreh = w * Math.min(s * D.eng, quer / Math.max(s, 0.05));
+  kurs += dreh * dt;
+  // Drift-Winkel: Lenken und Gas stellen das Auto quer (Nase zeigt in die Kurve hinein)
+  const tempoK = cl((s - 0.22 * p.vMax) / (0.3 * p.vMax), 0, 1);
+  let ziel;
+  if (hand) { const seite = Math.abs(w) > 0.08 ? Math.sign(w) : -Math.sign(beta); ziel = -seite * D.hand * cl(s / (0.3 * p.vMax), 0, 1); }
+  else ziel = -Math.sign(w) * cl((Math.abs(w) - D.ab) / (1 - D.ab), 0, 1) * D.winkel * (D.ohneGas + (1 - D.ohneGas) * a.gas) * tempoK;
+  const mehr = ziel * beta < 0 || Math.abs(ziel) > Math.abs(beta);
+  const b2 = beta + (ziel - beta) * Math.min(1, dt * (mehr ? D.ein : D.aus));
+  const hNeu = kurs - b2;
+  a.r = (hNeu - a.h) / dt; a.h = hNeu;
+  a.u = s * Math.cos(b2); a.v = s * Math.sin(b2); a.ax = acc;
+  a.x += Math.sin(kurs) * s * dt; a.z += Math.cos(kurs) * s * dt;
+  // Vorderräder zeigen dorthin, wohin das Auto fährt (im Drift sieht das wie Gegenlenken aus)
+  a.lenk = cl(b2 * 0.9 + w * 0.2, -p.lenkMax, p.lenkMax);
+  a.rutschHinten = cl((Math.abs(b2) - 0.12) / 0.3, 0, 1); a.rutschVorn = a.rutschHinten * 0.4;
 }
 
 function luftHelfer(a, T, f, dt) {
