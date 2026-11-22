@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- Rennspiel – macht aus Baum-Modellen flache Bilder (zwei Ansichten nebeneinander, Hintergrund durchsichtig).
-     Die Modelle (baum_fichte.glb, baum_laub.glb, baum_pinie.glb, baum_zypresse.glb – aus Powershot, assets/gelaende/)
+     Die Modelle (baum_fichte.glb, baum_laub.glb, baum_pinie.glb, baum_zypresse.glb, baum_palme.glb – aus Powershot, assets/gelaende/)
      in den Ordner quellen_modelle/baeume/ legen, dann http://localhost:8765/tools/baumbilder.html öffnen.
      Jedes Bild mit Rechtsklick speichern und als bilder/baum_<name>.webp ablegen. -->
 <meta charset="utf-8"><title>Baum-Bilder</title>
@@ -10,9 +10,12 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // Name → Breite einer Ansicht in Bildpunkten (Höhe immer 512)
-const BAEUME = { fichte: 288, laub: 512, pinie: 512, zypresse: 128 };
+const BAEUME = { fichte: 288, laub: 512, pinie: 512, zypresse: 128, palme: 384 };
+// ?nur=palme macht nur dieses eine Bild
+const NUR = new URLSearchParams(location.search).get('nur');
 window.bilder = {};
 for (const [name, breit] of Object.entries(BAEUME)) {
+  if (NUR && name !== NUR) continue;
   const g = await new GLTFLoader().loadAsync(`../quellen_modelle/baeume/baum_${name}.glb`);
   const c = document.createElement('canvas'); c.width = breit * 2; c.height = 512; document.body.append(c);
   const r = new THREE.WebGLRenderer({ canvas: c, alpha: true, antialias: true, preserveDrawingBuffer: true, premultipliedAlpha: false });
