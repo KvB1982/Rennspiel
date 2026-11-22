@@ -7,6 +7,7 @@
 // Vorn ist +z, links ist +x. Der Nullpunkt liegt im Schwerpunkt zwischen den Achsen (wie bei den anderen Autos).
 
 import * as THREE from 'three';
+import { baueAnzeige, baueLenkrad, schalterReihe, stab } from './cockpit.js';
 import { rumpf, rad, stange } from './autobau.js';
 import { nummer } from './texturen.js';
 
@@ -162,18 +163,24 @@ export function baueRallye({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massst
   const drin = m => { innen.add(m); return m; };
   drin(kiste(W * 1.5, 0.03, 1.7, matt, 0, 1.03, -0.5));                      // dunkler Boden (sonst säße man auf blauem Blech)
   drin(kiste(W * 1.5, 0.08, 0.4, matt, 0, 1.07, 0.33));                      // Armaturenbrett
-  drin(kiste(0.34, 0.08, 0.12, matt, 0.33, 1.14, 0.2));                      // Haube über den Anzeigen
-  const anzeige = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.06), new THREE.MeshStandardMaterial({ color: 0x102030, emissive: 0x3fd0ff, emissiveIntensity: 0.9 }));
-  anzeige.position.set(0.33, 1.14, 0.135); anzeige.rotation.y = Math.PI; drin(anzeige);
+  drin(kiste(0.31, 0.14, 0.06, matt, 0.33, 1.15, 0.17));                     // Gehäuse der Anzeige
+  // Anzeige: zeigt wirklich Gang, Tempo und Drehzahl (mit Schaltlichtern)
+  const anz = baueAnzeige(0.27, 0.1, { art: 'renn', farbe: '#3fd0ff' });
+  anz.mesh.position.set(0.33, 1.16, 0.135); drin(anz.mesh);
+  drin(kiste(0.31, 0.02, 0.1, matt, 0.33, 1.222, 0.17));                     // Dach über der Anzeige
   for (const s of [-1, 1]) {
     drin(stange([s * W * 0.74, 1.07, 0.5], [s * W * 0.66, dach, -0.22], 0.022, matt));        // Scheibenrahmen links und rechts
     drin(stange([s * W * 0.6, 0.4, -0.95], [s * W * 0.6, dach - 0.03, -0.95], 0.025, rohrMat)); // Überrollkäfig
   }
   drin(stange([-W * 0.62, dach - 0.01, -0.22], [W * 0.62, dach - 0.01, -0.22], 0.03, matt));  // Dachkante
-  const lenkrad = new THREE.Group(); lenkrad.position.set(0.33, 1.08, 0.02); lenkrad.rotation.x = -0.35; innen.add(lenkrad);
-  const kranz = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.018, 8, 24), matt); lenkrad.add(kranz);
-  lenkrad.add(kiste(0.25, 0.03, 0.02, matt, 0, 0, 0), kiste(0.03, 0.13, 0.02, matt, 0, -0.065, 0));
-  const marke = kiste(0.03, 0.02, 0.03, new THREE.MeshStandardMaterial({ color: 0xffd400, roughness: 0.5 }), 0, 0.13, 0); lenkrad.add(marke);   // gelbe Marke oben: so sieht man, wie weit man lenkt
+  // Lenkrad mit Händen, dazu Schalter, Schalthebel und Handbremshebel
+  const lenk = baueLenkrad('sport', { r: 0.14, naht: 0xc0181c, aermel: farbe, arm: [0.1, -0.24, -0.22] });
+  const lenkrad = lenk.gruppe; lenk.halter.position.set(0.33, 1.07, 0.0); lenk.halter.rotation.x = 0.35; innen.add(lenk.halter);
+  drin(stab([0.33, 1.07, 0.02], [0.33, 1.04, 0.2], 0.025, matt));
+  const schalter = schalterReihe(5, 0.035, rohrMat); schalter.position.set(0, 1.085, 0.128); drin(schalter);
+  drin(stab([0.08, 0.75, -0.1], [0.1, 1.04, 0.0], 0.011, rohrMat));
+  const knauf = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), new THREE.MeshStandardMaterial({ color: 0xc0181c, roughness: 0.5 })); knauf.position.set(0.1, 1.05, 0.0); drin(knauf);
+  drin(stab([-0.03, 0.75, -0.15], [-0.03, 1.1, -0.06], 0.013, rohrMat));
   innen.visible = false;
 
   auto.traverse(o => { if (o.isMesh) o.castShadow = true; });
@@ -181,5 +188,5 @@ export function baueRallye({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massst
   auto.scale.setScalar(massstab);
   // auge = wo die Augen des Fahrers sind (links im Auto), für die Cockpit-Kamera
   const sicht = imAuto => { for (const m of nurAussen) m.visible = !imAuto; };
-  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, innen, sicht, auge: [0.33, 1.3, -0.5], licht: { material: rueckMat }, helm: [helm, helm], halo: [], massstab, scheinwerfer: scheinMat };
+  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, lenkStellen: lenk.stelle, zeige: (a, mal) => anz.male(a, mal), blickTief: 2.2, innen, sicht, auge: [0.33, 1.3, -0.5], licht: { material: rueckMat }, helm: [helm, helm], halo: [], massstab, scheinwerfer: scheinMat };
 }

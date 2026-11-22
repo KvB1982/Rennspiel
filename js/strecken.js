@@ -303,6 +303,25 @@ export const STRECKEN = [
     pfuetzen: 4,
     welt: { art: 'rallye', zeit: 'abend', wald: 'berg' },
   },
+  {
+    // Enger Weg: nur 6,5 m breit, die Bäume stehen dicht am Rand – so wirkt das Tempo viel höher.
+    // "felder" = Stücke der Strecke (Anteil von … bis), die über offene Wiesen und Felder führen statt durch Wald.
+    id: 'wp_alm', name: 'WP 4 · Almweg', ort: 'Enger Schotterweg über Felder, durch Wald und in Serpentinen auf die Alm, Mittag',
+    text: 'Schmal und schnell: erst über die Felder im Tal, dann durch dichten Wald und in fünf Serpentinen steil den Berg hinauf. Oben über den Kamm – und in einer langen Abfahrt durch den Wald zurück ins Tal.',
+    rallye: true, belag: 'schotter', breite: 6.5, glatt: 10, kerbAb: 99, aus: 'gras', grasBreite: 1.8,
+    ecken: [
+      [0, 0, 50], [350, -60, 90], [650, 60, 60], [800, 330, 45],
+      [600, 420, 13], [860, 500, 13], [600, 580, 13], [860, 660, 13], [600, 740, 13], [820, 870, 35],
+      [600, 1010, 70], [250, 960, 50], [0, 1090, 60], [-300, 980, 40],
+      [-430, 700, 80], [-300, 450, 30], [-480, 290, 25], [-350, 110, 40], [-200, -70, 45],
+    ],
+    hoehe: [[0, 20], [0.14, 26], [0.2, 48], [0.27, 76], [0.33, 104], [0.39, 132], [0.45, 158], [0.52, 172], [0.6, 166], [0.68, 134], [0.76, 98], [0.84, 62], [0.92, 32]],
+    wellen: [[240, 1.0], [110, 0.5]], schlaengeln: [[170, 6], [80, 2]],
+    spruenge: [[0.08, 1.5, 36], [0.56, 1.6, 34]],
+    pfuetzen: 8, matsch: [[0.7, 0.74]],
+    felder: [[0.96, 1], [0, 0.15], [0.5, 0.6]],
+    welt: { art: 'rallye', zeit: 'nachmittag', wald: 'berg' },
+  },
 ];
 
 export const strecke = id => STRECKEN.find(s => s.id === id) || STRECKEN[0];

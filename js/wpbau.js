@@ -38,6 +38,10 @@ export function baueWpWelt(T, szene, { qualitaet = 'hoch', etappe = null } = {})
   // Ist an dieser Stelle (s, Seite) Platz für Zuschauer? Dort keine Bäume
   const beiLeuten = (s, seite, weit = 30) => zuschauer.some(z => z.seite === seite && Math.abs(((s - z.s + T.laenge * 1.5) % T.laenge) - T.laenge / 2) < weit);
 
+  // Felder: Stücke der Strecke, die über offene Wiesen und Äcker führen (def.felder = [[Anteil von, bis]]).
+  // feld[i] = 0 (Wald) bis 1 (Feld), am Übergang weich dazwischen
+  const feld = feldStuecke(T, def.felder);
+
   // ---------------------------------------------------------------- der Weg
   const SP = 10;
   const wegMat = asphalt
@@ -133,15 +137,20 @@ export function baueWpWelt(T, szene, { qualitaet = 'hoch', etappe = null } = {})
     // Waldboden: vom Waldrand nach außen, fällt etwas ab (darunter liegt das Gelände)
     const lat2 = (i, j) => seite * (T.hb[i] + aus[i] + [0.2, 7, 22][j]);
     const hoch2 = (i, j) => [-0.15, -0.55, -1.6][j];
-    gruppe.add(mesh(band(T, 0, T.n, 2, lat2, hoch2, { uv: (i, j, l, s) => [l / 5, s / 5] }), bodenMat, false, true));
+    for (const [von, bis] of abschnitte(T.n, i => feld[i] <= 0.5)) gruppe.add(mesh(band(T, von, bis, 2, lat2, hoch2, { uv: (i, j, l, s) => [l / 5, s / 5] }), bodenMat, false, true));
+    // auf dem Feld liegt dort Wiese statt Waldboden
+    for (const [von, bis] of abschnitte(T.n, i => feld[i] > 0.5)) gruppe.add(mesh(band(T, von, bis, 2, lat2, hoch2, { uv: (i, j, l, s) => [l / 3, s / 3] }), grasMat, false, true));
   }
 
   // ---------------------------------------------------------------- Gelände ringsum (Hügel, im Dunst Berge)
   const nah = naeheGitter(T, 60);
-  const hoeheBei = gelaende(T, gruppe, welt, wald, viel, nah);
+  const hoeheBei = gelaende(T, gruppe, welt, wald, viel, nah, feld);
 
   // ---------------------------------------------------------------- Bäume
-  baeume(T, gruppe, welt, wald, viel, r, nah, hoeheBei, beiLeuten);
+  baeume(T, gruppe, welt, wald, viel, r, nah, hoeheBei, beiLeuten, feld);
+
+  // ---------------------------------------------------------------- Weidezaun und Heuballen auf den Feldern
+  if (def.felder) feldSchmuck(T, gruppe, feld, hoeheBei, beiLeuten);
 
   // ---------------------------------------------------------------- Felsen, Holzstapel
   felsenUndHolz(T, gruppe, wald, viel, r, etappe, beiLeuten);
@@ -157,7 +166,22 @@ export function baueWpWelt(T, szene, { qualitaet = 'hoch', etappe = null } = {})
 }
 
 // ---------------------------------------------------------------- Gelände
-function gelaende(T, gruppe, welt, wald, viel, nah) {
+// Macht aus den Feld-Stücken der Strecke eine Zahl je Messpunkt: 0 = Wald, 1 = Feld (auf etwa 50 m weich dazwischen)
+function feldStuecke(T, felder) {
+  const n = T.n, hart = new Float32Array(n), weich = new Float32Array(n);
+  if (!felder) return weich;
+  for (const [a, b] of felder) for (let i = Math.floor(a * n); i < Math.min(n, Math.ceil(b * n)); i++) hart[i] = 1;
+  const w = Math.max(1, Math.round(25 / T.ds));
+  let summe = 0;
+  for (let k = -w; k <= w; k++) summe += hart[((k % n) + n) % n];
+  for (let i = 0; i < n; i++) { weich[i] = summe / (2 * w + 1); summe += hart[(i + w + 1) % n] - hart[((i - w) % n + n) % n]; }
+  return weich;
+}
+
+// Farben der Felder: Weizen, Wiese, junges Grün, Acker, Raps
+const FELD_FARBEN = [0xe6cf7a, 0x9cc04e, 0xb9d268, 0xa98a5c, 0xe8dc4a, 0x8fb848];
+
+function gelaende(T, gruppe, welt, wald, viel, nah, feld) {
   const { minx, maxx, minz, maxz } = welt.grenzen;
   const rand = 1100, x0 = minx - rand, x1 = maxx + rand, z0 = minz - rand, z1 = maxz + rand;
   const N = viel >= 1 ? 230 : viel > 0.5 ? 170 : 120;
@@ -167,18 +191,28 @@ function gelaende(T, gruppe, welt, wald, viel, nah) {
     const ty = f.i >= 0 ? T.y[f.i] : 0;
     const frei = f.i >= 0 ? T.hb[f.i] + Math.max(T.ausL[f.i], T.ausR[f.i]) + 20 : 0;
     const d = f.i >= 0 ? f.d : 1e4;
-    const w = Math.min(1, Math.max(0, (d - frei) / (wald === 'berg' ? 160 : 220))), glatt = w * w * (3 - 2 * w);
+    // über den Feldern bleibt das Land länger flach, die Hügel fangen erst weiter weg an
+    const fw = f.i >= 0 ? feld[f.i] : 0;
+    const w = Math.min(1, Math.max(0, (d - frei - fw * 60) / ((wald === 'berg' ? 160 : 220) + fw * 140))), glatt = w * w * (3 - 2 * w);
     // dicht am Weg etwas tiefer als der Rand (sonst schaut das Gelände bei Kuppen durch)
     return ty - 1.7 + glatt * (rs(x / 600, z / 600, 4) * amp + amp * 0.6 + (wald === 'berg' ? Math.max(0, rs(x / 1500 + 3, z / 1500, 2)) * 260 * glatt : 0));
   };
   const pos = [], cols = [], idx = [], uvs = [];
-  const c = new THREE.Color(), boden = new THREE.Color(wald === 'laub' ? 0x6a6238 : 0x5f6a3a), moos = new THREE.Color(0x4f7232), fels = new THREE.Color(0x77736a);
+  const c = new THREE.Color(), boden = new THREE.Color(wald === 'laub' ? 0x6a6238 : 0x5f6a3a), moos = new THREE.Color(0x4f7232), fels = new THREE.Color(0x77736a), acker = new THREE.Color();
   for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
     const x = x0 + (x1 - x0) * i / N, z = z0 + (z1 - z0) * j / N, h = hoehe(x, z);
     pos.push(x, h, z); uvs.push(x / 14, z / 14);
     const v = rs(x / 80, z / 80, 3) * 0.5 + 0.5;
     c.copy(boden).lerp(moos, v * 0.6);
     if (wald === 'berg' && h > 220) c.lerp(fels, Math.min(1, (h - 220) / 80));
+    // Felder: bunte Streifen wie ein Flickenteppich (jeder Acker hat seine Farbe)
+    const fn = nah(x, z, 5);
+    if (fn.i >= 0 && feld[fn.i] > 0) {
+      const u = x * 0.87 + z * 0.5, w2 = -x * 0.5 + z * 0.87;
+      const nr = Math.abs(Math.floor(u / 70) * 7 + Math.floor(w2 / 130) * 13) % FELD_FARBEN.length;
+      acker.setHex(FELD_FARBEN[nr]).multiplyScalar(2.1);       // heller, weil das Bild vom Waldboden dunkel ist
+      c.lerp(acker, feld[fn.i] * Math.min(1, Math.max(0, (300 - fn.d) / 80)));
+    }
     cols.push(c.r, c.g, c.b);
   }
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const a = j * (N + 1) + i, b = a + 1, cc = a + N + 1, d = cc + 1; idx.push(a, cc, b, b, cc, d); }
@@ -201,7 +235,7 @@ function gelaende(T, gruppe, welt, wald, viel, nah) {
 }
 
 // ---------------------------------------------------------------- Bäume: dichte Reihen am Weg, dazu Wald im Gelände
-function baeume(T, gruppe, welt, wald, viel, r, nah, hoehe, beiLeuten) {
+function baeume(T, gruppe, welt, wald, viel, r, nah, hoehe, beiLeuten, feld) {
   // Welche Bäume? [Bild, Höhe, Anteil]
   const ARTEN = wald === 'laub' ? [['laub', 12, 0.75], ['fichte', 15, 0.25]] : wald === 'berg' ? [['fichte', 14, 0.85], ['laub', 9, 0.15]] : [['fichte', 16, 0.7], ['pinie', 13, 0.15], ['laub', 11, 0.15]];
   const stellen = [];   // [x, y, z, Größe]
@@ -213,6 +247,7 @@ function baeume(T, gruppe, welt, wald, viel, r, nah, hoehe, beiLeuten) {
       if (s < 40 || s > T.laenge - 30) continue;           // am Start ist eine Lichtung
       const i = T.index(s);
       if (T.belag[i] === BELAG.wasser) continue;
+      if (feld[i] > 0.5 && r() > 0.04) continue;           // auf dem Feld stehen nur einzelne Bäume am Weg
       for (let k = 0; k < BAUM_REIHEN; k++) {
         if (r() < 0.12 + k * 0.1) continue;                 // Lücken
         const d = seite * (T.hb[i] + aus[i] + 0.9 + k * 4.2 + r() * 3.2);
@@ -232,6 +267,7 @@ function baeume(T, gruppe, welt, wald, viel, r, nah, hoehe, beiLeuten) {
       const d = seite * (T.hb[i] + aus + weit);
       const x = T.x[i] + T.tz[i] * d + (r() - 0.5) * 6, z = T.z[i] - T.tx[i] * d + (r() - 0.5) * 6;
       if (beiLeuten(s, seite, 40) && weit < 40) continue;
+      if (feld[i] > 0.5 && weit < 110) continue;           // Feld: der Wald fängt erst weit hinten an
       const f = nah(x, z, 3);
       if (f.i >= 0 && f.d < T.hb[f.i] + Math.max(T.ausL[f.i], T.ausR[f.i]) + 10) continue;
       stellen.push([x, hoehe(x, z) - 0.3, z, 0.8 + r() * 0.5]);
@@ -245,6 +281,7 @@ function baeume(T, gruppe, welt, wald, viel, r, nah, hoehe, beiLeuten) {
     const f = nah(x, z, 3);
     if (f.i >= 0 && f.d < T.hb[f.i] + Math.max(T.ausL[f.i], T.ausR[f.i]) + 14) continue;
     if (rs(x / 300, z / 300, 2) < -0.35) continue;
+    if (f.i >= 0 && feld[f.i] > 0.5 && f.d < 230) continue;   // keine Bäume mitten im Acker
     const h = hoehe(x, z);
     if (wald === 'berg' && h > 260) continue;               // oben am Berg nur Fels
     stellen.push([x, h - 0.3, z, 0.85 + r() * 0.5]); k++;
@@ -274,6 +311,51 @@ function baeume(T, gruppe, welt, wald, viel, r, nah, hoehe, beiLeuten) {
     im.castShadow = true; im.receiveShadow = false;
     gruppe.add(im);
   });
+}
+
+// ---------------------------------------------------------------- Felder: Weidezaun am Weg, Heuballen auf der Wiese
+function feldSchmuck(T, gruppe, feld, hoehe, beiLeuten) {
+  const r = TX.zufall(71), kiste = new THREE.BoxGeometry(1, 1, 1);
+  const holz = new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 0.95 });
+  const teile = [];   // [x, y, z, Richtung, breit, hoch, lang]
+  const PFOSTEN = 3.5;   // alle 3,5 m ein Pfosten
+  for (const seite of [1, -1]) {
+    const aus = seite > 0 ? T.ausL : T.ausR;
+    let alt = null;
+    for (let s = 0; s < T.laenge; s += PFOSTEN) {
+      const i = T.index(s);
+      if (feld[i] < 0.6 || beiLeuten(s, seite) || s < 30 || s > T.laenge - 20) { alt = null; continue; }
+      const d = seite * (T.hb[i] + aus[i] + 0.7);
+      const p = { x: T.x[i] + T.tz[i] * d, y: T.y[i] - 0.25, z: T.z[i] - T.tx[i] * d };
+      teile.push([p.x, p.y + 0.55, p.z, 0, 0, 0.12, 1.1, 0.12]);
+      if (alt) {   // zwei Latten vom letzten Pfosten bis zu diesem
+        const dx = p.x - alt.x, dz = p.z - alt.z, lang = Math.hypot(dx, dz), h = Math.atan2(dx, dz), steig = Math.atan2(p.y - alt.y, lang);
+        for (const hoch of [0.45, 0.9]) teile.push([(p.x + alt.x) / 2, (p.y + alt.y) / 2 + hoch, (p.z + alt.z) / 2, h, -steig, 0.05, 0.1, lang]);
+      }
+      alt = p;
+    }
+  }
+  const zaun = new THREE.InstancedMesh(kiste, holz, teile.length);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(0, 0, 0, 'YXZ');
+  teile.forEach(([x, y, z, h, steig, b, ho, l], k) => { e.set(steig, h, 0); q.setFromEuler(e); m4.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(b, ho, l)); zaun.setMatrixAt(k, m4); });
+  zaun.castShadow = true; gruppe.add(zaun);
+
+  // Heuballen: dicke Rollen, die auf der Wiese liegen
+  const rolle = new THREE.CylinderGeometry(0.8, 0.8, 1.3, 14); rolle.rotateZ(Math.PI / 2);
+  const heu = new THREE.MeshStandardMaterial({ color: 0xd8bc6a, roughness: 1 });
+  const ballen = [];
+  for (let s = 0; s < T.laenge; s += 28) {
+    const i = T.index(s);
+    if (feld[i] < 0.9 || r() < 0.35) continue;
+    const seite = r() < 0.5 ? 1 : -1, aus = seite > 0 ? T.ausL[i] : T.ausR[i], weit = 4 + r() * 16, d = seite * (T.hb[i] + aus + 0.2 + weit);
+    const x = T.x[i] + T.tz[i] * d, z = T.z[i] - T.tx[i] * d;
+    // die Wiese fällt vom Weg weg etwas ab (wie das Band oben in baueWpWelt)
+    const tief = weit < 6.8 ? 0.15 + 0.4 * weit / 6.8 : 0.55 + 1.05 * (weit - 6.8) / 15;
+    ballen.push([x, T.y[i] - tief + 0.75, z, r() * 6.28]);
+  }
+  const bm = new THREE.InstancedMesh(rolle, heu, ballen.length);
+  ballen.forEach(([x, y, z, h], k) => { e.set(0, h, 0); q.setFromEuler(e); m4.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(1, 1, 1)); bm.setMatrixAt(k, m4); });
+  bm.castShadow = true; gruppe.add(bm);
 }
 
 // ---------------------------------------------------------------- Felsen ("nicht schneiden") und Holzstapel

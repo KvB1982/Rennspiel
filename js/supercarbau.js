@@ -17,6 +17,10 @@ import { rumpf, rad, stange } from './autobau.js';
 import { ladeSupercars as laden, ladeRallye, echtesAuto, lackMaterial } from './automodelle.js';
 import { supercar, SUPERCARS } from './supercars.js';
 import { RALLYEAUTOS } from './rallyeautos.js';
+import { baueAnzeige, baueLenkrad, kartenBild, lueftung, schalterReihe, stab, klotz } from './cockpit.js';
+
+// Farbe von Nähten und Zierleisten im Innenraum je Auto (fehlt eins: rotbraun)
+const INNEN_FARBE = { falkner: 0xb5482a, falkner_s: 0xc9a227, taurino: 0xe2b714, stallone: 0xc41e1e, aurelion: 0x2f6fd6, nordvind: 0xe86a17, vento: 0x8b5a2b };
 
 // Alle Supercar-Modelle laden (siehe js/automodelle.js)
 export const ladeSupercars = opt => laden(SUPERCARS.map(S => S.id), opt);
@@ -121,7 +125,11 @@ export function baueSupercar(id, { farbe = null } = {}) {
     const u = unterkante(z), o = Math.max(u + 0.08, kurve(oben, z));
     schnitte.push([z, breite(z), (o - u) / 2, (o + u) / 2]);
   }
-  add(new THREE.Mesh(rumpf(schnitte.reverse(), F.rund, 28), lack));   // rumpf will die Schnitte von vorn nach hinten
+  schnitte.reverse();                                                  // rumpf will die Schnitte von vorn nach hinten
+  const huelle = add(new THREE.Mesh(rumpf(schnitte, F.rund, 28), lack));
+  // Im Cockpit wird die ganze Hülle ausgeblendet (ihr Blech läge sonst mitten im Innenraum). Dafür gibt es
+  // die Haube noch einmal allein: nur das Stück vor der Scheibe.
+  const haubeInnen = new THREE.Mesh(rumpf(schnitte.filter(q => q[0] >= F.kv - 0.12), F.rund, 28), lack);
   // dunkler Unterboden, damit man durch die Radläufe nicht hindurchsieht
   add(kiste(W * 2 - 0.5, 0.26, zF - zR - 1.2, schwarz, 0, 0.27, (zF + zR) / 2));
   for (const za of [VORN, HINTEN]) { const t = Math.min(0.64, kurve(oben, za) - 0.06); add(kiste(W * 2 - 0.4, t - 0.2, 0.8, schwarz, 0, (t + 0.2) / 2, za)); }
@@ -234,57 +242,111 @@ export function baueSupercar(id, { farbe = null } = {}) {
   }
 
   // Fahrer: Kopf (man sieht ihn nur schwach durch das dunkle Glas). Im Cockpit wird er ausgeblendet.
-  const auge = [0.36, F.dach - 0.16, F.kv - F.scheibe - 0.05];
+  // auge = wo die Augen des Fahrers sind (links im Auto). Alles im Cockpit wird von dort aus hingestellt,
+  // damit Lenkrad, Hände und Anzeige bei jedem Auto gut im Bild liegen.
+  const rallyeArt = RALLYEAUTOS.includes(S);
+  const auge = [0.36, F.dach - 0.16, F.kv - F.scheibe - 0.15];
+  const [ax, ay, az] = auge;
   const kopf = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 10), new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 }));
-  kopf.position.set(auge[0], auge[1] - 0.02, auge[2] - 0.08); add(kopf);
+  kopf.position.set(ax, ay - 0.02, az + 0.02); add(kopf);
 
-  // Innenraum (nur im Cockpit zu sehen): Armaturenbrett, Säulen der Scheibe, Türverkleidung, Lenkrad
+  // ---------- Innenraum (nur im Cockpit zu sehen) ----------
   const innen = new THREE.Group(); koerper.add(innen);
-  const hb = kurve(oben, F.kv);
-  const brett = new THREE.Mesh(new THREE.BoxGeometry(W * 1.7, 0.12, 0.45), innenMat); brett.position.set(0, hb + 0.02, F.kv - 0.32); innen.add(brett);
-  const tacho = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.1), new THREE.MeshStandardMaterial({ color: 0x0a0a0a, emissive: 0x2a7fff, emissiveIntensity: 0.5 }));
-  tacho.position.set(auge[0], hb + 0.085, F.kv - 0.5); tacho.rotation.x = -0.6; innen.add(tacho);
-  for (const s of [-1, 1]) {
-    innen.add(stange([s * W * F.kabineBreit * 0.95, hb + 0.02, F.kv - 0.05], [s * W * F.kabineBreit * 0.78, F.dach - 0.02, dachVorn], 0.035, innenMat));
-    const tuer = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.35), innenMat);
-    tuer.position.set(s * (W * F.kabineBreit * 0.98), hb - 0.1, (F.kv + dachHinten) / 2 - 0.2); tuer.rotation.y = Math.PI / 2; innen.add(tuer);
-  }
-  innen.add(kiste(W * 2 * F.kabineBreit * 0.8, 0.05, 0.06, innenMat, 0, F.dach - 0.03, dachVorn));
-  innen.add(kiste(0.2, 0.05, 0.02, chrom, 0, F.dach - 0.1, dachVorn - 0.02));   // Innenspiegel
-  const sitz = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.12), leder); sitz.position.set(-auge[0], hb - 0.08, auge[2] - 0.25); innen.add(sitz);
-  // Rallyeauto: innen sieht es nach Wettbewerb aus – Überrollkäfig aus Rohren, große Anzeige mit Schaltlichtern,
-  // langer Schalthebel und Handbremshebel, Wegstreckenzähler vor dem Beifahrer, Schalensitz mit Kopfstütze.
-  if (RALLYEAUTOS.includes(S)) {
-    const rohr = new THREE.MeshStandardMaterial({ color: 0xc9ccd2, roughness: 0.35, metalness: 0.7 });
-    const rot = new THREE.MeshStandardMaterial({ color: 0xc0181c, roughness: 0.5 });
-    const kb = W * F.kabineBreit, zm = auge[2];
-    for (const s of [-1, 1]) {
-      innen.add(stange([s * kb * 0.93, hb + 0.05, F.kv - 0.03], [s * kb * 0.8, F.dach - 0.03, dachVorn + 0.03], 0.014, rohr));    // Rohr vorn an der Scheibensäule
-      innen.add(stange([s * kb * 0.9, hb - 0.3, F.kv - 0.15], [s * kb * 0.9, hb - 0.05, zm - 0.9], 0.02, rohr));                  // Kreuz in der Tür
-      innen.add(stange([s * kb * 0.9, hb - 0.05, F.kv - 0.15], [s * kb * 0.9, hb - 0.3, zm - 0.9], 0.02, rohr));
-    }
-    // Anzeige hinter dem Lenkrad mit einer Reihe Schaltlichter (grün, gelb, rot)
-    innen.add(kiste(0.26, 0.13, 0.04, innenMat, auge[0], hb + 0.13, F.kv - 0.5));
-    [0x25d04a, 0x25d04a, 0xf2c21a, 0xf2c21a, 0xe02020].forEach((f, k) => {
-      innen.add(kiste(0.022, 0.014, 0.01, new THREE.MeshStandardMaterial({ color: f, emissive: f, emissiveIntensity: 1.5 }), auge[0] - (k - 2) * 0.04, hb + 0.21, F.kv - 0.5));   // von links nach rechts (links ist +x)
-    });
-    // Wegstreckenzähler vor dem Beifahrer
-    innen.add(kiste(0.22, 0.09, 0.05, innenMat, -auge[0], hb + 0.11, F.kv - 0.5));
-    innen.add(kiste(0.17, 0.045, 0.01, new THREE.MeshStandardMaterial({ color: 0x06140a, emissive: 0x30e060, emissiveIntensity: 0.7 }), -auge[0], hb + 0.11, F.kv - 0.53));
-    // Schalthebel und Handbremshebel (hoch und griffbereit neben dem Lenkrad)
-    innen.add(stange([0.08, hb - 0.42, zm + 0.3], [0.1, hb - 0.08, zm + 0.36], 0.012, rohr)); innen.add(kiste(0.045, 0.045, 0.045, rot, 0.1, hb - 0.07, zm + 0.36));
-    innen.add(stange([-0.03, hb - 0.42, zm + 0.22], [-0.03, hb - 0.03, zm + 0.3], 0.014, rohr)); innen.add(kiste(0.04, 0.08, 0.04, innenMat, -0.03, hb - 0.0, zm + 0.3));
-    innen.add(kiste(0.3, 0.16, 0.1, rot, -auge[0], hb + 0.28, zm - 0.3));
-  }
-  innen.visible = false;
+  const drin = m => { innen.add(m); return m; };
+  const hb = kurve(oben, F.kv), kb = W * F.kabineBreit;
+  drin(haubeInnen);
+  const naht = rallyeArt ? 0xc0181c : (INNEN_FARBE[S.id] ?? 0xb5482a);          // Farbe der Nähte und Zierleisten
+  const zier = new THREE.MeshStandardMaterial({ color: naht, roughness: 0.55 });
+  const weich = new THREE.MeshStandardMaterial({ color: 0x26272c, roughness: 0.95 });   // gepolsterte Flächen (etwas heller als das Brett)
+  const alu = new THREE.MeshStandardMaterial({ color: 0xaeb3bb, roughness: 0.3, metalness: 0.9 });
+  const loch = new THREE.MeshStandardMaterial({ color: 0x050506, roughness: 1 });
 
-  // Lenkrad (dreht sich mit dem Einschlag)
-  const lenkHalter = new THREE.Group(); lenkHalter.position.set(auge[0], hb - 0.02, auge[2] + 0.42); lenkHalter.rotation.x = -0.35; innen.add(lenkHalter);
-  if (RALLYEAUTOS.includes(S)) lenkHalter.position.y += 0.1;   // Rallye: Lenkrad höher und näher, man sieht es beim Fahren
-  const lenkrad = new THREE.Group(); lenkHalter.add(lenkrad);
-  const kranz = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.022, 8, 24), new THREE.MeshStandardMaterial({ color: 0x18181a, roughness: 0.7 })); lenkrad.add(kranz);
-  const nabe = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.03), innenMat); lenkrad.add(nabe);
-  const mark = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.03, 0.03), new THREE.MeshStandardMaterial({ color: 0xf2c21a })); mark.position.y = 0.17; lenkrad.add(mark);
+  // Armaturenbrett: eine Platte bis zur Scheibe und eine Front zum Fahrer hin
+  const brettOben = Math.min(hb + 0.08, ay - 0.12), brettHinten = az + 0.7, tiefe = Math.max(0.3, F.kv - brettHinten + 0.05);
+  drin(klotz(W * 1.75, 0.05, tiefe, innenMat, 0, brettOben - 0.025, brettHinten + tiefe / 2));
+  drin(klotz(W * 1.75, 0.36, 0.06, weich, 0, brettOben - 0.2, brettHinten + 0.03));
+  drin(klotz(W * 1.75, 0.009, 0.012, zier, 0, brettOben + 0.001, brettHinten + 0.004));            // farbige Naht an der Kante
+  drin(klotz(W * 1.75, 0.012, 0.008, alu, 0, brettOben - 0.2, brettHinten - 0.002));               // Zierleiste quer über die Front
+
+  // Boden, Wand zum Motorraum und Rückwand (dunkel, damit man nirgends auf die Straße hinunterschaut)
+  drin(klotz(W * 1.9, 0.04, F.kv - az + 0.9, innenMat, 0, 0.3, (F.kv + az - 0.9) / 2));
+  drin(klotz(W * 1.9, brettOben - 0.3, 0.04, innenMat, 0, (brettOben + 0.3) / 2, brettHinten + 0.12));
+  drin(klotz(W * 1.9, F.dach - 0.3, 0.04, weich, 0, (F.dach + 0.3) / 2, az - 0.5));
+  for (const s of [-1, 1]) drin(klotz(0.04, hb - 0.2, F.kv - az + 0.5, innenMat, s * W * 0.97, (hb + 0.2) / 2 + 0.05, (F.kv + az - 0.5) / 2));
+
+  // Lenkrad mit Händen (dreht sich mit dem Einschlag), dahinter die Lenksäule mit Hebeln
+  const ly = ay - 0.29, lz = az + 0.5;
+  const lenk = baueLenkrad(rallyeArt ? 'sport' : 'rund', { r: rallyeArt ? 0.165 : 0.175, naht, handschuh: rallyeArt ? 0x16171a : 0x2a211c, aermel: rallyeArt ? 0x1a2348 : 0x2b2d33 });
+  const lenkrad = lenk.gruppe; lenk.halter.position.set(ax, ly, lz); lenk.halter.rotation.x = 0.38; innen.add(lenk.halter);
+  drin(stab([ax, ly, lz + 0.02], [ax, ly - 0.07, brettHinten + 0.04], 0.03, innenMat, 0.036));
+  if (!rallyeArt) for (const s of [-1, 1]) drin(stab([ax, ly - 0.03, lz + 0.09], [ax + s * 0.2, ly - 0.02, lz + 0.07], 0.008, innenMat));   // Blinker- und Wischerhebel
+
+  // Anzeige hinter dem Lenkrad: zeigt wirklich Tempo, Gang und Drehzahl (durch das Lenkrad hindurch zu sehen)
+  const anz = baueAnzeige(rallyeArt ? 0.26 : 0.3, 0.12, { art: rallyeArt ? 'renn' : 'rund', farbe: rallyeArt ? '#39ff8a' : '#' + new THREE.Color(naht).lerp(new THREE.Color(0xffffff), 0.35).getHexString() });
+  const anzY = ly + 0.085, anzOben = anzY + 0.075;
+  anz.mesh.position.set(ax, anzY, brettHinten - 0.012); anz.mesh.rotation.x = 0.12; drin(anz.mesh);
+  // Gehäuse um die Anzeige: Rückwand, Dach gegen die Sonne, zwei Wangen
+  drin(klotz(0.36, Math.max(0.17, anzOben - brettOben + 0.2), 0.05, innenMat, ax, anzOben - Math.max(0.17, anzOben - brettOben + 0.2) / 2 + 0.01, brettHinten + 0.02));
+  drin(klotz(0.38, 0.022, 0.13, innenMat, ax, anzOben + 0.012, brettHinten + 0.0));
+  for (const s of [-1, 1]) drin(klotz(0.02, 0.16, 0.11, innenMat, ax + s * 0.18, anzY, brettHinten + 0.01));
+
+  // Scheibensäulen, Dachkante, Sonnenblenden, Innenspiegel
+  const saeuleUnten = [kb * 0.95, hb + 0.02, F.kv - 0.05], saeuleOben = [kb * 0.78, F.dach - 0.02, dachVorn];
+  for (const s of [-1, 1]) {
+    drin(stange([s * saeuleUnten[0], saeuleUnten[1], saeuleUnten[2]], [s * saeuleOben[0], saeuleOben[1], saeuleOben[2]], 0.035, innenMat));
+    drin(klotz(0.3, 0.012, 0.13, weich, s * 0.36, F.dach - 0.045, dachVorn + 0.03, -0.25));        // Sonnenblende
+  }
+  drin(klotz(kb * 1.6, 0.05, 0.06, innenMat, 0, F.dach - 0.03, dachVorn));
+  const spiegelY = hb + (F.dach - hb) * 0.86;
+  drin(stab([0, spiegelY + 0.05, dachVorn + 0.2], [0, spiegelY, dachVorn + 0.17], 0.008, innenMat));
+  drin(klotz(0.24, 0.065, 0.02, innenMat, 0, spiegelY - 0.02, dachVorn + 0.165));
+  drin(klotz(0.22, 0.05, 0.004, chrom, 0, spiegelY - 0.02, dachVorn + 0.153));
+
+  // Türen: Verkleidung, Armlehne mit farbiger Leiste, Griff
+  for (const s of [-1, 1]) {
+    const x = s * kb * 0.98, zt = (F.kv + dachHinten) / 2 - 0.2;
+    const tuer = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.5), weich); tuer.position.set(x, hb - 0.17, zt); tuer.rotation.y = Math.PI / 2; drin(tuer);
+    drin(klotz(0.07, 0.05, 0.75, innenMat, x - s * 0.035, hb - 0.16, az + 0.2));
+    drin(klotz(0.012, 0.012, 1.1, zier, x - s * 0.008, hb + 0.06, az + 0.25));
+    drin(klotz(0.012, 0.014, 0.08, alu, x - s * 0.012, hb - 0.03, az + 0.5));
+    if (rallyeArt) {   // Überrollkäfig: Kreuz in der Tür und ein Rohr an der Scheibensäule
+      const rohr = alu;
+      drin(stange([s * kb * 0.9, hb - 0.3, F.kv - 0.15], [s * kb * 0.9, hb - 0.02, az - 0.4], 0.02, rohr));
+      drin(stange([s * kb * 0.9, hb - 0.02, F.kv - 0.15], [s * kb * 0.9, hb - 0.3, az - 0.4], 0.02, rohr));
+    }
+  }
+
+  // Mitte: Konsole zwischen den Sitzen, darüber Bildschirm und Lüftung (Rallye: Schalter und Hebel)
+  drin(klotz(0.22, 0.09, 0.62, innenMat, 0, ay - 0.5, az + 0.34, -0.22));
+  if (rallyeArt) {
+    const schalter = schalterReihe(6, 0.035, alu); schalter.position.set(0, brettOben - 0.11, brettHinten - 0.004); drin(schalter);
+    drin(klotz(0.26, 0.085, 0.01, new THREE.MeshStandardMaterial({ color: 0x2b2d31, roughness: 0.4, metalness: 0.6 }), 0, brettOben - 0.1, brettHinten - 0.001));
+    // Wegstreckenzähler vor dem Beifahrer (mit grüner Leuchtschrift)
+    drin(klotz(0.22, 0.09, 0.05, innenMat, -ax, brettOben + 0.045, brettHinten + 0.05));
+    drin(klotz(0.17, 0.045, 0.006, new THREE.MeshStandardMaterial({ color: 0x06140a, emissive: 0x30e060, emissiveIntensity: 0.8 }), -ax, brettOben + 0.047, brettHinten + 0.022));
+    // langer Schalthebel und Handbremshebel, hoch und griffbereit neben dem Lenkrad
+    const rot = new THREE.MeshStandardMaterial({ color: 0xc0181c, roughness: 0.5 });
+    drin(stab([0.1, ay - 0.5, az + 0.32], [0.13, ly - 0.03, az + 0.42], 0.011, alu));
+    const knauf = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 10), rot); knauf.position.set(0.13, ly - 0.02, az + 0.42); drin(knauf);
+    drin(stab([-0.02, ay - 0.5, az + 0.24], [-0.02, ly + 0.02, az + 0.36], 0.013, alu));
+    drin(stab([-0.02, ly - 0.07, az + 0.335], [-0.02, ly + 0.03, az + 0.365], 0.02, weich));
+    drin(klotz(0.3, 0.16, 0.1, rot, -ax, ay - 0.02, az - 0.12));   // Kopfstütze am Schalensitz des Beifahrers
+    drin(klotz(0.42, 0.5, 0.1, rot, -ax, ay - 0.36, az - 0.1));
+  } else {
+    drin(klotz(0.27, 0.165, 0.012, alu, 0, brettOben - 0.1, brettHinten + 0.001));
+    const karte = kartenBild(0.25, 0.145, anz.mesh.material.color ? '#39c2ff' : '#39c2ff'); karte.position.set(0, brettOben - 0.1, brettHinten - 0.007); drin(karte);
+    for (const x of [0.2, -0.2, -(kb - 0.13), kb - 0.13]) { const l = lueftung(0.036, alu, loch); l.position.set(x, brettOben - 0.09, brettHinten - 0.004); drin(l); }
+    // Wählhebel und drei leuchtende Tasten auf der Konsole
+    drin(stab([0, ay - 0.47, az + 0.38], [0, ay - 0.39, az + 0.4], 0.012, alu));
+    const knauf = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 10), leder); knauf.position.set(0, ay - 0.38, az + 0.4); drin(knauf);
+    [0xff4a3a, 0xe9edf2, 0x39c2ff].forEach((f, k) => drin(klotz(0.03, 0.01, 0.03, new THREE.MeshStandardMaterial({ color: f, emissive: f, emissiveIntensity: 0.6 }), (k - 1) * 0.05, ay - 0.41, az + 0.52, -0.22)));
+    // Beifahrersitz mit Kopfstütze und farbiger Naht
+    drin(klotz(0.46, 0.55, 0.12, leder, -ax, ay - 0.38, az - 0.12));
+    drin(klotz(0.24, 0.16, 0.1, leder, -ax, ay - 0.02, az - 0.12));
+    drin(klotz(0.012, 0.5, 0.125, zier, -ax, ay - 0.38, az - 0.12));
+  }
+  innen.traverse(o => { o.castShadow = false; });
+  innen.visible = false;
 
   // Gibt es das fertige Modell? Dann kommt alles bisher Gebaute in eine Gruppe "alt" (nur im Cockpit zu sehen)
   const E = echtesAuto(S.id);
@@ -313,5 +375,5 @@ export function baueSupercar(id, { farbe = null } = {}) {
 
   auto.traverse(o => { if (o.isMesh) o.castShadow = true; });
   // Glas soll keine harten Schatten ins Auto werfen
-  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, licht: { material: rueckMat }, helm: [kopf, kopf], halo: [], innen, auge, scheinwerfer: scheinMat, massstab: 1, supercar: true, sicht, dachHaut };
+  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, licht: { material: rueckMat }, helm: [kopf, kopf], halo: [], innen, auge, blickTief: 2.7, zeige: (a, mal) => anz.male(a, mal), lenkStellen: lenk.stelle, scheinwerfer: scheinMat, massstab: 1, supercar: true, sicht, dachHaut, huelle };
 }

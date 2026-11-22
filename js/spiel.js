@@ -57,7 +57,7 @@ const speichereGeist = (id, art, g) => { try { localStorage.setItem(bestKey(id, 
 // Bestzeiten der kleinen Autos gelten je Höchsttempo (sonst wären sie nicht vergleichbar)
 const geistArt = () => E.fahrzeug === 'f1' ? '' : E.fahrzeug === 'super' ? '.' + E.supercar : E.fahrzeug === 'rallye' ? '.' + E.rallyeauto : '.' + E.tempo + (E.fahrzeug === 'slot' ? '' : '.3');   // .3: seit es Turbo und die Arcade-Hilfe für die kleinen Autos gibt, zählen die alten Bestzeiten nicht mehr
 // Die ganze Rallye: drei Prüfungen nacheinander
-const RALLYE_FOLGE = ['wp_seen', 'wp_nebel', 'wp_pass'];
+const RALLYE_FOLGE = ['wp_seen', 'wp_nebel', 'wp_pass', 'wp_alm'];
 const streckenCache = new Map();
 const holeStrecke = id => { if (!streckenCache.has(id)) streckenCache.set(id, baueStrecke(strecke(id))); return streckenCache.get(id); };
 
