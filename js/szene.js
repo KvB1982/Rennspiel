@@ -188,6 +188,7 @@ export class Buehne {
       m.helm[0].visible = m.helm[1].visible = !imAuto;
       for (const h of m.halo) h.visible = !imAuto;   // der Bügel wäre sonst genau vor den Augen
       if (m.innen) m.innen.visible = imAuto;
+      if (m.dachHaut) m.dachHaut.visible = !imAuto;
       if (m.sicht) m.sicht(imAuto);                    // fertiges Modell von außen, selbst gebautes Auto im Cockpit           // Supercar: Armaturenbrett und Lenkrad nur von innen
     }
     if (this.verkehrBild) this.verkehrBild.update();

@@ -25,7 +25,7 @@ const $ = id => document.getElementById(id);
 // ---------------------------------------------------------------- Einstellungen (werden im Browser gemerkt)
 const STANDARD = {
   fahrzeug: 'f1', modus: 'rennen', strecke: 'kueste', strecke_modell: 'wohnzimmer', strecke_slot: 'slot_oval', strecke_drift: 'drift_matte', strecke_super: 'metropole', strecke_rallye: 'wp_seen', tempo: 'mittel',
-  rallyeauto: 'sturmfalke', lack_rallye: 0, beifahrer: 'beides', kamera_rallye: 'hinten',
+  rallyeauto: 'sturmfalke', lack_rallye: 0, beifahrer: 'beides', kamera_rallye: 'hinten', kopfneigen: true,
   supercar: 'falkner', lack: 0, verkehr: 'normal', runden_super: 1, gegner_super: 5,
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
   bremshilfe: true, lenkhilfe: false, traktion: true, arcade: true, autogas: false, grafik: 'hoch', linie: true, boxen: true,
@@ -43,6 +43,7 @@ const E = Object.assign({}, STANDARD);
 // iPad und iPhone: zuerst "mittel" (weniger Bildpunkte, weniger Häuser und Bäume), bis man selbst etwas anderes wählt
 if (istApfelGeraet()) { E.grafik = 'mittel'; E.neigen = true; }   // und zuerst durch Neigen steuern
 try { Object.assign(E, JSON.parse(localStorage.getItem('rennspiel.einst') || '{}')); } catch (e) {}
+if (E.kamera_rallye === 'haube') E.kamera_rallye = 'cockpit';   // die Motorhauben-Kamera ist jetzt ein richtiges Cockpit
 const merken = () => { try { localStorage.setItem('rennspiel.einst', JSON.stringify(E)); } catch (e) {} };
 
 // Bestzeiten und Geist-Runden
@@ -124,7 +125,7 @@ export function starteSpiel() {
     if (rallye) {
       zeile('Stärke der anderen Fahrer', 'staerke', [['leicht', 'leicht'], ['mittel', 'mittel'], ['schwer', 'schwer']]);
       zeile('Beifahrer', 'beifahrer', [['beides', 'spricht und zeigt'], ['bild', 'nur zeigen'], ['aus', 'aus']]);
-      zeile('Kamera', 'kamera_rallye', [['hinten', 'hinter dem Auto'], ['weit', 'weiter weg'], ['haube', 'Motorhaube']]);
+      zeile('Kamera', 'kamera_rallye', [['hinten', 'hinter dem Auto'], ['weit', 'weiter weg'], ['cockpit', 'im Cockpit']]);
     } else if (sup) {
       zeile('Gegner', 'gegner_super', [3, 5, 7].map(n => [n, String(n)]), rennenAn);
       zeile('Stärke der Gegner', 'staerke', [['leicht', 'leicht'], ['mittel', 'mittel'], ['schwer', 'schwer']], rennenAn);
@@ -137,6 +138,8 @@ export function starteSpiel() {
       zeile('Runden', 'runden', (modell ? [3, 5, 10, 20] : [1, 3, 5, 10]).map(n => [n, String(n)]), rennenAn);
     }
     if (!modell && !rallye) zeile('Kamera', 'kamera', [['hinten', 'hinter dem Auto'], ['weit', 'weiter weg'], ['cockpit', 'im Cockpit']]);
+    // Kopfneigung: Auch hinter dem Auto legt sich das Bild in die Kurve (im Cockpit immer)
+    zeile('Kopf neigt sich in die Kurve', 'kopfneigen', [[true, 'an'], [false, 'aus']], !modell);
     zeile('Höchsttempo', 'tempo', [['langsam', 'langsam'], ['mittel', 'mittel'], ['schnell', 'schnell']], modell);
     zeile('Tanken und Reifen', 'boxen', [[true, 'an'], [false, 'aus']], modell && rennenAn && !drift);
     zeile('Ideallinie und Bremszonen', 'linie', [[true, 'an'], [false, 'aus']], !modell && !rallye);
@@ -304,7 +307,7 @@ export function starteSpiel() {
   function kameraWeiter() {
     if (!kamera) return;
     if (kamera.modus === 'stand') { kamera.standNr = (kamera.standNr + 1) % Math.max(1, buehne.welt.standorte.length); kamera.frisch = true; melden(buehne.welt.standorte[kamera.standNr].name); return; }
-    const folge = rennen && rennen.rallye ? ['hinten', 'weit', 'haube'] : ['hinten', 'weit', 'cockpit'];
+    const folge = ['hinten', 'weit', 'cockpit'];
     kamera.setze(folge[(folge.indexOf(kamera.modus) + 1) % folge.length]);
     melden(SICHTEN[kamera.modus]);
   }
@@ -555,7 +558,7 @@ export function starteSpiel() {
       // Rallye: Der Beifahrer liest die nächste Ansage vor
       if (R.rallye && R.ansageNeu) { const g = R.ansageNeu; R.ansageNeu = null; if (E.beifahrer === 'beides') sprecher.sagen(g.sprache, g.s - R.weg); }
     }
-    kamera.update(dt, R.ich.a, { modell: !!T.def.modell, standorte: buehne.welt.standorte, massstab: T.sc });
+    kamera.update(dt, R.ich.a, { modell: !!T.def.modell, standorte: buehne.welt.standorte, massstab: T.sc, kopfNeigen: E.kopfneigen !== false });
     if (!pausiert) buehne.schritt(dt, R.ich.a);
     if (!malen) return;
     buehne.malen(dt, R.ich.a, R.geistBei(), R.phase === 'ampel' ? R.ampel : 0, false, kamera.modus === 'cockpit' ? R.ich : null);
