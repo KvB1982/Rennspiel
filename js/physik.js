@@ -37,21 +37,28 @@ export const AUTOS = {
     gaenge: 8, drehzahlMax: 12500, vMax: 96, rueck: 14,
     schritte: 8, unten: 3,
   },
-  // Ferngesteuertes Auto im Maßstab 1:30. Das Tempo ist mit heruntergerechnet:
-  // 1,1 m/s beim kleinen Auto sehen so schnell aus wie 120 km/h beim großen. Mit Absicht langsam: Man steht daneben
-  // und sieht die ganze Strecke – bei mehr Tempo ist das Auto durch die Kurve, bevor man lenken kann.
+  // Ferngesteuertes Auto im Maßstab 1:30. Es fährt wie ein kleiner Rennwagen: Auf der Geraden zieht es kräftig an
+  // (2 m/s sehen im Maßstab aus wie gut 210 km/h), vor den Kurven muss es bremsen (die Bremshilfe macht das für dich),
+  // und die Arcade-Hilfe hält es auf der Bahn – so wie bei den großen Autos.
   modell: {
     name: 'Ferngesteuertes Auto 1:30',
     masse: 0.32, traeg: 0.00075,
     a: 0.055, b: 0.065, hoehe: 0.02,
-    haft: 1.0, hinten: 1.12, B: 8, C: 1.4,
+    haft: 0.26, hinten: 1.12, B: 8, C: 1.4,   // wenig Haftung, passend zum Maßstab: Vor den Kurven muss das Auto bremsen, auf der Geraden zieht es davon
     abtrieb: 0, abtriebVorn: 0.45, widerstand: 0.0015,
     rollen: 0.008, motorBremse: 0.22,   // rollt ohne Gas weich aus (Motorbremse wächst mit dem Tempo)
-    leistung: 2.2, schubMax: 0.6,
-    bremse: 0.55, bremseVorn: 0.55,
-    lenkMax: 0.36, lenkTempo: 1.9,      // voller Einschlag = ein Kreis von gut 40 cm bei mittlerem Tempo: eng genug für jede Kurve, aber nicht zappelig
+    leistung: 3.0, schubMax: 0.8,
+    zugGriff: 2.4,                      // kräftiger Antritt (Spiel-Wert wie bei den großen Autos)
+    bremse: 0.8, bremseVorn: 0.55, bremsGriff: 2,
+    lenkMax: 0.42, lenkTempo: 1.9,      // voller Einschlag = ein Kreis von knapp 30 cm: Das Auto lenkt sofort und kräftig ein
     esp: { beta: 0.1, dreh: 8, quer: 0.3, ab: 0.3 },   // Schleuderschutz: Das kleine Auto dreht sich nicht mehr um die eigene Achse
-    gaenge: 1, drehzahlMax: 30000, vMax: 1.1, abregeln: true, rueck: 0.5,
+    // Arcade-Hilfe wie bei Rennwagen und Supercars (siehe ARCADE unten): direkte Lenkung, und der Computer hilft
+    // unsichtbar, auf der Bahn zu bleiben. Dazu der Drift zum Selber-Steuern wie im Rallye-Modus (nur Bild):
+    // Wer hart durch die Kurve fährt, stellt das Auto quer – und lädt damit den Turbo auf (siehe turbo unten).
+    arcade: { lenk: 1.5, folgen: 26, griff: 1.15, ein: 10, fang: 6, frei: 0.08, halt: 2, rand: 9, zug: 0.6, kurve: 0.92,
+      drift: { winkel: 0.5, hand: 0.85, ab: 0.55, abTempo: 0.3, lose: 0.5, feder: 55, ruhe: 9, lang: 4 } },
+    turbo: { mal: 1.4, schub: 2.2 },    // Turbo: so viel mal das Höchsttempo, so viel mal die Zugkraft
+    gaenge: 6, drehzahlMax: 30000, vMax: 1.1, abregeln: true, rueck: 0.5,
     prall: 0.55,                        // so stark springt es von der Bande zurück (0 = gar nicht, 1 = wie ein Flummi)
     schritte: 16, unten: 0.35,
   },
@@ -90,8 +97,10 @@ export const AUTOS = {
       zug: 1.25, bremse: 1.5,   // Beschleunigen und Bremsen (m/s²)
       rollen: 0.06, motor: 0.5, // Ausrollen ohne Gas
       reibt: 0.5,        // quer rutschen kostet Tempo (m/s² bei 90 Grad)
+      rand: 2.5,         // Strecken-Helfer wie bei den großen Autos: kurz vor dem Rand dreht die Fahrtrichtung etwas zurück zur Matte
     },
-    gaenge: 1, drehzahlMax: 30000, vMax: 0.9, abregeln: true, rueck: 0.35,
+    turbo: { mal: 1.3, schub: 2 },                // Turbo (siehe turbo.js): etwas sanfter als beim ferngesteuerten Auto, die Matte ist klein
+    gaenge: 5, drehzahlMax: 30000, vMax: 0.9, abregeln: true, rueck: 0.35,
     prall: 0.5,
     schritte: 24, unten: 0.15,
   },
@@ -154,6 +163,12 @@ export const lenkGrenze = (p, u) => p.lenkMax / (1 + (Math.abs(u) / p.lenkTempo)
 // Einen Zeitschritt rechnen. T = Strecke (für Untergrund, Höhe, Begrenzung).
 export function schritt(a, T, dt) {
   const p = a.p, leichtAn = !!p.leicht && a.tc === true, n = leichtAn ? 0 : p.schritte, h = dt / p.schritte;
+  // kl: Bei den kleinen Autos sind alle Längen und Tempo-Grenzen der Hilfen mit verkleinert (große Autos: 1)
+  const kl = T.def.modell ? T.sc : 1;
+  // Turbo (kleine Autos): eine kurze Zeit lang mehr Höchsttempo und mehr Zugkraft (a.turbo = Sekunden, die er noch brennt)
+  const TB = a.turbo > 0 && p.turbo ? p.turbo : null;
+  if (a.turbo > 0) a.turbo = Math.max(0, a.turbo - dt);
+  const vMax = p.vMax * (TB ? TB.mal : 1);
   // Wo auf der Strecke? (einmal pro Bild reicht)
   const f = T.finde(a.x, a.z, a.idx);
   a.idx = f.i; a.d = f.d; a.s = f.s;
@@ -178,13 +193,13 @@ export function schritt(a, T, dt) {
   // Arcade (sauber): Mehr Einschlag, als die Reifen in eine Kurve umsetzen können, bremst nur (die Vorderräder schieben
   // quer über den Boden). Deshalb drehen die Räder bei Tempo höchstens ein Stück ("sauber") weiter als nötig für die
   // engste Kurve, die die Haftung hergibt. Voll einlenken bleibt die engste Kurve – nur ohne Festbremsen. Gegenlenken ist frei.
-  if (A && A.sauber && a.u > 2) {
+  if (A && A.sauber && a.u > 2 * kl) {
     const lose = A.belag && gr.haft < 1 ? 1 + (1 / gr.haft - 1) * A.belag : 1;
     const rMax = p.haft * gr.haft * G * A.griff * lose / a.u;
     let eng = Math.min(lenkGr, Math.atan((p.a + p.b) * rMax / a.u) + A.sauber);
     // kreis: Der engste Kreis beim Fahren ist "kreis" Meter groß – das reicht für jede Kehre. Noch enger würde das Auto
     // bei wenig Tempo nur hin und her zappeln. Fast im Stand (zum Wenden) gilt wieder der volle Einschlag.
-    if (A.kreis) { const k = Math.atan((p.a + p.b) / A.kreis); if (eng > k) eng = k + (eng - k) * Math.max(0, 1 - (a.u - 2) / 3); }
+    if (A.kreis) { const k = Math.atan((p.a + p.b) / A.kreis); if (eng > k) eng = k + (eng - k) * Math.max(0, 1 - (a.u - 2 * kl) / (3 * kl)); }
     // beim Gegenlenken geht es weich über zum vollen Einschlag (je weiter das Heck weg ist, desto mehr)
     const gegen = Math.sign(a.lenkWunsch) === Math.sign(a.v) ? Math.min(1, Math.abs(Math.atan2(a.v, a.u)) / 0.35) : 0;
     lenkGr = eng + (lenkGr - eng) * gegen;
@@ -210,14 +225,14 @@ export function schritt(a, T, dt) {
     // Antrieb und Bremse
     let Fx = 0, Fbf = 0, Fbr = 0;
     if (a.gas > 0 && u > -0.5) {
-      Fx = a.gas * Math.min(p.schubMax, p.leistung / Math.max(au, 1)) * (p.schub || 1);
+      Fx = a.gas * Math.min(p.schubMax, p.leistung / Math.max(au, 1)) * (p.schub || 1) * (TB ? TB.schub : 1);
       // Drift-Hilfe: Steht das Auto schon zu quer, nimmt sie etwas Gas weg (dann greifen die Hinterräder wieder)
       if (p.esp && p.esp.nurWinkel && a.tc !== false && au > p.esp.ab) {
         const zuquer = Math.abs(Math.atan2(v, au)) - p.esp.beta;
         if (zuquer > 0) Fx *= Math.max(0.25, 1 - zuquer * 3);
       }
       // kleine Autos: Der Motor dreht nicht höher, kurz vor dem Höchsttempo lässt der Schub nach
-      if (p.abregeln) Fx *= Math.max(0, Math.min(1, (p.vMax * 1.03 - u) / (p.vMax * 0.12)));
+      if (p.abregeln) Fx *= Math.max(0, Math.min(1, (vMax * 1.03 - u) / (vMax * 0.12)));
     }
     const muF = mu * Fzf, muR = muH * Fzr;
     // Handbremse: Die Hinterräder blockieren, der Antrieb ist ausgekuppelt. Blockierte Räder halten zur Seite kaum noch: Das Heck rutscht weg.
@@ -280,7 +295,8 @@ export function schritt(a, T, dt) {
 
     // Luftwiderstand, Rollwiderstand, Untergrund
     const Fd = 0.5 * LUFT * p.widerstand * u * au + p.rollen * p.masse * G * Math.sign(u) + gr.zieh * p.masse * G * Math.sign(u) * Math.min(1, au / 6)
-      + (p.motorBremse || 0) * p.masse * u * (a.gas > 0 ? 0 : 1);
+      + (p.motorBremse || 0) * p.masse * u * (a.gas > 0 ? 0 : 1)
+      + (p.turbo && u > vMax * 1.03 ? (u - vMax) * p.masse * 2.5 : 0);   // nach dem Turbo: zurück aufs normale Höchsttempo
     const Fb = (Fbf + Fbr) * Math.sign(u) * Math.min(1, au / 0.3);
     const cs = Math.cos(a.lenk), sn = Math.sin(a.lenk);
     let du = (Fx + Fxf * cs - Fb - Fd - Fyf * sn) / p.masse + v * r;
@@ -309,7 +325,7 @@ export function schritt(a, T, dt) {
       dr += korr;
       du -= Math.abs(korr) * E.quer;                                      // ESP bremst dabei einzelne Räder
     }
-    if (A && au > 3) {
+    if (A && au > 3 * kl) {
       // ARCADE-HILFE (nur für dich, nur Rennwagen und Supercars; so machen es viele Arcade-Rennspiele):
       // 1. Lenk-Helfer: Das Auto soll sich so schnell drehen, wie die Räder zeigen – höchstens so schnell, wie es die
       //    Haftung (mal "griff") hergibt. Dreht es langsamer (es schiebt geradeaus = Untersteuern), hilft ein Dreh-Moment
@@ -352,16 +368,18 @@ export function schritt(a, T, dt) {
   }
   a.rutschVorn = Math.min(1, Math.max(0, maxRutschV - 0.75) * 2.5);
   a.rutschHinten = Math.min(1, Math.max(0, maxRutschH - 0.75) * 2.5);
-  if (leichtAn) driftLeicht(a, gr, dt);
+  if (leichtAn) driftLeicht(a, gr, dt, vMax, TB);
 
   // 3. Strecken-Helfer (Arcade-Hilfe): Fährt das Auto auf den Rand der Fahrbahn zu, lenkt die Straße es unsichtbar
   //    etwas zurück: Fahrtrichtung und Auto drehen sich gemeinsam ein Stück in Richtung der Straße. Je näher am Rand
   //    und je schneller, desto mehr. Mitten auf der Straße merkt man nichts davon.
-  if (A && A.rand && Math.abs(a.u) > 5) streckenHelfer(a, T, f, A, dt);
+  if (A && A.rand && Math.abs(a.u) > 5 * kl) streckenHelfer(a, T, f, A, dt, kl);
+  // (Drift-Rallye mit Drift-Hilfe: derselbe Helfer, nur sanfter – quer rutschen soll man ja)
+  else if (leichtAn && p.leicht.rand && a.u > 5 * kl) streckenHelfer(a, T, f, p.leicht, dt, kl);
   // 4. Spur-Helfer (Rallye): Zeigt die Nase schräg zum Weg, dreht die Hilfe Auto und Fahrtrichtung langsam wieder in
   //    Richtung des Wegs. Das nimmt dem Auto das Pendeln von links nach rechts, wenn man zu spät gegenlenkt.
   //    Wer lenkt, ist immer stärker als diese Hilfe.
-  if (A && A.spur && Math.abs(a.u) > 4 && !a.handbremse) {
+  if (A && A.spur && Math.abs(a.u) > 4 * kl && !a.handbremse) {
     let d = Math.atan2(T.tx[f.i], T.tz[f.i]) - a.h; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
     if (Math.abs(d) < 1.2) { const w = d * Math.min(1, dt * A.spur); a.h += w; a.r -= a.r * Math.min(1, dt * A.spur * (A.ruhe || 0)) * (1 - Math.abs(a.lenkWunsch)); }
   }
@@ -424,7 +442,7 @@ export function schritt(a, T, dt) {
     const tempo = Math.abs(a.u);
     let ziel = 0;
     if (!a.luft && tempo > DR.abTempo) {
-      const halt = p.haft * gr.haft * G;                                  // so viel Kurvenkraft hält der Boden
+      const halt = DR.halt ? DR.halt * gr.haft : p.haft * gr.haft * G;   // so viel Kurvenkraft hält der Boden (kleine Autos: eigener Wert, sie fahren nie an der Grenze)
       const quer = a.u * a.r / halt;                                      // wie hart geht es gerade um die Kurve? (1 = Grenze)
       // Nur eine richtige Kurve zählt: Kurzes Hin- und Herlenken auf der Geraden mittelt sich weg (a.driftQ)
       a.driftQ = (a.driftQ || 0) + (Math.max(-1.2, Math.min(1.2, quer)) - (a.driftQ || 0)) * Math.min(1, dt * DR.lang);
@@ -432,7 +450,7 @@ export function schritt(a, T, dt) {
       const lose = 1 + (1 - Math.min(1, gr.haft)) * DR.lose;             // loser Boden: mehr Drift
       const schnell = Math.min(1, (tempo - DR.abTempo) / DR.abTempo);
       ziel = Math.sign(a.driftQ) * DR.winkel * hart * lose * (0.65 + 0.35 * a.gas) * schnell;
-      if (a.handbremse && Math.abs(a.lenkWunsch) > 0.1) ziel = Math.sign(a.lenkWunsch) * DR.hand * schnell;
+      if ((a.handbremse || a.driftHand) && Math.abs(a.lenkWunsch) > 0.1) ziel = Math.sign(a.lenkWunsch) * DR.hand * schnell;
       ziel = Math.max(-DR.hand, Math.min(DR.hand, ziel));
     }
     // Gegenlenken holt das Heck schneller zurück
@@ -447,12 +465,14 @@ export function schritt(a, T, dt) {
   // Gang und Drehzahl (nur für den Klang und die Anzeige)
   const au = Math.abs(a.u);
   if (p.gaenge > 1) {
-    const stufe = p.vMax / p.gaenge;
+    // (kleine Autos: Der höchste Gang kommt schon bei gut drei Vierteln des Höchsttempos – so schaltet das Auto auf der
+    //  Geraden bis ganz nach oben durch, wie ein schneller Rennwagen)
+    const stufe = p.vMax / p.gaenge / (kl < 1 ? 1.28 : 1);
     let g = Math.min(p.gaenge, Math.max(1, Math.floor(au / stufe * 0.95) + 1));
     a.gang = g;
-    const lo = (g - 1) * stufe * 0.82, hi = g * stufe * 1.02;
+    const lo = (g - 1) * stufe * 0.82, hi = g === p.gaenge && kl < 1 ? p.vMax * 1.1 : g * stufe * 1.02;
     a.drehzahl = 4500 + (p.drehzahlMax - 4500) * Math.min(1, Math.max(0, (au - lo) / (hi - lo)));
-    if (a.gas > 0.1 && au < 3) a.drehzahl = Math.max(a.drehzahl, 6000 + a.gas * 5000);
+    if (a.gas > 0.1 && au < 3 * kl) a.drehzahl = Math.max(a.drehzahl, 6000 + a.gas * 5000);
   } else {
     a.gang = 1; a.drehzahl = 2000 + (p.drehzahlMax - 2000) * Math.min(1, au / p.vMax);
   }
@@ -476,7 +496,7 @@ export function schritt(a, T, dt) {
 //      viel lenken und Gas = quer. Gas weg oder Lenkrad gerade = Auto wird wieder gerade.
 //   3. Quer rutschen kostet etwas Tempo, die Handbremse stellt das Auto ganz quer und dreht es um die Haarnadel.
 // So dreht sich das Auto nie von allein um die eigene Achse – aber der Drift fühlt sich an wie selbst gemacht.
-function driftLeicht(a, gr, dt) {
+function driftLeicht(a, gr, dt, vMax = a.p.vMax, TB = null) {
   const p = a.p, D = p.leicht, w = a.lenkWunsch || 0;
   const cl = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
   let s = Math.hypot(a.u, a.v);
@@ -498,7 +518,8 @@ function driftLeicht(a, gr, dt) {
   let kurs = a.h + beta;                       // Fahrtrichtung
   // Tempo: Gas, Bremse, Ausrollen, Untergrund – und das Rutschen selbst bremst
   let acc = 0;
-  if (a.gas > 0 && !hand) acc += a.gas * D.zug * cl((p.vMax * 1.03 - s) / (p.vMax * 0.15), 0, 1) * Math.min(1, gr.haft * 1.4);
+  if (a.gas > 0 && !hand) acc += a.gas * D.zug * (TB ? TB.schub : 1) * cl((vMax * 1.03 - s) / (vMax * 0.15), 0, 1) * Math.min(1, gr.haft * 1.4);
+  if (s > vMax * 1.03) acc -= (s - vMax) * 2.5;   // nach dem Turbo: zurück aufs normale Höchsttempo
   acc -= a.brems * D.bremse * gr.haft;
   if (hand) acc -= D.handBremst;
   acc -= D.rollen + (a.gas > 0 ? 0 : D.motor * s) + gr.zieh * G * Math.min(1, s / 0.3);
@@ -537,7 +558,7 @@ function luftHelfer(a, T, f, dt) {
   if (aussen > 0) { const schub = -Math.sign(f.d) * Math.min(1, aussen) * 5 * dt; a.x += T.tz[i] * schub; a.z -= T.tx[i] * schub; }
 }
 
-function streckenHelfer(a, T, f, A, dt) {
+function streckenHelfer(a, T, f, A, dt, kl = 1) {
   const i = f.i, tx = T.tx[i], tz = T.tz[i];
   const sh = Math.sin(a.h), ch = Math.cos(a.h);
   const wx = sh * a.u + ch * a.v, wz = ch * a.u - sh * a.v;   // Tempo in der Welt
@@ -545,8 +566,8 @@ function streckenHelfer(a, T, f, A, dt) {
   const seite = f.d >= 0 ? 1 : -1;
   const raus = (wx * tz - wz * tx) * seite;                     // wie schnell es zum nächsten Rand hin geht
   if (raus <= 0) return;
-  const abstand = T.hb[i] - 1.0 - Math.abs(f.d);                // so viel Platz ist noch bis zum Rand (Auto ist 2 m breit)
-  const zone = 3 + 0.3 * tempo;                                 // ab hier hilft die Straße (bei 200 km/h ab gut 19 m vor dem Rand)
+  const abstand = T.hb[i] - 1.0 * kl - Math.abs(f.d);                // so viel Platz ist noch bis zum Rand (Auto ist 2 m breit)
+  const zone = 3 * kl + 0.3 * tempo;                                 // ab hier hilft die Straße (bei 200 km/h ab gut 19 m vor dem Rand)
   if (abstand > zone) return;
   let k = Math.min(1.4, 1 - abstand / zone); k *= k;
   // Winkel zwischen Fahrtrichtung und Straße, ein Stück davon zurückdrehen

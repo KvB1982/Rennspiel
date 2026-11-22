@@ -159,7 +159,10 @@ export class Klang {
     const ziel = (sg, wert, zeit = 0.08) => sg.g.gain.setTargetAtTime(wert, t, zeit);
     if (modell) {
       // Elektromotor: je schneller das Auto, desto höher das Surren
-      const v = Math.min(1.2, Math.abs(a.u) / a.p.vMax);
+      // Mit Gängen (ferngesteuertes Auto, Drift-Rallye): Das Surren steigt in jedem Gang an und fällt beim Hochschalten
+      // wieder ab – so hört man das Auto durch die Gänge schalten. Mit jedem Gang klingt es etwas höher.
+      const dreh = a.p.gaenge > 1 ? Math.max(0, (a.drehzahl - 4500) / (a.p.drehzahlMax - 4500)) : 0;
+      const v = a.p.gaenge > 1 ? Math.min(1.3, 0.12 + dreh * 0.62 + (a.gang - 1) / (a.p.gaenge - 1) * 0.3 + (a.turbo > 0 ? 0.15 : 0)) : Math.min(1.2, Math.abs(a.u) / a.p.vMax);
       m.elektro.s.playbackRate.setTargetAtTime(0.55 + v * 1.6, t, glatt);
       m.f.frequency.setTargetAtTime(2500 + v * 6000, t, glatt);
       ziel(m.elektro, laut * LAUT_ELEKTRO); ziel(m.leer, 0); ziel(m.hoch, 0);
@@ -257,6 +260,25 @@ export class Klang {
     o.frequency.value = f; o.type = 'sine';
     g.gain.setValueAtTime(laut, c.currentTime); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dauer);
     o.connect(g); g.connect(this.haupt); o.start(); o.stop(c.currentTime + dauer + 0.02);
+  }
+
+  // Turbo zündet: ein Fauchen, das schnell ansteigt (selbst erzeugt). Je höher die Stufe, desto länger und heller.
+  turbo(stufe = 1) {
+    if (!this.ctx || !this.an) return;
+    const c = this.ctx, t = c.currentTime, dauer = 0.35 + stufe * 0.2;
+    // Rauschen durch einen Filter, der nach oben fährt
+    const n = Math.floor(c.sampleRate * dauer), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const q = c.createBufferSource(); q.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2;
+    f.frequency.setValueAtTime(500, t); f.frequency.exponentialRampToValueAtTime(2600 + stufe * 900, t + dauer * 0.7);
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.05); g.gain.exponentialRampToValueAtTime(0.001, t + dauer);
+    q.connect(f); f.connect(g); g.connect(this.haupt); q.start(t);
+    // dazu ein Ton, der hochzieht
+    const o = c.createOscillator(), g2 = c.createGain(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(180, t); o.frequency.exponentialRampToValueAtTime(700 + stufe * 250, t + dauer * 0.8);
+    g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.12, t + 0.04); g2.gain.exponentialRampToValueAtTime(0.001, t + dauer);
+    o.connect(g2); g2.connect(this.haupt); o.start(t); o.stop(t + dauer + 0.05);
   }
 
   // Aufprall: staerke 0…1. Kleine Autos klingen nach Plastik, der Rennwagen nach Blech und Kohlefaser.

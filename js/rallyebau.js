@@ -93,12 +93,13 @@ export function baueRallye({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massst
   add(kiste(0.26, 0.05, 0.02, schwarz, 0, dach + 0.07, -0.14));
 
   // Streifen: zwei breite Bänder über Haube, Dach und Heck (Zweitfarbe)
+  const nurAussen = [];   // was man von innen nicht sehen soll (die Streifen auf Scheibe und Dach hingen sonst vor den Augen)
   for (const x of [-0.17, 0.17]) {
     const pts = [[zF - 0.2, 0.8], [VORN, 0.93], [kv - 0.05, 1.01], [0.05, dach + 0.04], [-1.4, dach + 0.04], [-1.75, 1.08], [zR + 0.1, 1.03]];
     for (let k = 0; k < pts.length - 1; k++) {
       const [z0, y0] = pts[k], [z1, y1] = pts[k + 1];
       const l = Math.hypot(z1 - z0, y1 - y0), p = new THREE.Mesh(new THREE.PlaneGeometry(0.14, l), streifen);
-      p.position.set(x, (y0 + y1) / 2 + 0.012, (z0 + z1) / 2); p.rotation.x = Math.atan2(z1 - z0, y1 - y0); add(p);   // flach auf die Karosserie legen, der Neigung folgend
+      p.position.set(x, (y0 + y1) / 2 + 0.012, (z0 + z1) / 2); p.rotation.x = Math.atan2(z1 - z0, y1 - y0); add(p); if (k >= 2 && k <= 4) nurAussen.push(p);   // flach auf die Karosserie legen, der Neigung folgend
     }
   }
   // Seiten: schräger Streifen und weiße Tafel mit Startnummer auf der Tür
@@ -153,8 +154,32 @@ export function baueRallye({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massst
     if (k < 2) lenkVorn.push(halter);
   }
 
+  // Cockpit (nur zu sehen, wenn die Kamera im Auto sitzt): Armaturenbrett, Lenkrad, Scheibenrahmen und Überrollkäfig.
+  // Von innen sieht man durch Glas und Blech hindurch nach draußen – die Haube liegt vor einem.
+  const innen = new THREE.Group(); koerper.add(innen);
+  const matt = new THREE.MeshStandardMaterial({ color: 0x1a1b1e, roughness: 0.9 });
+  const rohrMat = new THREE.MeshStandardMaterial({ color: 0xd8dadd, roughness: 0.4, metalness: 0.6 });
+  const drin = m => { innen.add(m); return m; };
+  drin(kiste(W * 1.5, 0.03, 1.7, matt, 0, 1.03, -0.5));                      // dunkler Boden (sonst säße man auf blauem Blech)
+  drin(kiste(W * 1.5, 0.08, 0.4, matt, 0, 1.07, 0.33));                      // Armaturenbrett
+  drin(kiste(0.34, 0.08, 0.12, matt, 0.33, 1.14, 0.2));                      // Haube über den Anzeigen
+  const anzeige = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.06), new THREE.MeshStandardMaterial({ color: 0x102030, emissive: 0x3fd0ff, emissiveIntensity: 0.9 }));
+  anzeige.position.set(0.33, 1.14, 0.135); anzeige.rotation.y = Math.PI; drin(anzeige);
+  for (const s of [-1, 1]) {
+    drin(stange([s * W * 0.74, 1.07, 0.5], [s * W * 0.66, dach, -0.22], 0.022, matt));        // Scheibenrahmen links und rechts
+    drin(stange([s * W * 0.6, 0.4, -0.95], [s * W * 0.6, dach - 0.03, -0.95], 0.025, rohrMat)); // Überrollkäfig
+  }
+  drin(stange([-W * 0.62, dach - 0.01, -0.22], [W * 0.62, dach - 0.01, -0.22], 0.03, matt));  // Dachkante
+  const lenkrad = new THREE.Group(); lenkrad.position.set(0.33, 1.08, 0.02); lenkrad.rotation.x = -0.35; innen.add(lenkrad);
+  const kranz = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.018, 8, 24), matt); lenkrad.add(kranz);
+  lenkrad.add(kiste(0.25, 0.03, 0.02, matt, 0, 0, 0), kiste(0.03, 0.13, 0.02, matt, 0, -0.065, 0));
+  const marke = kiste(0.03, 0.02, 0.03, new THREE.MeshStandardMaterial({ color: 0xffd400, roughness: 0.5 }), 0, 0.13, 0); lenkrad.add(marke);   // gelbe Marke oben: so sieht man, wie weit man lenkt
+  innen.visible = false;
+
   auto.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  innen.traverse(o => { o.castShadow = false; });
   auto.scale.setScalar(massstab);
-  const lenkrad = new THREE.Group();   // im Rallyeauto sitzt man nie (Kamera steht neben der Matte), das Lenkrad bleibt unsichtbar
-  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, licht: { material: rueckMat }, helm: [helm, helm], halo: [], massstab, scheinwerfer: scheinMat };
+  // auge = wo die Augen des Fahrers sind (links im Auto), für die Cockpit-Kamera
+  const sicht = imAuto => { for (const m of nurAussen) m.visible = !imAuto; };
+  return { gruppe: auto, koerper, raeder, lenkVorn, lenkrad, innen, sicht, auge: [0.33, 1.3, -0.5], licht: { material: rueckMat }, helm: [helm, helm], halo: [], massstab, scheinwerfer: scheinMat };
 }

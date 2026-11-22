@@ -243,6 +243,8 @@ export function bremsHilfe(a, T, L) {
   // deshalb schneller in die Kurve (kurve = so viel mal das Plan-Tempo).
   const A = a.arcade && a.p.arcade;
   const ziel = L.tempo[i] * (A && A.kurve ? A.kurve : 1.02), ein = a.p.vMax / 90;
+  // Turbo (kleine Autos): Auf der Geraden darf das Auto schneller sein als das Höchsttempo – dann nicht dagegen bremsen
+  if (a.turbo > 0 && L.tempo[i] > a.p.vMax * 0.92) return false;
   if (a.u > ziel + 0.8 * ein) {
     a.brems = Math.max(a.brems, Math.min(1, (a.u - ziel) / (4 * ein)));
     a.gas = Math.min(a.gas, 0.1);
