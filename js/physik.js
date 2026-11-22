@@ -394,6 +394,38 @@ export function schritt(a, T, dt) {
   }
   if (T.def.rallye) huepfen(a, T, f2, dt); else a.y = f2.y;
 
+  // DRIFT ZUM SELBER-STEUERN (Rallye, nur mit Arcade-Hilfe): Die Reifen halten das Auto sicher auf dem Weg – aber im Bild
+  // stellt es sich quer wie ein Rallyeauto im Drift. Wie weit, bestimmst du:
+  //   - je härter du durch die Kurve fährst (Tempo und Lenken), desto weiter kommt das Heck heraus
+  //   - auf Schotter und Matsch mehr als auf Asphalt, mit Gas mehr als ohne
+  //   - Handbremse: das Heck fliegt sofort ganz herum (für Kehren)
+  //   - gegenlenken oder gerade stellen: das Auto richtet sich wieder aus (mit einem kleinen Nachschwingen)
+  // a.drift ist der Winkel (plus = Nase nach links), a.driftV sein Tempo. Gefahren wird weiter dort, wo die Räder hinrollen.
+  const DR = a.arcade && p.arcade && p.arcade.drift;
+  if (DR) {
+    const tempo = Math.abs(a.u);
+    let ziel = 0;
+    if (!a.luft && tempo > DR.abTempo) {
+      const halt = p.haft * gr.haft * G;                                  // so viel Kurvenkraft hält der Boden
+      const quer = a.u * a.r / halt;                                      // wie hart geht es gerade um die Kurve? (1 = Grenze)
+      // Nur eine richtige Kurve zählt: Kurzes Hin- und Herlenken auf der Geraden mittelt sich weg (a.driftQ)
+      a.driftQ = (a.driftQ || 0) + (Math.max(-1.2, Math.min(1.2, quer)) - (a.driftQ || 0)) * Math.min(1, dt * DR.lang);
+      const hart = Math.min(1, Math.max(0, (Math.abs(a.driftQ) - DR.ab) / (1 - DR.ab)));
+      const lose = 1 + (1 - Math.min(1, gr.haft)) * DR.lose;             // loser Boden: mehr Drift
+      const schnell = Math.min(1, (tempo - DR.abTempo) / DR.abTempo);
+      ziel = Math.sign(a.driftQ) * DR.winkel * hart * lose * (0.65 + 0.35 * a.gas) * schnell;
+      if (a.handbremse && Math.abs(a.lenkWunsch) > 0.1) ziel = Math.sign(a.lenkWunsch) * DR.hand * schnell;
+      ziel = Math.max(-DR.hand, Math.min(DR.hand, ziel));
+    }
+    // Gegenlenken holt das Heck schneller zurück
+    const gegen = a.drift * a.lenkWunsch < 0 && Math.abs(a.lenkWunsch) > 0.15;
+    const feder = DR.feder * (gegen ? 2.2 : 1);
+    a.driftV = (a.driftV || 0) + ((ziel * (gegen ? 0.3 : 1) - (a.drift || 0)) * feder - (a.driftV || 0) * DR.ruhe) * dt;
+    a.drift = (a.drift || 0) + a.driftV * dt;
+    // Staub, Steine und Reifengeräusch gehören dazu
+    a.rutschHinten = Math.max(a.rutschHinten, Math.min(1, Math.abs(a.drift) / 0.3));
+  } else if (a.drift) { a.drift = 0; a.driftV = 0; }
+
   // Gang und Drehzahl (nur für den Klang und die Anzeige)
   const au = Math.abs(a.u);
   if (p.gaenge > 1) {
