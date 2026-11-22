@@ -94,7 +94,7 @@ export class Buehne {
     this.sonnenRichtung = sonne;
     const pmrem = new THREE.PMREMGenerator(r);
     if (!modell) {
-      const himmel = this.himmel = new Sky(); himmel.scale.setScalar(T.strasse ? 14000 : 8000);
+      const himmel = this.himmel = new Sky(); himmel.scale.setScalar(T.strasse || def.weit ? 14000 : 8000);
       const u = himmel.material.uniforms;
       u.turbidity.value = st.truebe; u.rayleigh.value = st.rayleigh; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.85;
       u.sunPosition.value.copy(sonne);
@@ -144,10 +144,10 @@ export class Buehne {
     this.etappe = etappe;
     this.spritzer = def.rallye ? new Spritzer(s, { staubFarbe: def.welt.wald === 'laub' ? 0x8f7a5c : def.welt.wald === 'berg' ? 0xb0aa9c : 0xcbb894, viel: this.qualitaet === 'hoch' ? 1 : this.qualitaet === 'mittel' ? 0.65 : 0.35 }) : null;
     if (def.rallye) { L = null; s.fog.near = st.nebelNah ?? 150; }
-    if (T.strasse) {
-      // Straßen-Strecken sind riesig: weiter sehen, die Berge am Horizont nur leicht im Dunst
+    if (T.strasse || def.weit) {
+      // Straßen-Strecken (und die ganz lange Rennstrecke) sind riesig: weiter sehen, die Berge am Horizont nur leicht im Dunst
       const weit = Math.max(9000, (this.welt.weit || 6000) + 2500);
-      s.fog = new THREE.Fog(st.nebel, 900, weit * 0.95);
+      s.fog = new THREE.Fog(st.nebel, 900, def.weit ? st.nebelWeit : weit * 0.95);
       this.kamera.far = weit; this.kamera.updateProjectionMatrix();
     }
     this.verkehrBild = verkehr ? new VerkehrBild(s, verkehr, { abend: istDunkel(def), kamera: this.kamera }) : null;
@@ -226,7 +226,7 @@ export class Buehne {
     if (this.spuren) for (const { c } of this.autos) this.spurSetzen(c.a);
 
     // Himmel wandert mit der Kamera mit (die Straßen-Strecken sind größer als der Himmel)
-    if (this.himmel && this.T.strasse) this.himmel.position.copy(this.kamera.position);
+    if (this.himmel && (this.T.strasse || this.T.def.weit)) this.himmel.position.copy(this.kamera.position);
     if (this.sterne && this.szene === this.sterne.parent) this.sterne.position.copy(this.kamera.position);
     // Geist
     if (geistLage) {

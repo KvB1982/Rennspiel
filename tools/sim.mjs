@@ -2,18 +2,19 @@
 //   node tools/sim.mjs                 alle Strecken, 3 Runden, 7 Gegner, mittel
 //   node tools/sim.mjs kueste 5 9 schwer
 //   node tools/sim.mjs metropole 1 5 mittel 1     Supercars, letzte Zahl = Verkehr (0 = keiner, 1 = normal, 1.6 = viel)
+//   node tools/sim.mjs schleife 1 5 mittel 0 super   Supercars auf einer Rennstrecke, die es für beide gibt (auchSuper)
 import { STRECKEN } from '../js/strecken.js';
 import { baueStrecke } from '../js/strecke.js';
 import { Rennen, zeitText } from '../js/rennen.js';
 
-const [nur, runden = 3, gegner = 7, staerke = 'mittel', verkehr = 1] = process.argv.slice(2);
+const [nur, runden = 3, gegner = 7, staerke = 'mittel', verkehr = 1, artWunsch = ''] = process.argv.slice(2);
 let fehler = 0;
 for (const def of STRECKEN) {
   if (nur && def.id !== nur) continue;
   if (def.rallye) continue;   // Rallye-Prüfungen: node tools/rallye.mjs
   const T = baueStrecke(def);
-  const art = def.slot ? 'slot' : def.drift ? 'drift' : def.modell ? 'modell' : def.strasse ? 'super' : 'f1';
-  const R = new Rennen(T, { modus: 'rennen', runden: def.strasse && !nur ? 1 : +runden, gegner: def.modell ? Math.min(3, +gegner) : +gegner, staerke, art, mitSpieler: false, boxen: true, verkehr: +verkehr });
+  const art = def.slot ? 'slot' : def.drift ? 'drift' : def.modell ? 'modell' : def.strasse || (artWunsch === 'super' && def.auchSuper) ? 'super' : 'f1';
+  const R = new Rennen(T, { modus: 'rennen', runden: (def.strasse || def.rundenMax) && !nur ? 1 : +runden, gegner: def.modell ? Math.min(3, +gegner) : +gegner, staerke, art, mitSpieler: false, boxen: true, verkehr: +verkehr });
   const dt = 1 / 60;
   let wand = 0, neben = 0, maxV = 0, schritte = 0, verkehrStoss = 0;
   const grenze = 60 * 60 * 15;
