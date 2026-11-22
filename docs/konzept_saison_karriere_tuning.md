@@ -102,7 +102,7 @@ Belohnungen für Erfolge und nicht käuflich. Damit hat auch ein jüngeres Kind 
 Eine Saison ist eine Folge von Veranstaltungen mit Punkten und Tabelle. Sie ist auch **ohne Karriere** spielbar:
 Menü → „Saison“ → Auto und Stärke wählen → los. Tuning ist dabei offen (alle Teile frei) oder aus.
 
-Wir haben je Disziplin nur drei Strecken. Damit eine Saison nicht nach drei Rennen wiederholt, gibt es **Varianten**:
+(Nachtrag 22.11.2026: Formel und Supercar haben jetzt je sieben Strecken, Rallye vier WPs. Die Varianten bleiben trotzdem sinnvoll.) Wir hatten beim Schreiben je Disziplin nur drei Strecken. Damit eine Saison nicht nach drei Rennen wiederholt, gibt es **Varianten**:
 
 | Variante | Aufwand | Wirkung |
 | --- | --- | --- |

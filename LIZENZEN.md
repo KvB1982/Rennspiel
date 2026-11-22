@@ -106,7 +106,7 @@ das Blau gegen die gewählte Lackfarbe).
 | --- | --- | --- | --- |
 | `bilder/gras.jpg` | Wiesen und Rasen | [Leafy Grass](https://polyhaven.com/a/leafy_grass) von Poly Haven, verkleinert und grüner gefärbt | CC0 |
 | `bilder/asphalt.jpg` | Fahrbahn | [Asphalt 04](https://polyhaven.com/a/asphalt_04) von Poly Haven, verkleinert und abgedunkelt | CC0 |
-| `bilder/baum_fichte.webp`, `baum_laub.webp`, `baum_pinie.webp`, `baum_zypresse.webp` | Bäume als flache Bilder | Fotos der Baum-Modelle aus Powershot (`assets/gelaende/baum_*.glb`, dort mit 3D AI Studio erzeugt), gemacht mit `tools/baumbilder.html` | eigene Modelle |
+| `bilder/baum_fichte.webp`, `baum_laub.webp`, `baum_pinie.webp`, `baum_zypresse.webp`, `baum_palme.webp` | Bäume als flache Bilder | Fotos der Baum-Modelle aus Powershot (`assets/gelaende/baum_*.glb`, dort mit 3D AI Studio erzeugt), gemacht mit `tools/baumbilder.html` | eigene Modelle |
 
 ## Programme
 
