@@ -211,7 +211,20 @@ export function baueStrecke(def) {
     }
     return hp[0][1];
   };
-  const Y = glaetten(Array.from({ length: n }, (_, i) => hoeheBei(T.s[i] / T.laenge)), 10);
+  // hoeheWeich: Bei sehr vielen Stützwerten (lange Berg-und-Tal-Strecke) läuft eine weiche Kurve durch alle Werte.
+  // Sonst hätte ein langer Anstieg an jedem Stützwert eine kleine flache Stufe.
+  const hoeheWeich = f => {
+    const m = hp.length; let j = m - 1;
+    for (let q = 0; q < m; q++) if (hp[q][0] <= f) j = q; else break;
+    if (f < hp[0][0]) { j = m - 1; f += 1; }
+    const P = q => { const r = ((q % m) + m) % m; return [hp[r][0] + Math.floor(q / m), hp[r][1]]; };
+    const [f0, y0] = P(j), [f1, y1] = P(j + 1), [fa, ya] = P(j - 1), [fb, yb] = P(j + 2);
+    const h = f1 - f0 || 1e-9, u = (f - f0) / h;
+    const m0 = (y1 - ya) / (f1 - fa) * h, m1 = (yb - y0) / (fb - f0) * h;   // Steigung an beiden Enden (aus den Nachbarn)
+    const u2 = u * u, u3 = u2 * u;
+    return (2 * u3 - 3 * u2 + 1) * y0 + (u3 - 2 * u2 + u) * m0 + (-2 * u3 + 3 * u2) * y1 + (u3 - u2) * m1;
+  };
+  const Y = glaetten(Array.from({ length: n }, (_, i) => (def.hoeheWeich && hp.length > 3 ? hoeheWeich : hoeheBei)(T.s[i] / T.laenge)), 10);
   // Rallye: dazu viele kleine Hügel (Wellen) und Kuppen, über die das Auto springt
   if (def.rallye) rallyeHoehe(def, T, Y);
   for (let i = 0; i < n; i++) T.y[i] = Y[i];
@@ -275,6 +288,10 @@ export function baueStrecke(def) {
       if (T.artR[m] !== 4) T.kerbR[m] = 1;
     }
   }
+
+  // Beton-Platten statt Asphalt (Steilkurve): Angabe { beton: true } an einer Ecke
+  T.beton = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (roh[i].teil.beton) T.beton[i] = 1;
 
   // Was liegt auf der Fahrbahn? Asphalt, Schotter, Matsch oder Wasser (Rallye). Dazu die Pfützen.
   T.belag = new Uint8Array(n).fill(BELAG[def.belag] ?? BELAG.asphalt);

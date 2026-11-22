@@ -88,6 +88,80 @@ export const STRECKEN = [
     hoehe: [[0, 8], [0.25, 14], [0.5, 6], [0.75, 12]],
     welt: { art: 'park', zeit: 'nachmittag' },
   },
+  // ---------------------------------------------------------------- die ganz lange Schleife durch die Waldberge
+  // Vorbild ist die berühmte alte Berg-und-Tal-Rennstrecke in der Eifel: gleiche Länge (20,8 km), gleiche Reihenfolge
+  // der Kurven, gleiches Auf und Ab (300 m Unterschied zwischen dem tiefsten und dem höchsten Punkt).
+  // Der Verlauf ist aus dem Gedächtnis nachgezeichnet, nicht vermessen. Name, Aussehen und die Namen der Abschnitte
+  // sind ausgedacht (in Klammern steht im Kommentar, welcher Abschnitt des Vorbilds gemeint ist).
+  // auchSuper = die Strecke steht auch bei den Supercars zur Wahl (dort ohne Verkehr, wie an einem Renntag).
+  // weit = so groß wie eine Straßen-Strecke: Der Himmel wandert mit, man sieht weiter.
+  // rundenMax = mehr Runden kann man im Menü nicht wählen (eine Runde dauert schon sehr lange).
+  // hoeheWeich = eine weiche Kurve durch alle Höhen-Werte (strecke.js). { beton: true } = Steilkurve aus Beton-Platten.
+  // welt.burg = [x, z]: Dort steht auf einem Berg mitten in der Schleife die Hohenburg (streckebau.js).
+  {
+    id: 'schleife', name: 'Hohenburg-Schleife', ort: 'Waldberge rund um die Hohenburg, Nachmittag',
+    text: 'Die längste und schwerste Strecke: 20,8 km und über 80 Kurven durch den Bergwald, nachempfunden der berühmtesten Rennstrecke der Welt. 300 Meter bergab und wieder hinauf, blinde Kuppen, die Fuchsbau-Senke, der Steilkessel aus Beton – und zum Schluss die Hochgerade mit über zwei Kilometern Vollgas.',
+    breite: 11, glatt: 14, aus: 'gras', grasBreite: 5, start: 0.5,
+    auchSuper: true, weit: true, hoeheWeich: true, rundenMax: 2,
+    // Abschnitte der Reihe nach (eine Zeile je Abschnitt): Bachgrund-Bogen und Bachgrund-Schlangen (Hatzenbach), Eichensenke
+    // (Hocheichen), Quellhöhe, Flugkuppe (Flugplatz), Kreuzkuppe (Schwedenkreuz), Arenkehre (Aremberg), Fuchsbau-Senke
+    // (Fuchsröhre), Försterhaken (Adenauer Forst), Metzgerwiese, Kaltenhardt, Seifental (Wehrseifen), Talbrücke
+    // (Breidscheid, tiefster Punkt), Mühlenkehre, Linksknick, Bergwerkskehre, Kesselsteig (Kesselchen), Mutkurve,
+    // Klostergrund mit Steilkehre, Steilkessel (Karussell), Hohe Warte (höchster Punkt), Hedwigsblick, Wipperschlangen,
+    // Eschgrund, Brunnenkurven (Brünnchen), Eiskurve, Pflanzgarten-Kuppen mit Sprunghügel, Schnelle Schlange,
+    // Schwalbennest mit kleinem Steilkessel, Galgenberg, Hochgerade (Döttinger Höhe), Buchenknick, Wildgehege, Hohenrain.
+    ecken: [
+      [-367, -97, 200], [-579, -349, 150],
+      [-804, -479, 70], [-847, -642, 60], [-992, -710, 55], [-1018, -857, 55], [-1148, -932, 60], [-1163, -1101, 70],
+      [-1291, -1253, 45], [-1202, -1443, 60],
+      [-1413, -1895, 250],
+      [-1470, -2219, 130], [-1402, -2406, 150], [-1083, -2724, 350], [-929, -3145, 400],
+      [-894, -3543, 160],
+      [-1019, -3759, 55, { aus: 'kies', kiesBreite: 11 }], [-974, -3836, 55, { aus: 'kies', kiesBreite: 11 }],
+      [-493, -3835, 300], [-203, -3969, 300], [93, -4021, 250], [298, -4164, 140],
+      [366, -4351, 90], [466, -4434, 28, { aus: 'kies', kiesBreite: 11 }], [421, -4512, 30, { aus: 'kies', kiesBreite: 11 }], [594, -4611, 100],
+      [884, -4533, 130], [1048, -4609, 80],
+      [1107, -4830, 40, { aus: 'kies', kiesBreite: 11 }], [1271, -4715, 120], [1441, -4700, 90], [1556, -4603, 90], [1607, -4462, 80],
+      [1738, -4352, 60], [1760, -4223, 28, { aus: 'kies', kiesBreite: 11 }], [1881, -4343, 80],
+      [2074, -4395, 60],
+      [2137, -4530, 40, { aus: 'kies', kiesBreite: 11 }], [2389, -4462, 150],
+      [2566, -4493, 180],
+      [2796, -4685, 60, { aus: 'kies', kiesBreite: 11 }], [2864, -4667, 60, { aus: 'kies', kiesBreite: 11 }],
+      [2987, -4327, 300], [3275, -4110, 300], [3581, -4016, 250],
+      [3819, -3801, 220], [4087, -3718, 250],
+      [4280, -3487, 150],
+      [4302, -3238, 40, { aus: 'kies', kiesBreite: 11 }], [4264, -3205, 40, { aus: 'kies', kiesBreite: 11 }], [3969, -3257, 200], [3666, -3081, 250],
+      [3466, -3080, 32, { beton: true }, { beton: true }], [3466, -3014, 32, { beton: true }], [3946, -2996, 200], [4232, -3088, 150],
+      [4423, -3248, 55, { aus: 'kies', kiesBreite: 11 }],
+      [4539, -3110, 70], [4707, -3080, 70],
+      [4797, -2924, 80], [4782, -2754, 70], [4903, -2633, 70],
+      [4877, -2485, 70],
+      [4962, -2337, 60, { aus: 'kies', kiesBreite: 11 }], [4882, -2165, 60, { aus: 'kies', kiesBreite: 11 }],
+      [4669, -2107, 50, { aus: 'kies', kiesBreite: 11 }],
+      [4612, -1894, 150], [4485, -1766, 90], [4306, -1750, 100],
+      [4165, -1608, 200],
+      [3996, -1546, 200], [3876, -1426, 200], [3716, -1367, 220],
+      [3540, -1190, 50, { aus: 'kies', kiesBreite: 11 }],
+      [3352, -1258, 35, { beton: true }], [3309, -1011, 150],
+      [3159, -750, 90, { aus: 'kies', kiesBreite: 11 }], [3003, -660, 110, { aus: 'kies', kiesBreite: 11 }],
+      [765, -178, 400],
+      [453, -18, 300],
+      [206, 17, 60, { aus: 'kies', kiesBreite: 11 }], [106, -29, 50, { aus: 'kies', kiesBreite: 11 }],
+      [0, 0, 60],
+    ],
+    hoehe: [
+      [0, 260], [0.0147, 265], [0.0271, 258], [0.037, 252], [0.0463, 248], [0.0524, 245], [0.0609, 241], [0.0665, 238], [0.0761, 233], [0.0843, 222],
+      [0.0959, 220], [0.1183, 258], [0.1351, 268], [0.1468, 262], [0.1677, 254], [0.1883, 248], [0.2066, 241], [0.2174, 215], [0.2245, 205], [0.2485, 187],
+      [0.2641, 162], [0.2778, 132], [0.2886, 152], [0.2989, 174], [0.3032, 180], [0.3088, 180], [0.319, 174], [0.3326, 162], [0.3396, 150], [0.3507, 132],
+      [0.3603, 122], [0.3682, 110], [0.3744, 99], [0.3825, 86], [0.3893, 72], [0.3943, 57], [0.4027, 38], [0.4106, 20], [0.4191, 34], [0.4313, 50],
+      [0.439, 60], [0.4542, 70], [0.4562, 73], [0.4742, 95], [0.4918, 120], [0.5068, 146], [0.5224, 170], [0.5353, 192], [0.5485, 208], [0.5589, 218],
+      [0.56, 220], [0.5728, 230], [0.59, 246], [0.5989, 262], [0.6047, 264], [0.629, 285], [0.6427, 300], [0.6543, 317], [0.6632, 311], [0.6704, 304],
+      [0.6778, 298], [0.6874, 291], [0.6938, 283], [0.702, 272], [0.7085, 260], [0.7161, 253], [0.725, 260], [0.7372, 250], [0.7449, 234], [0.7522, 224],
+      [0.7628, 214], [0.7706, 206], [0.7794, 199], [0.7868, 192], [0.7995, 182], [0.8075, 178], [0.8211, 188], [0.8348, 200], [0.8423, 208], [0.897, 218],
+      [0.9517, 226], [0.9689, 212], [0.9804, 236], [0.9855, 245], [0.991, 252],
+    ],
+    welt: { art: 'eifel', zeit: 'nachmittag', burg: [450, -1100], stimmung: { nebelWeit: 6500, truebe: 3.2 } },
+  },
   {
     id: 'wohnzimmer', name: 'Wohnzimmer-Ring', ort: 'Ferngesteuertes Auto auf dem Teppich',
     text: 'Eine Rennstrecke aus Matten quer durchs Wohnzimmer. Du stehst daneben und lenkst das kleine Auto aus der Ferne.',

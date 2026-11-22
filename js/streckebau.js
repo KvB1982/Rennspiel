@@ -30,6 +30,32 @@ export function abschnitte(n, pruef) {
   return out;
 }
 
+// Riesige Strecken (def.weit, über 20 km): Alles wird in Stücke geteilt. Der Rechner malt dann nur die Stücke,
+// die gerade im Bild sind – sonst müsste er in jedem Bild die ganze Strecke durchrechnen.
+// Lange Abschnitte in Stücke von höchstens "lang" Messpunkten teilen (Nachbarn teilen sich eine Reihe, so bleibt keine Lücke)
+export function stuecke(T, liste, lang = 500) {
+  if (!T.def.weit) return liste;
+  const out = [];
+  for (const [von, bis] of liste) for (let a = von; a < bis; a += lang) out.push([a, Math.min(bis, a + lang)]);
+  return out;
+}
+// Ein großes Netz in mehrere kleine zerlegen. fach(nr) sagt, in welches Fach das Dreieck mit der Nummer nr gehört.
+// Alle Stücke benutzen dieselben Eckpunkte (und Farben) wie das große Netz – ändert man dort etwas, ändert es sich überall.
+export function teileNetz(g, mat, fach, empfangen = true) {
+  const idx = g.getIndex().array, pos = g.getAttribute('position'), faecher = new Map();
+  for (let t = 0; t < idx.length / 3; t++) { const f = fach(t); if (!faecher.has(f)) faecher.set(f, []); faecher.get(f).push(idx[t * 3], idx[t * 3 + 1], idx[t * 3 + 2]); }
+  const gruppe = new THREE.Group(), kiste = new THREE.Box3(), v = new THREE.Vector3();
+  for (const liste of faecher.values()) {
+    const teil = new THREE.BufferGeometry();
+    for (const name of Object.keys(g.attributes)) teil.setAttribute(name, g.getAttribute(name));
+    teil.setIndex(liste);
+    kiste.makeEmpty(); for (const k of liste) kiste.expandByPoint(v.fromBufferAttribute(pos, k));
+    teil.boundingBox = kiste.clone(); teil.boundingSphere = kiste.getBoundingSphere(new THREE.Sphere());
+    gruppe.add(mesh(teil, mat, false, empfangen));
+  }
+  return gruppe;
+}
+
 // Ein Band entlang der Strecke. lat(i, j) = seitlicher Abstand (plus = links) der Spalte j, hoch(i, j) = Höhe darüber.
 export function band(T, von, bis, spalten, lat, hoch, { uv = null, farbe = null, schritt = 1 } = {}) {
   const n = T.n, pos = [], uvs = [], cols = [], idx = [];
@@ -104,6 +130,11 @@ const LAND = {
   wueste: { amp: 16, mass: 300, gross: 70, boden: 'sand', bergArt: 'tafel', baumZahl: 1100, schwelle: 0.3, einzeln: 0.006, baeume: [['palme', 0x4a6a2c, 0.75, 1], ['pinie', 0x5a6a34, 0.25, 0.75]], felsen: 'tafel' },
   alpen: { amp: 46, gross: 240, fern: 260, boden: 'grau', see: true, bergArt: 'schnee', baumZahl: 7500, schwelle: -0.05, baumGrenze: 150, baeume: [['nadel', 0x2c4f2a, 0.85, 1.05], ['laub', 0x4a7a34, 0.15, 0.8]], felsen: 'brocken' },
   nacht: { amp: 3, boden: 'beton', baumZahl: 0, baeume: [] },
+  // Waldberge der Hohenburg-Schleife: dichter Mischwald gleich hinter der Leitplanke (allee = Anteil der Bäume am Streckenrand,
+  // alleeTief = wie tief dieser Wald-Streifen ist), feiner = feineres Gitter für das Gelände, weil die Strecke riesig ist,
+  // tief = so viel liegt das Land unter der Fahrbahn (m; mehr als sonst, damit es in den engen Kehren am Hang nicht durch die Straße schaut)
+  eifel: { amp: 55, mass: 800, gross: 130, bergH: 420, bergFarbe: 0x486a4c, baumZahl: 60000, schwelle: -0.12, einzeln: 0.05, allee: 0.78, alleeTief: 46, feiner: 1.45, tief: 0.8,
+    baeume: [['nadel', 0x2c4f2a, 0.55, 1.1], ['laub', 0x3f6b2e, 0.45, 1]] },
   park: { amp: 9, mass: 520, boden: 'grau', bergH: 170, bergFarbe: 0x6f6a3c, baumZahl: 15000, schwelle: 0.02, einzeln: 0.1, allee: 0.3, herbst: true, baeume: [['laub', 0xb8702a, 0.8, 1.1], ['nadel', 0x2c4f2a, 0.2, 1]] },
 };
 const landVon = art => LAND[art] || LAND.kueste;
@@ -160,7 +191,8 @@ export function baueWelt(T, szene, { qualitaet = 'hoch' } = {}) {
     farbe: (i, j) => { const v = 0.92 + 0.08 * Math.sin(T.s[i] * 0.013 + j); return [v, v, v]; },
   });
   welt.strasse = mesh(strasse, asMat, false, true);
-  gruppe.add(welt.strasse);
+  // riesige Strecke: die Fahrbahn in Stücken von je 1 km zeigen (welt.strasse bleibt das ganze Netz, für Gummi und Ideallinie)
+  gruppe.add(def.weit ? teileNetz(strasse, asMat, t => Math.floor(t / (2 * SP * 500))) : welt.strasse);
 
   // Weiße Linien am Rand, Startlinie, Startplätze
   const weiss = new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -2 });
@@ -215,7 +247,7 @@ export function baueWelt(T, szene, { qualitaet = 'hoch' } = {}) {
   const kerbMat = new THREE.MeshStandardMaterial({ map: TX.kerb().map, roughness: 0.6 });
   for (const seite of [1, -1]) {
     const flag = seite > 0 ? T.kerbL : T.kerbR;
-    for (const [von, bis] of abschnitte(T.n, i => flag[i])) {
+    for (const [von, bis] of stuecke(T, abschnitte(T.n, i => flag[i]))) {
       gruppe.add(mesh(band(T, von, bis, 2, (i, j) => seite * (T.hb[i] - (modell ? 0 : 0.05) + kb * j / 2), (i, j) => (modell ? 0.0003 : 0.01) + (j === 1 ? (modell ? 0.0006 : 0.05) : j === 2 ? (modell ? 0.0003 : 0.02) : 0), {
         uv: (i, j, l, s) => [j / 2, s / (modell ? 0.05 : 4)],
       }), kerbMat, false, true));
@@ -237,11 +269,31 @@ export function baueWelt(T, szene, { qualitaet = 'hoch' } = {}) {
   for (const seite of [1, -1]) {
     const artArr = seite > 0 ? T.artL : T.artR, aus = seite > 0 ? T.ausL : T.ausR;
     for (const [code, mat, gross] of [[BELAG.gras, grasMat, 10], [BELAG.kies, kiesMat, 6], [BELAG.mauer, randMat, 4], [BELAG.asphalt, randMat, 4]]) {
-      for (const [von, bis] of abschnitte(T.n, i => artArr[i] === code)) {
+      for (const [von, bis] of stuecke(T, abschnitte(T.n, i => artArr[i] === code))) {
         gruppe.add(mesh(band(T, von - 1, bis + 1, 2, (i, j) => seite * (T.hb[i] + (aus[i] + (modell ? 0 : 0.6)) * j / 2), (i, j) => modell ? 0 : (code === BELAG.mauer ? 0.12 : -0.03) * (j > 0 ? 1 : 0), {
           uv: (i, j, l, s) => [l / gross, s / gross], schritt: 1,
         }), mat, false, true));
       }
+    }
+  }
+
+  // ---------------------------------------------------------------- Steilkessel: helle Beton-Platten auf der Innenseite der Kurve
+  // (Angabe { beton: true } an einer Ecke in strecken.js). Außen bleibt ein Streifen Asphalt. Dunkle Fugen alle 5 m und eine längs.
+  if (!modell && T.beton) {
+    const platte = new THREE.MeshStandardMaterial({ map: betonT.map, normalMap: betonT.normalMap, roughness: 0.9, color: 0xe9e6da, polygonOffset: true, polygonOffsetFactor: -2 });
+    const fuge = new THREE.MeshStandardMaterial({ color: 0x4a4a46, roughness: 1, polygonOffset: true, polygonOffsetFactor: -3 });
+    for (const [von, bis] of abschnitte(T.n, i => T.beton[i])) {
+      const mitte = ((Math.round((von + bis) / 2) % T.n) + T.n) % T.n, innen = T.k[mitte] > 0 ? 1 : -1;   // Linkskurve: innen ist links
+      const lat = (i, u) => innen * T.hb[i] * (-0.28 + 1.26 * u);                                        // von knapp jenseits der Mitte bis zum Innenrand
+      gruppe.add(mesh(band(T, von, bis, 2, (i, j) => lat(i, j / 2), () => 0.008, { uv: (i, j, l, s) => [l / 4, s / 4] }), platte, false, true));
+      gruppe.add(mesh(band(T, von, bis, 1, (i, j) => lat(i, 0.5) + (j - 0.5) * 0.09, () => 0.011), fuge, false, false));
+      const quer = [];
+      for (let k = von; k < bis; k += Math.max(1, Math.round(5 / T.ds))) {
+        const i = ((k % T.n) + T.n) % T.n, a = lat(i, 0), b2 = lat(i, 1), q = new THREE.PlaneGeometry(Math.abs(b2 - a), 0.09);
+        q.rotateX(-Math.PI / 2); q.rotateY(Math.atan2(T.tx[i], T.tz[i])); const m = (a + b2) / 2;
+        q.translate(T.x[i] + T.tz[i] * m, T.y[i] + 0.011, T.z[i] - T.tx[i] * m); quer.push(q);
+      }
+      if (quer.length) gruppe.add(mesh(mergeGeometries(quer), fuge, false, false));
     }
   }
 
@@ -391,10 +443,10 @@ function baueBegrenzung(T, gruppe, viel, modell) {
       gruppe.add(mesh(band(T, von, bis, 1, i => lat(i) + seite * 0.25, (i, j) => 1.1 + j * 3.2, { uv: (i, j, l, s) => [s / 0.5, j * 3.2 / 0.5] }), zaunMat, false, false));
       for (let k = von; k <= bis; k += Math.max(1, Math.round(6 / T.ds))) { const i = ((k % n) + n) % n; const [x, z] = wo(i, lat(i) + seite * 0.25); pfosten.push([x, T.y[i] + 1.1, z, 3.3, 0.06]); }
     }
-    for (const [von, bis] of abschnitte(n, i => !istMauer(i))) {
+    for (const [von, bis] of stuecke(T, abschnitte(n, i => !istMauer(i)))) {
       // Leitplanke: zwei Blechbänder auf Pfosten
       for (const h of [0.45, 0.75]) gruppe.add(mesh(band(T, von, bis, 1, (i, j) => lat(i), (i, j) => h + j * 0.22), blech));
-      for (let k = von; k <= bis; k += Math.max(1, Math.round(4 / T.ds))) { const i = ((k % n) + n) % n; const [x, z] = wo(i, lat(i) + seite * 0.08); pfosten.push([x, T.y[i], z, 1.0, 0.05]); }
+      for (let k = von; k < bis + (def.weit ? 0 : 1); k += Math.max(1, Math.round((def.weit ? 8 : 4) / T.ds))) { const i = ((k % n) + n) % n; const [x, z] = wo(i, lat(i) + seite * 0.08); pfosten.push([x, T.y[i], z, 1.0, 0.05]); }
       // Werbebande davor an Geraden
       // Reifenstapel vor der Leitplanke, wo Kies liegt (Kurven außen)
       for (let k = von; k <= bis; k += Math.max(1, Math.round(0.75 / T.ds))) {
@@ -408,11 +460,12 @@ function baueBegrenzung(T, gruppe, viel, modell) {
   }
   // Pfosten und Reifen als "Instanzen": ein Modell, tausendmal hingestellt (schnell)
   if (pfosten.length) {
-    const g = new THREE.CylinderGeometry(1, 1, 1, 6); g.translate(0, 0.5, 0);
+    // (riesige Strecke: einfache Pfosten mit vier Kanten, ohne Schatten und ohne Deckel – es sind über fünftausend)
+    const g = def.weit ? new THREE.CylinderGeometry(1, 1, 1, 4, 1, true) : new THREE.CylinderGeometry(1, 1, 1, 6); g.translate(0, 0.5, 0);
     const im = new THREE.InstancedMesh(g, pfostenMat, pfosten.length);
     const m4 = new THREE.Matrix4();
     pfosten.forEach(([x, y, z, h, rr], k) => { m4.makeScale(rr, h, rr); m4.setPosition(x, y, z); im.setMatrixAt(k, m4); });
-    im.castShadow = true; gruppe.add(im);
+    im.castShadow = !def.weit; gruppe.add(im);
   }
   if (reifen.length) {
     const g = new THREE.CylinderGeometry(0.36, 0.36, 0.72, 10); g.translate(0, 0.36, 0);
@@ -456,7 +509,8 @@ function baueGelaende(T, gruppe, welt, art, viel, r) {
   const P = landVon(art);
   const rand = 900;
   const x0 = minx - rand, x1 = maxx + rand, z0 = minz - rand, z1 = maxz + rand;
-  const N = qualitaetsGitter(viel);
+  // (riesige Strecke: feineres Gitter, auch bei einfacher Grafik nie gröber als bei mittlerer – sonst schaut am Hang das Land durch die Fahrbahn)
+  const N = Math.round(Math.max(qualitaetsGitter(viel), P.feiner ? 160 : 0) * (P.feiner || 1));
   const nah = naeheGitter(T, 60);
   const rs = TX.rauschen(art.length * 17);
   const amp = P.amp, mass = P.mass || 700;
@@ -467,14 +521,34 @@ function baueGelaende(T, gruppe, welt, art, viel, r) {
   const wasserY = meer !== null ? 0.5 : seeY !== null ? seeY + 0.6 : null;   // darunter wächst nichts
   const pos = [], cols = [], idx = [];
   const gruen = new THREE.Color(0x5c8a3a), trocken = new THREE.Color(0xa7a35a), fels = new THREE.Color(0x8b8173), sandC = new THREE.Color(0xd8c48e), stadt = new THREE.Color(0x7d7d78), wald = new THREE.Color(0x2f5a2a);
+  // Riesige Strecke: Weit weg von der Fahrbahn (mitten in der Schleife) richtet sich das Land nach allen Teilen der Strecke
+  // ringsum – nahe Teile zählen viel, ferne wenig. So gibt es keine Stufe im Gelände, wenn die Strecke 300 m höher liegt.
+  let fern = null;
+  if (T.def.weit) {
+    const px = [], pz = [], py = [];
+    for (let i = 0; i < T.n; i += Math.max(1, Math.round(100 / T.ds))) { px.push(T.x[i]); pz.push(T.z[i]); py.push(T.y[i]); }
+    fern = (x, z) => {
+      let sum = 0, gew = 0, d2min = Infinity;
+      for (let k = 0; k < px.length; k++) { const d2 = (px[k] - x) ** 2 + (pz[k] - z) ** 2 + 400; const g = 1 / (d2 * d2); sum += py[k] * g; gew += g; if (d2 < d2min) d2min = d2; }
+      return { y: sum / gew, d: Math.sqrt(d2min) };
+    };
+  }
+  const burg = T.def.welt.burg || null;   // [x, z]: Dort steht ein Burgberg
+  // So viel liegt das Land unter der Fahrbahn. Je gröber das Gitter, desto mehr (P.tief gilt für Felder von 24 m).
+  const tief = P.tief ? P.tief * Math.max(1, ((x1 - x0) / N / 24) ** 2) : 0.35;
   const hoehe = (x, z) => {
     const f = nah(x, z, 4);
-    const ty = f.i >= 0 ? T.y[f.i] : 0;
+    let ty = f.i >= 0 ? T.y[f.i] : 0;
     const frei = f.i >= 0 ? T.hb[f.i] + Math.max(T.ausL[f.i], T.ausR[f.i]) + 14 : 0;
-    const d = f.i >= 0 ? f.d : 1e4;
+    let d = f.i >= 0 ? f.d : 1e4;
+    if (fern) {
+      const e = fern(x, z);
+      if (f.i < 0) { ty = e.y; d = e.d; } else { const u = Math.min(1, Math.max(0, (d - 60) / 180)); ty += (e.y - ty) * u * u * (3 - 2 * u); }
+    }
     const w = Math.min(1, Math.max(0, (d - frei) / 260));
     const glatt = w * w * (3 - 2 * w);
-    let h = ty - 0.35 + glatt * (rs(x / mass, z / mass, 4) * amp + amp * 0.35 + (P.gross ? Math.max(0, rs(x / 1800 + 5, z / 1800, 2)) * P.gross * glatt : 0));
+    if (burg) { const u = Math.max(0, 1 - Math.hypot(x - burg[0], z - burg[1]) / 420); ty += glatt * 95 * u * u * (3 - 2 * u); }
+    let h = ty - tief + glatt * (rs(x / mass, z / mass, 4) * amp + amp * 0.35 + (P.gross ? Math.max(0, rs(x / 1800 + 5, z / 1800, 2)) * P.gross * glatt : 0));
     // Talkessel: Je weiter weg von der Strecke, desto höher steigt das Land
     if (P.fern) { const u = Math.min(1.25, Math.max(0, (d - 120) / 800)); h += P.fern * u * u * Math.max(0.15, 0.9 + 1.5 * rs(x / 420 + 9, z / 420, 4)); }
     // Bergsee: In manchen Senken liegt das Land tiefer als der Wasserspiegel
@@ -494,6 +568,7 @@ function baueGelaende(T, gruppe, welt, art, viel, r) {
   }
   const sandHell = new THREE.Color(0xe6cf9c), sandDunkel = new THREE.Color(0xcf9f62), rotFels = new THREE.Color(0xb86a3e);
   const alm = new THREE.Color(0x5a8c34), almWald = new THREE.Color(0x2f5226), grauFels = new THREE.Color(0x8d8f90), schnee = new THREE.Color(0xf3f6f9), nachtBoden = new THREE.Color(0x4a4c52), laubBoden = new THREE.Color(0x8a7a2c), parkGruen = new THREE.Color(0x4f8230);
+  const eifelWald = new THREE.Color(0x3f6a34), eifelWiese = new THREE.Color(0x7fa84a);
   const c = new THREE.Color();
   for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
     const x = x0 + dx * i, z = z0 + dz * j, k = j * W + i;
@@ -516,6 +591,11 @@ function baueGelaende(T, gruppe, welt, art, viel, r) {
     }
     else if (art === 'nacht') c.copy(nachtBoden);
     else if (art === 'park') c.copy(parkGruen).lerp(laubBoden, glatt * (0.15 + v * 0.5));
+    else if (art === 'eifel') {
+      // Waldberge: dunkler Waldboden, dazwischen helle Wiesen und Lichtungen
+      const lichtung = Math.min(1, Math.max(0, (rs(x / 520 + 3, z / 520 + 8, 3) - 0.08) * 6));
+      c.copy(eifelWald).lerp(eifelWiese, lichtung * (0.55 + 0.45 * glatt)).lerp(trocken, v * 0.18);
+    }
     else { c.copy(gruen).lerp(wald, glatt * 0.7).lerp(trocken, v * 0.25); }
     if (meer !== null && h < -3) c.copy(fels);
     cols.push(c.r, c.g, c.b);
@@ -532,8 +612,8 @@ function baueGelaende(T, gruppe, welt, art, viel, r) {
   g.setIndex(idx); g.computeVertexNormals();
   const gt = P.boden === 'sand' ? TX.sand() : P.boden === 'beton' ? TX.beton() : P.boden === 'grau' ? TX.bodenGrau() : TX.gras();
   const gm = new THREE.MeshStandardMaterial({ map: gt.map, vertexColors: true, roughness: 1, color: P.boden ? 0xffffff : 0xcfcfcf });
-  const boden = mesh(g, gm, false, true);
-  gruppe.add(boden);
+  // riesige Strecke: das Gelände in Kacheln von 40 × 40 Feldern zeigen
+  gruppe.add(T.def.weit ? teileNetz(g, gm, t => { const feld = t >> 1; return Math.floor(Math.floor(feld / N) / 40) * 1000 + Math.floor((feld % N) / 40); }) : mesh(g, gm, false, true));
 
   // ferne Berge rundherum (gehen im Dunst unter)
   if (P.bergArt) {
@@ -544,11 +624,13 @@ function baueGelaende(T, gruppe, welt, art, viel, r) {
     const ring = new THREE.CylinderGeometry(5200, 5200, 1, 64, 1, true);
     const bpos = [], bidx = [], M = 128, rsB = TX.rauschen(5);
     const cx = (minx + maxx) / 2, cz = (minz + maxz) / 2;
+    // Die Hügelkette steht 4,2 km von der Mitte weg – bei einer riesigen Strecke weiter draußen, hinter dem Gelände
+    const weg = Math.max(4200, Math.hypot(x1 - x0, z1 - z0) / 2 + 300), fuss = weg > 4200 ? yMin - 60 : -20;
     for (let k = 0; k <= M; k++) {
       const a = k / M * Math.PI * 2;
-      const hh = P.bergH * (0.55 + 0.45 * rsB(Math.cos(a) * 3, Math.sin(a) * 3, 4));
+      const hh = (weg > 4200 ? yMax : 0) + P.bergH * (0.55 + 0.45 * rsB(Math.cos(a) * 3, Math.sin(a) * 3, 4));
       const meerSeite = art === 'kueste' && Math.sin(a) < -0.2;
-      bpos.push(cx + Math.cos(a) * 4200, -20, cz + Math.sin(a) * 4200, cx + Math.cos(a) * 4600, meerSeite ? -10 : hh, cz + Math.sin(a) * 4600);
+      bpos.push(cx + Math.cos(a) * weg, fuss, cz + Math.sin(a) * weg, cx + Math.cos(a) * (weg + 400), meerSeite ? -10 : hh, cz + Math.sin(a) * (weg + 400));
     }
     for (let k = 0; k < M; k++) { const a = k * 2; bidx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
     ring.dispose();
@@ -583,6 +665,29 @@ function baueGelaende(T, gruppe, welt, art, viel, r) {
       k++;
     }
     baueFelsen(gruppe, liste, tafel ? 0xb86a3e : 0x8d8f90, r);
+  }
+
+  // Burg auf dem Burgberg mitten in der Schleife (welt.burg): runder Turm, Ringmauer mit vier kleinen Türmen, Fahne
+  if (burg) {
+    const [bx, bz] = burg, by = hoehe(bx, bz).h - 3;
+    const stein = new THREE.MeshStandardMaterial({ color: 0x9a9484, roughness: 1, flatShading: true });
+    const dachRot = new THREE.MeshStandardMaterial({ color: 0x7a3b2e, roughness: 0.9, flatShading: true });
+    const teile = [], daecher = [];
+    const rolle = (x, z, rad, h, y = 0) => { const g = new THREE.CylinderGeometry(rad, rad * 1.08, h, 12); g.translate(bx + x, by + y + h / 2, bz + z); teile.push(g); };
+    rolle(0, 0, 8, 38); rolle(0, 0, 9.4, 3.5, 38);                                   // Bergfried mit breitem Kranz
+    for (let k = 0; k < 8; k++) {
+      const a0 = k / 8 * Math.PI * 2, a1 = (k + 1) / 8 * Math.PI * 2, R = 36;
+      const x0b = Math.cos(a0) * R, z0b = Math.sin(a0) * R, x1b = Math.cos(a1) * R, z1b = Math.sin(a1) * R;
+      const wand = new THREE.BoxGeometry(Math.hypot(x1b - x0b, z1b - z0b) + 1, k % 3 === 1 ? 7 : 11, 2.2);   // ein paar Stücke sind eingefallen (Ruine)
+      wand.rotateY(-Math.atan2(z1b - z0b, x1b - x0b)); wand.translate(bx + (x0b + x1b) / 2, by + (k % 3 === 1 ? 3.5 : 5.5), bz + (z0b + z1b) / 2); teile.push(wand);
+      if (k % 2 === 0) { rolle(x0b, z0b, 4.2, 17); const d = new THREE.ConeGeometry(5.2, 8, 12); d.translate(bx + x0b, by + 21, bz + z0b); daecher.push(d); }
+    }
+    { const haus = new THREE.BoxGeometry(22, 13, 11); haus.translate(bx + 14, by + 6.5, bz - 16); teile.push(haus); const d = new THREE.CylinderGeometry(0.1, 8.5, 7, 4); d.rotateY(Math.PI / 4); d.scale(1.75, 1, 0.9); d.translate(bx + 14, by + 16.5, bz - 16); daecher.push(d); }
+    const flach = l => mergeGeometries(l.map(g => g.index ? g.toNonIndexed() : g));
+    gruppe.add(mesh(flach(teile), stein, true, true), mesh(flach(daecher), dachRot, true, true));
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 12, 6), stein); mast.position.set(bx, by + 47, bz); gruppe.add(mast);
+    const fahne = new THREE.Mesh(new THREE.PlaneGeometry(7, 4), new THREE.MeshStandardMaterial({ color: 0xc8a020, roughness: 0.8, side: THREE.DoubleSide })); fahne.position.set(bx + 3.6, by + 50.5, bz); gruppe.add(fahne);
+    welt.burg = { x: bx, y: by, z: bz };
   }
 
   // Bäume
@@ -641,8 +746,9 @@ function baueBaeume(T, gruppe, art, viel, nah, hoehe, x0, x1, z0, z1, r, wasserY
     // am liebsten flache Bilder echter Bäume (4 Dreiecke je Baum), sonst Kenney-Modell, sonst selbst gebaut
     const bb = baumBild(...BILD[name]);
     const bm = bb || (MODELL[name] ? baumModell(...MODELL[name]) : null);
-    const krone = new THREE.InstancedMesh(bm ? bm.krone : formen[name](), bm ? bm.kroneMat : kroneMat, zahl);
+    let krone = new THREE.InstancedMesh(bm ? bm.krone : formen[name](), bm ? bm.kroneMat : kroneMat, zahl);
     const st = bb ? null : new THREE.InstancedMesh(bm ? bm.stamm : stamm, bm ? bm.stammMat : stammMat, zahl);
+    const kacheln = T.def.weit && bb ? new Map() : null;   // riesige Strecke: Bäume nach Gegend sortieren (Kacheln von 1 km)
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color();
     let k = 0, versuche = 0;
     while (k < zahl && versuche < zahl * 30) {
@@ -650,9 +756,10 @@ function baueBaeume(T, gruppe, art, viel, nah, hoehe, x0, x1, z0, z1, r, wasserY
       let x = x0 + r() * (x1 - x0), z = z0 + r() * (z1 - z0);
       // Allee: Ein Teil der Bäume steht in Reihen links und rechts der Strecke (Park)
       const allee = P.allee && r() < P.allee;
-      if (allee) { const i = Math.floor(r() * T.n), sd = r() < 0.5 ? 1 : -1, l = sd * (T.hb[i] + (sd > 0 ? T.ausL[i] : T.ausR[i]) + 9 + r() * 16); x = T.x[i] + T.tz[i] * l; z = T.z[i] - T.tx[i] * l; }
+      if (allee) { const i = Math.floor(r() * T.n), sd = r() < 0.5 ? 1 : -1, l = sd * (T.hb[i] + (sd > 0 ? T.ausL[i] : T.ausR[i]) + 9 + r() * (P.alleeTief || 16)); x = T.x[i] + T.tz[i] * l; z = T.z[i] - T.tx[i] * l; }
       const f = nah(x, z, 3);
       if (f.i >= 0 && f.d < T.hb[f.i] + Math.max(T.ausL[f.i], T.ausR[f.i]) + 9) continue;
+      if (T.def.welt.burg && Math.hypot(x - T.def.welt.burg[0], z - T.def.welt.burg[1]) < 44) continue;   // im Burghof stehen keine Bäume
       // Wälder in Gruppen (wo das Rauschen hoch ist), sonst nur vereinzelt
       const dicht = rs(x / 260, z / 260, 3);
       if (!allee && dicht < P.schwelle && r() > (P.einzeln ?? 0.08)) continue;
@@ -669,9 +776,20 @@ function baueBaeume(T, gruppe, art, viel, nah, hoehe, x0, x1, z0, z1, r, wasserY
       else if (bb) { const v = 0.78 + r() * 0.3; c.setRGB(v, v, v * 0.94); }       // Bild behält seine Farben, nur etwas heller oder dunkler
       else c.setHex(farbe).offsetHSL((r() - 0.5) * 0.04, (r() - 0.5) * 0.1, (r() - 0.5) * 0.08);
       krone.setColorAt(k, c);
+      if (kacheln) { const f = Math.floor(x / 1000) * 1000 + Math.floor(z / 1000); if (!kacheln.has(f)) kacheln.set(f, []); kacheln.get(f).push(k); }
       k++;
     }
     krone.count = k; krone.castShadow = true; krone.receiveShadow = !bb;
+    if (kacheln) {
+      // je Kachel ein eigener Baum-Haufen: Was nicht im Bild ist, wird nicht gemalt
+      for (const liste of kacheln.values()) {
+        const teil = new THREE.InstancedMesh(krone.geometry, krone.material, liste.length);
+        liste.forEach((von, nach) => { krone.getMatrixAt(von, m4); teil.setMatrixAt(nach, m4); krone.getColorAt(von, c); teil.setColorAt(nach, c); });
+        teil.castShadow = true; teil.receiveShadow = false; teil.computeBoundingSphere();
+        gruppe.add(teil);
+      }
+      krone.dispose(); continue;
+    }
     gruppe.add(krone);
     if (st) { st.count = k; st.castShadow = true; gruppe.add(st); }
   }
