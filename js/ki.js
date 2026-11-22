@@ -239,7 +239,10 @@ export function fahren(f, a, T, L, andere, dt) {
 // Bremshilfe für den Spieler: bremst selbst, wenn man zu schnell auf eine Kurve zufährt
 export function bremsHilfe(a, T, L) {
   const i = T.index(a.s + Math.abs(a.u) * 0.2);
-  const ziel = L.tempo[i] * 1.02, ein = a.p.vMax / 90;
+  // Mit der Arcade-Hilfe hält das Auto in der Kurve mehr aus, als der Tempo-Plan annimmt: Die Bremshilfe lässt es
+  // deshalb schneller in die Kurve (kurve = so viel mal das Plan-Tempo).
+  const A = a.arcade && a.p.arcade;
+  const ziel = L.tempo[i] * (A && A.kurve ? A.kurve : 1.02), ein = a.p.vMax / 90;
   if (a.u > ziel + 0.8 * ein) {
     a.brems = Math.max(a.brems, Math.min(1, (a.u - ziel) / (4 * ein)));
     a.gas = Math.min(a.gas, 0.1);

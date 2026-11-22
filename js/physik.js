@@ -32,7 +32,7 @@ export const AUTOS = {
     bremse: 1.1, bremseVorn: 0.6,     // Bremse (Anteil der Haftung), Anteil vorn
     bremsGriff: 1.25,                 // beim Bremsen halten die Reifen längs mehr aus als zur Seite (Spiel-Wert: kräftigere Bremse)
     esp: { beta: 0.1, dreh: 6, quer: 0.4 },   // Schleuderschutz (siehe unten)
-    arcade: { lenk: 1.3, folgen: 24, griff: 1.12, ein: 10, fang: 5, frei: 0.06, halt: 1.8, rand: 3.5 },   // Arcade-Hilfe (siehe ARCADE unten)
+    arcade: { lenk: 1.3, folgen: 24, griff: 1.12, ein: 10, fang: 5, frei: 0.06, halt: 1.8, rand: 3.5, zug: 0.6, kurve: 1.2 },   // Arcade-Hilfe (siehe ARCADE unten)
     lenkMax: 0.42, lenkTempo: 32,     // größter Lenkeinschlag (rad); ab diesem Tempo (m/s) lenkt man weniger
     gaenge: 8, drehzahlMax: 12500, vMax: 96, rueck: 14,
     schritte: 8, unten: 3,
@@ -219,7 +219,11 @@ export function schritt(a, T, dt) {
     // Computerfahrer (a.tc nicht gesetzt) fahren immer mit Traktionskontrolle; beim Drift-Auto dreht sie für dich nie ab (durchdrehen)
     const tcAn = a.tc === undefined || (a.tc !== false && !p.durchdrehen);
     const zugGrenze = (!tcAn ? muR * (p.durchdrehen || 0.97) : Math.sqrt(Math.max(0, (muR * rest) ** 2 - (a.Fyr || 0) ** 2))) * zg;
-    if (Math.abs(Fx) > zugGrenze) Fx = Math.sign(Fx) * zugGrenze;
+    // Arcade-Hilfe: Auch mitten in der Kurve (und im Drift) bleibt ein Teil der Zugkraft übrig (zug). Sonst nimmt die
+    // Traktionskontrolle dort fast alles Gas weg und das Auto wird im Drift immer langsamer.
+    const zugMin = A && A.zug && tcAn ? muR * zg * A.zug : 0;
+    const zugG = Math.max(zugGrenze, zugMin);
+    if (Math.abs(Fx) > zugG) Fx = Math.sign(Fx) * zugG;
     if (vz) {
       const zugVorn = (!tcAn ? muF * 0.97 : Math.sqrt(Math.max(0, (muF * rest) ** 2 - (a.Fyf || 0) ** 2))) * zg;
       if (Math.abs(Fxf) > zugVorn) Fxf = Math.sign(Fxf) * zugVorn;
@@ -231,7 +235,8 @@ export function schritt(a, T, dt) {
     const alF = a.lenk * sgn - Math.atan2(v + p.a * r, us);
     const alR = -Math.atan2(v - p.b * r, us);
     // Haftkreis: was zum Bremsen/Ziehen gebraucht wird, fehlt für die Kurve
-    const lfx = Fbf / bg + Math.abs(Fxf) / zg, lrx = Math.abs(Fx) / zg + Fbr / bg;
+    // (Die geschenkte Zugkraft der Arcade-Hilfe kostet die Hinterreifen keine Haftung zur Seite.)
+    const lfx = Fbf / bg + Math.abs(Fxf) / zg, lrx = Math.min(Math.abs(Fx), zugGrenze) / zg + Fbr / bg;
     const DF = Math.sqrt(Math.max(0, muF * muF - lfx * lfx));
     const DR = Math.sqrt(Math.max(0, muR * muR - lrx * lrx));
     // Ganz langsam rollt das Auto einfach dorthin, wohin die Räder zeigen (siehe unten "leicht").
