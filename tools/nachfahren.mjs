@@ -51,7 +51,7 @@ console.log(`Strecke ${def.name} (${P.strecke}), Auto ${auto}, ${E.fahrzeug === 
 console.log(`Fahrgefühl ${E.arcade !== false ? 'Arcade' : 'echter'}, Bremshilfe ${E.bremshilfe ? 'an' : 'aus'}, Lenkhilfe ${E.lenkhilfe ? 'an' : 'aus'}, Traktion ${E.traktion ? 'an' : 'aus'}, Gas von allein ${E.autogas ? 'an' : 'aus'}`);
 console.log(`Steuerung: ${quelle}${F.neig ? ' (Neige-Stufe ' + E.neigStufe + ')' : ''} · Grafik ${E.grafik} · Kamera ${E.fahrzeug === 'rallye' ? E.kamera_rallye : T.def.modell ? E.kamera_klein : E.kamera}`);
 if (P.geraet) console.log(`Gerät: ${P.geraet.app ? 'App' : 'Browser'}, ${P.geraet.breite} × ${P.geraet.hoehe} Punkte (mal ${P.geraet.punkte}) · ${String(P.geraet.ua).slice(0, 90)}`);
-console.log(`Aufnahme: ${zeit(dauer)} lang, ${F.n} Bilder${P.abgeschnitten ? ' (nach 20 Minuten abgeschnitten)' : ''}`);
+console.log(`Aufnahme: ${zeit(dauer)} lang, ${F.n} ${F.schritt ? "Rechenschritte von 1/120 s" : "Bilder"}${P.abgeschnitten ? ' (nach 20 Minuten abgeschnitten)' : ''}`);
 
 console.log('\n--- 1. Was wirklich passiert ist ---');
 if (P.ende) {
@@ -77,14 +77,21 @@ const stelle = i => { const s = spurBei(i); return `bei ${(s.s / sc).toFixed(0).
 for (const i of wand.slice(0, 12)) console.log(`   Wand   nach ${zeit(tBei[i])} ${stelle(i)}`);
 for (const a of ausfluege.filter(a => a.dauer > 0.25).slice(0, 20)) console.log(`   neben  nach ${zeit(tBei[a.ab])} ${stelle(a.ab)}, ${a.dauer.toFixed(1)} s lang`);
 // Wie flüssig lief das Bild?
-let langsam = 0, sehrLangsam = 0; for (let i = 0; i < F.n; i++) { if (F.dt[i] > 1 / 48) langsam++; if (F.dt[i] > 1 / 31) sehrLangsam++; }
-const bps = F.n / dauer;
+// Neue Aufnahmen (fester Rechenschritt) merken sich, mit welchem Schritt ein neues Bild anfing; alte haben ein Bild je Eintrag
+const bildZeiten = [];
+if (F.schritt) { let z = 0, offen = false; for (let i = 0; i < F.n; i++) { if (F.neu(i)) { if (offen) bildZeiten.push(z); z = 0; offen = true; } z += F.dt[i]; } if (offen) bildZeiten.push(z); }
+else for (let i = 0; i < F.n; i++) bildZeiten.push(F.dt[i]);
+const BN = bildZeiten.length;
+const je = F.schritt ? 2 : 1;   // so viele Einträge der Datei sind 1/60 Sekunde (neue Aufnahmen: 2 Rechenschritte)
+// Mit festem Schritt sind Bildzeiten Vielfache von 1/120 s: 2 Schritte = 60 Bilder/s, 3 = 40, 4 = 30
+let langsam = 0, sehrLangsam = 0; for (const z of bildZeiten) { if (z > 1 / 48) langsam++; if (z > 1 / 31) sehrLangsam++; }
+const bps = BN / dauer;
 let tech = '';
 if (P.technik && P.technik.length) {
   const sp = k => P.technik.map(t => t[k]);
   tech = ` · Bilder/s ${Math.min(...sp(1))}–${Math.max(...sp(1))} · Bildschärfe ${Math.min(...sp(2))}–${Math.max(...sp(2))} · Dreiecke bis ${Math.max(...sp(3)).toLocaleString('de-DE')} · Zeichenaufrufe bis ${Math.max(...sp(4))}`;
 }
-console.log(`Tempo des Bildes: im Schnitt ${bps.toFixed(0)} Bilder/s, ${proz(langsam, F.n)} der Bilder langsamer als 48/s, ${proz(sehrLangsam, F.n)} langsamer als 31/s${tech}`);
+console.log(`Tempo des Bildes: im Schnitt ${bps.toFixed(0)} Bilder/s, ${proz(langsam, BN)} der Bilder langsamer als 48/s, ${proz(sehrLangsam, BN)} langsamer als 31/s${tech}`);
 if (P.technik && P.technik.length && P.geraet) {
   const sp = k => P.technik.map(t => t[k]);
   console.log(`Zeile für docs/tempo_ipad.md:\n| ${String(P.wann).slice(0, 10)} | ${P.geraet.app ? 'App' : 'Browser'} ${P.geraet.breite}×${P.geraet.hoehe} | ${def.name} | ${auto} | ${E.grafik} | ${(sp(1).reduce((x, y) => x + y, 0) / sp(1).length).toFixed(0)} (${Math.min(...sp(1))}–${Math.max(...sp(1))}) | ${Math.min(...sp(2))}–${Math.max(...sp(2))} | ${Math.max(...sp(3)).toLocaleString('de-DE')} | ${Math.max(...sp(4))} |`);
@@ -157,9 +164,9 @@ if (R.ich.zeiten && R.ich.zeiten.length && ersteAb < 0) console.log(`Runden beim
 // Tempo im Vergleich zum Plan (nur wo ein Plan da ist): in den Kurven = an den langsamsten Stellen des Plans
 if (L && !slot) {
   const kurven = [];
-  for (let i = 30; i < F.n - 30; i++) {
+  for (let i = 30 * je; i < F.n - 30 * je; i++) {
     if (!F.laeuft(i) || PLAN[i] > a.p.vMax * 0.85 || PLAN[i] <= 0) continue;
-    let tief = true; for (let k = 1; k <= 30 && tief; k++) if (PLAN[i + k] < PLAN[i] || PLAN[i - k] <= PLAN[i]) tief = false;
+    let tief = true; for (let k = 1; k <= 30 && tief; k++) if (PLAN[i + k * je] < PLAN[i] || PLAN[i - k * je] <= PLAN[i]) tief = false;
     if (tief && U[i] > PLAN[i] * 0.3) kurven.push(U[i] / PLAN[i]);   // (fast stehende Autos nach „zurück auf die Strecke“ zählen nicht)
   }
   if (kurven.length) console.log(`Tempo in den Kurven: im Mittel ${mitte(kurven).toFixed(2)}-mal Plan-Tempo (${kurven.length} Kurven, langsamste ${Math.min(...kurven).toFixed(2)}, schnellste ${Math.max(...kurven).toFixed(2)})`);
@@ -172,10 +179,10 @@ if (mitFahrer) {
   else {
     // Der Fahrer aus tools/echt.mjs lenkt so: Lenkrad = Stärke mal Winkel zum Zielpunkt auf der Linie – aber erst nach einer Schrecksekunde.
     // Wir probieren alle Schrecksekunden und Stärken durch und nehmen, was am besten zur Aufnahme passt.
-    const gut = []; for (let i = 60; i < F.n; i++) if (F.laeuft(i) && Math.abs(U[i]) > 5 * sc && !F.neben(i)) gut.push(i);
+    const gut = []; for (let i = 60 * je; i < F.n; i++) if (F.laeuft(i) && Math.abs(U[i]) > 5 * sc && !F.neben(i)) gut.push(i);
     let best = { fehler: Infinity };
     for (let tau = 0; tau <= 42; tau += 1) for (const K of [1.5, 2, 2.5, 3.3, 4, 5, 6.5, 8, 10, 13]) {
-      let f = 0; for (const i of gut) { const m = Math.max(-1, Math.min(1, K * W[i - tau])) - F.lenk[i]; f += m * m; }
+      let f = 0; for (const i of gut) { const m = Math.max(-1, Math.min(1, K * W[i - tau * je])) - F.lenk[i]; f += m * m; }
       f = Math.sqrt(f / Math.max(1, gut.length));
       if (f < best.fehler) best = { tau, K, fehler: f };
     }
@@ -184,7 +191,7 @@ if (mitFahrer) {
     const bremsAb = [];
     for (let i = 1; i < F.n; i++) if (F.laeuft(i) && F.brems[i] > 0.5 && F.brems[i - 1] <= 0.5 && U[i] > 8 * sc) { const pl = L.tempo[T.index(S[i] + Math.abs(U[i]) * 0.6)]; if (pl > 0) bremsAb.push(U[i] / pl); }
     const bremsMal = bremsAb.length >= 3 ? mitte(bremsAb) : null;
-    console.log(`Schrecksekunde: ${(best.tau / 60).toFixed(2)} s (${best.tau} Bilder) · Lenk-Stärke ${best.K} (echt.mjs rechnet mit 3,3; „Spät“ mit 8,3)`);
+    console.log(`Schrecksekunde: ${(best.tau / 60).toFixed(2)} s (${best.tau} Sechzigstel) · Lenk-Stärke ${best.K} (echt.mjs rechnet mit 3,3; „Spät“ mit 8,3)`);
     console.log(`Das Modell erklärt die Lenkung zu ${Math.max(0, 100 * (1 - (best.fehler / ohne) ** 2)).toFixed(0)} % (Rest ${best.fehler.toFixed(2)} vom vollen Einschlag = Zittern, Korrekturen, eigene Linie)`);
     if (best.fehler / ohne > 0.8) console.log('Vorsicht: Das passt schlecht. Der Mensch lenkt hier anders als ein Fahrer, der einem Punkt auf der Ideallinie folgt.');
     console.log(bremsMal ? `Bremst selbst: ${bremsAb.length}-mal, im Mittel bei ${bremsMal.toFixed(2)}-mal Plan-Tempo (unter 1 = früh, über 1 = spät)` : `Bremst kaum selbst (${bremsAb.length}-mal)${E.bremshilfe ? ' – die Bremshilfe macht das' : ''}`);

@@ -9,11 +9,15 @@
 // (Lenkung in 10.000 Schritten je Seite), dass man davon nichts merkt.
 
 export const FASSUNG = 1;
+// Der feste Rechenschritt: Die Fahrphysik rechnet immer in Schritten von 1/120 Sekunde – egal, wie schnell der Bildschirm ist.
+// (833 Hunderttausendstel, weil die Datei Zeiten in dieser Stufe aufschreibt.)
+export const SCHRITT = 833 / 100000;
+export const SCHRITTE_MAX = 6;   // höchstens so viele Schritte je Bild (ruckelt es stärker, läuft das Spiel kurz langsamer)
 const DT_MAL = 100000, LENK_MAL = 10000, PEDAL_MAL = 250;
-const SPUR_ALLE = 12;         // alle 12 Bilder (5-mal pro Sekunde) wird aufgeschrieben, wo das Auto wirklich ist
+const SPUR_ALLE = 24;         // alle 24 Schritte (5-mal pro Sekunde) wird aufgeschrieben, wo das Auto wirklich ist
 const SPUR_FELDER = 8;        // x, z, Richtung, Tempo vorwärts, Tempo seitwärts, Drehen, Abstand zur Mitte, Weg auf der Strecke
 const SPUR_MAL = [10000, 10000, 100000, 10000, 10000, 10000, 10000, 1000];
-const MAX_BILDER = 60 * 60 * 20;   // höchstens 20 Minuten, dann hört die Aufnahme auf
+const MAX_BILDER = 120 * 60 * 20;   // höchstens 20 Minuten, dann hört die Aufnahme auf
 const QUELLEN = ['tastatur', 'handy', 'gamepad', 'neigen'];
 
 // Eingaben auf die Stufen der Datei runden. Das Spiel rechnet mit dem, was hier herauskommt.
@@ -33,7 +37,7 @@ export class Rekorder {
   // Neue Fahrt. kopf = alles, was man zum Nachfahren wissen muss (Strecke, Auto, Einstellungen …)
   start(kopf) {
     this.kopf = { fassung: FASSUNG, ...kopf };
-    this.platz = 60 * 120;
+    this.platz = 120 * 120;
     this.dt = new Uint16Array(this.platz); this.lenk = new Int16Array(this.platz);
     this.gas = new Uint8Array(this.platz); this.brems = new Uint8Array(this.platz);
     this.zeichen = new Uint8Array(this.platz);      // kleine Ja/Nein-Angaben je Bild (siehe bild)
@@ -54,8 +58,9 @@ export class Rekorder {
   }
 
   // Ein Bild aufschreiben – gleich NACH dem Rechnen. e = die gerundeten Eingaben aus raster, a = dein Auto,
-  // neben = Auto ist neben der Fahrbahn, wand = harter Stoß in diesem Bild, laeuft = die Uhr läuft (nach der Ampel)
-  bild(e, a, { neben = false, wand = false, laeuft = true, quelle = 'tastatur', winkel = 0 } = {}) {
+  // neben = Auto ist neben der Fahrbahn, wand = harter Stoß in diesem Bild, laeuft = die Uhr läuft (nach der Ampel),
+  // neu = mit diesem Schritt fängt ein neues Bild auf dem Bildschirm an (daran sieht man später, wie flüssig es lief)
+  bild(e, a, { neben = false, wand = false, laeuft = true, quelle = 'tastatur', winkel = 0, neu = false } = {}) {
     if (!this.an) return;
     if (this.n >= MAX_BILDER) { this.an = false; this.kopf.abgeschnitten = true; return; }
     if (this.n >= this.platz) this.wachsen();
@@ -63,7 +68,7 @@ export class Rekorder {
     this.dt[n] = Math.round(e.dt * DT_MAL); this.lenk[n] = Math.round(e.lenk * LENK_MAL);
     this.gas[n] = Math.round(e.gas * PEDAL_MAL); this.brems[n] = Math.round(e.brems * PEDAL_MAL);
     const q = Math.max(0, QUELLEN.indexOf(quelle));
-    this.zeichen[n] = (e.hand ? 1 : 0) | (wand ? 2 : 0) | (neben ? 4 : 0) | (a.luft ? 8 : 0) | (q << 4) | (laeuft ? 64 : 0);
+    this.zeichen[n] = (e.hand ? 1 : 0) | (wand ? 2 : 0) | (neben ? 4 : 0) | (a.luft ? 8 : 0) | (q << 4) | (laeuft ? 64 : 0) | (neu ? 128 : 0);
     if (quelle === 'neigen') { this.neig[n] = Math.max(-32767, Math.min(32767, Math.round(winkel * 100))); this.neigDa = true; }
     if (n % SPUR_ALLE === 0) {
       const w = [a.x, a.z, a.h, a.u, a.v, a.r, a.d, a.s], o = this.spurN * SPUR_FELDER;
@@ -81,7 +86,7 @@ export class Rekorder {
 
   // Alles zusammen als ein Paket, das man als Text (JSON) sichern kann
   paket() {
-    const n = this.n, p = { ...this.kopf, bilder: n, ende: this.ende, ereignisse: this.ereignisse, technik: this.technik,
+    const n = this.n, p = { ...this.kopf, schritt: SCHRITT, bilder: n, ende: this.ende, ereignisse: this.ereignisse, technik: this.technik,
       dt: alsText(this.dt.subarray(0, n)), lenk: alsText(this.lenk.subarray(0, n)), gas: alsText(this.gas.subarray(0, n)),
       brems: alsText(this.brems.subarray(0, n)), zeichen: alsText(this.zeichen.subarray(0, n)),
       spurAlle: SPUR_ALLE, spur: alsText(this.spur.subarray(0, this.spurN * SPUR_FELDER)) };
@@ -105,7 +110,7 @@ export function auspacken(p) {
   }
   return { n, dt, lenk, gas, brems, neig, spur,
     hand: i => z[i] & 1, wand: i => !!(z[i] & 2), neben: i => !!(z[i] & 4), luft: i => !!(z[i] & 8),
-    quelle: i => QUELLEN[(z[i] >> 4) & 3], laeuft: i => !!(z[i] & 64) };
+    quelle: i => QUELLEN[(z[i] >> 4) & 3], laeuft: i => !!(z[i] & 64), neu: i => !!(z[i] & 128), schritt: p.schritt || 0 };
 }
 
 // Zahlenreihe ↔ Text (Base64), damit sie in eine JSON-Datei passt

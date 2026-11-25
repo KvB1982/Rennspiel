@@ -18,7 +18,7 @@ import { SUPERCARS, LACKE, supercar } from './supercars.js';
 import { inApp, istApfelGeraet, teilPlugin } from './native.js';
 import { zeitText as rallyeZeit } from './rallye.js';
 import { baueRennen, TEMPO } from './rennbau.js';
-import { Rekorder, raster } from './rekorder.js';
+import { Rekorder, raster, SCHRITT, SCHRITTE_MAX } from './rekorder.js';
 import { Stand, PROFILE_MAX } from './stand.js';
 import { RALLYEAUTOS, rallyeauto } from './rallyeautos.js';
 import { ladeRallyeautos } from './supercarbau.js';
@@ -82,7 +82,7 @@ export function starteSpiel() {
   const klang = new Klang();
   let buehne = null, kamera = null, rennen = null, T = null;
   let kurven = null;   // für jede Stelle der Strecke: wo die nächste Kurve ist und welcher Gang dort passt
-  let laeuft = false, pausiert = false, letzteZeit = 0, infoTakt = 0, meldungBis = 0, fertigGezeigt = false;
+  let laeuft = false, pausiert = false, letzteZeit = 0, zeitRest = 0, infoTakt = 0, meldungBis = 0, fertigGezeigt = false;
   const rek = new Rekorder();   // schreibt jede Fahrt mit (js/rekorder.js); „Fahrt sichern“ macht daraus eine Datei
   const app = { E, empfang, eingabe, klang, rek, stand };
   const sprecher = new Beifahrer();
@@ -383,7 +383,7 @@ export function starteSpiel() {
         : sup ? 'Lenken ← →   Gas ↑   Bremse ↓ (im Stand: rückwärts)   Kamera C   Pause P   Zurück auf die Straße R'
         : 'Lenken ← →   Gas ↑   Bremse ↓ (im Stand: rückwärts)   Kamera C   Pause P   Zurück auf die Strecke R';
       kartenGrund = null;
-      laeuft = true; pausiert = false; fertigGezeigt = false; letzteZeit = performance.now(); app.rennen = rennen; app.T = T; app.kamera = kamera;
+      laeuft = true; pausiert = false; fertigGezeigt = false; zeitRest = 0; letzteZeit = performance.now(); app.rennen = rennen; app.T = T; app.kamera = kamera;
       lenkradAnzeigen();
       wachAn();
     }
@@ -702,7 +702,7 @@ export function starteSpiel() {
     const tsd = n => n.toLocaleString('de-DE');
     $('mText').textContent = Math.round(mess.bps) + ' Bilder/s · ' + (mess.zeit * 1000).toFixed(1) + ' ms (längstes ' + (mess.lang * 1000).toFixed(0) + ')\n'
       + tsd(mess.dreiecke) + ' Dreiecke · ' + mess.aufrufe + ' Aufrufe · Schärfe ' + buehne.punkte.toFixed(2).replace('.', ',') + '\n'
-      + 'Steuerung: ' + eingabe.quelle + (eingabe.quelle === 'neigen' ? ' ' + eingabe.neigung.winkel.toFixed(0) + '°' : '') + ' · Aufnahme ' + Math.round(rek.n / 60) + ' s';
+      + 'Steuerung: ' + eingabe.quelle + (eingabe.quelle === 'neigen' ? ' ' + eingabe.neigung.winkel.toFixed(0) + '°' : '') + ' · Aufnahme ' + Math.round(rek.n / 120) + ' s';
   }
 
   // ---------------------------------------------------------------- Fahrt sichern
@@ -748,10 +748,17 @@ export function starteSpiel() {
     const R = rennen;
     if (!pausiert) {
       // Die Eingaben werden auf feste Stufen gerundet und mitgeschrieben – so lässt sich die Fahrt später genau nachfahren
-      const ein = raster(dt, eingabe), klein = !!T.def.modell, ich = R.ich.a;
+      const ein = raster(SCHRITT, eingabe), klein = !!T.def.modell, ich = R.ich.a;
+      // Fester Zeitschritt: Die vergangene Zeit wird gesammelt und in gleich großen Schritten von 1/120 Sekunde gerechnet.
+      // So fährt das Auto auf jedem Gerät gleich – egal ob der Bildschirm 30, 60 oder 120 Bilder pro Sekunde zeigt.
+      zeitRest += dt;
+      let schritte = Math.round(zeitRest / SCHRITT);
+      zeitRest -= schritte * SCHRITT;
+      if (schritte > SCHRITTE_MAX) { schritte = SCHRITTE_MAX; zeitRest = 0; }
+      for (let k = 0; k < schritte; k++) {
       R.update(ein.dt, ein);
-      rek.bild(ein, ich, { neben: ich.idx >= 0 && Math.abs(ich.d) > T.hb[ich.idx] + 0.5 * T.sc, wand: ich.stoss > (klein ? 0.1 : 2), laeuft: R.phase === 'los', quelle: eingabe.quelle, winkel: eingabe.neigung.winkel });
-      if (rek.n % 120 === 0 && buehne) rek.messwert([Math.round(mess.bps), buehne.punkte, mess.dreiecke, mess.aufrufe]);
+      rek.bild(ein, ich, { neben: ich.idx >= 0 && Math.abs(ich.d) > T.hb[ich.idx] + 0.5 * T.sc, wand: ich.stoss > (klein ? 0.1 : 2), laeuft: R.phase === 'los', quelle: eingabe.quelle, winkel: eingabe.neigung.winkel, neu: k === 0 });
+      if (rek.n % 240 === 0 && buehne) rek.messwert([Math.round(mess.bps), buehne.punkte, mess.dreiecke, mess.aufrufe]);
       if (R.beruehrt) { klang.rumms(R.beruehrt * 0.08, klein); R.beruehrt = 0; }
       if (R.ich.a.stoss > (klein ? 0.1 : 3)) klang.rumms(Math.min(1, R.ich.a.stoss / (klein ? 1 : 25)), klein);
       // Slotcar fliegt raus: lauter Plastik-Knall
@@ -767,6 +774,7 @@ export function starteSpiel() {
       if (R.phase === 'fertig' && !fertigGezeigt) { fertigGezeigt = true; const dieses = R; setTimeout(() => { if (laeuft && rennen === dieses) ergebnisZeigen(); }, 1200); }   // wer inzwischen im Menü ist oder neu gestartet hat, bekommt kein Ergebnis mehr darübergelegt
       // Rallye: Der Beifahrer liest die nächste Ansage vor
       if (R.rallye && R.ansageNeu) { const g = R.ansageNeu; R.ansageNeu = null; if (E.beifahrer === 'beides') sprecher.sagen(g.sprache, g.s - R.weg); }
+      }
     }
     kamera.update(dt, R.ich.a, { modell: !!T.def.modell, standorte: buehne.welt.standorte, massstab: T.sc, kopfMal: KOPF_STUFEN[E.kopfneigen] ?? 1 });
     if (!pausiert) buehne.schritt(dt, R.ich.a);
@@ -805,7 +813,7 @@ export function starteSpiel() {
 
   // Für Tests: Spiel ohne requestAnimationFrame vorspulen (wie __powershot.step in Powershot)
   // Gemalt wird nur das letzte Bild (Malen ist im Test-Browser ohne Grafikkarte sehr langsam)
-  app.step = (n = 1, dt = 1 / 60) => { for (let k = 0; k < n; k++) bild(dt, k === n - 1); };
+  app.step = (n = 1, dt = 1 / 60, malen = true) => { for (let k = 0; k < n; k++) bild(dt, malen && k === n - 1); };
   app.starten = starten; app.zumMenue = zumMenue; app.kameraWeiter = kameraWeiter;
   app.zustand = () => ({ laeuft, pausiert });
 }
