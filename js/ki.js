@@ -123,7 +123,7 @@ export function ideallinie(T, p, { rechts = false } = {}) {
 }
 
 // Höchsttempo an jeder Stelle (m/s), mit Bremszonen davor
-export function tempoPlan(T, kr, p, sicher = 0.9) {
+export function tempoPlan(T, kr, p, sicher = 0.9, bremsMal = 0.8) {
   const n = T.n, ds = T.ds;
   const q = 0.5 * LUFT * p.abtrieb / p.masse;   // Abtrieb pro Tempo² und kg
   const mu = p.haft * sicher;
@@ -138,7 +138,7 @@ export function tempoPlan(T, kr, p, sicher = 0.9) {
     for (let k = 2 * n; k > 0; k--) {
       const i = k % n, j = (k + 1) % n;
       const vj = v[j];
-      const brems = mu * (G + q * vj * vj) * p.bremse * (p.bremsGriff || 1) * 0.8 + wid * vj * vj;
+      const brems = mu * (G + q * vj * vj) * p.bremse * (p.bremsGriff || 1) * bremsMal + wid * vj * vj;
       v[i] = Math.min(v[i], Math.sqrt(vj * vj + 2 * brems * ds));
     }
     // vorwärts: beschleunigen braucht Zeit
@@ -150,6 +150,15 @@ export function tempoPlan(T, kr, p, sicher = 0.9) {
     }
   }
   return v;
+}
+
+// Fahrgefühl „echter“: Ohne Arcade-Hilfe hält das Auto in der Kurve nur, was die Reifen wirklich hergeben. Der normale
+// Tempo-Plan fährt ganz knapp an dieser Grenze – das schafft nur ein Computer. Für dich gibt es deshalb einen eigenen,
+// vorsichtigeren Plan auf derselben Linie (sicher = so viel der Haftung wird benutzt, bremsen = so stark wird gebremst):
+// Die roten Bremszonen fangen früher an, der Gang für die Kurve passt dazu, und die Bremshilfe bremst weiter herunter.
+export function linieFuer(T, L, p, echt) {
+  if (!echt || !p.echt || !L) return L;
+  return { ...L, tempo: tempoPlan(T, L.kr, p, p.echt.sicher, p.echt.bremsen) };
 }
 
 // Ein Computerfahrer. staerke 0.8 … 1.0 = wie nah am Höchsttempo er fährt.
@@ -238,11 +247,17 @@ export function fahren(f, a, T, L, andere, dt) {
 
 // Bremshilfe für den Spieler: bremst selbst, wenn man zu schnell auf eine Kurve zufährt
 export function bremsHilfe(a, T, L) {
-  const i = T.index(a.s + Math.abs(a.u) * 0.2);
+  let i = T.index(a.s + Math.abs(a.u) * 0.2);
   // Mit der Arcade-Hilfe hält das Auto in der Kurve mehr aus, als der Tempo-Plan annimmt: Die Bremshilfe lässt es
   // deshalb schneller in die Kurve (kurve = so viel mal das Plan-Tempo).
   const A = a.arcade && a.p.arcade;
-  const ziel = L.tempo[i] * (A && A.kurve ? A.kurve : 1.02), ein = a.p.vMax / 90;
+  // Fahrgefühl „echter“: Dort hält das Auto nur, was die Reifen wirklich hergeben – die Bremshilfe bremst früher (voraus)
+  // und etwas weiter herunter (kurve), damit auch ein Mensch mit Schrecksekunde die Kurve schafft.
+  // Wer bis in die Kurve hinein bremst, dem kommt das Heck.
+  const X = !a.arcade && a.p.echt;
+  let plan = L.tempo[i];
+  if (X && X.voraus) { i = T.index(a.s + Math.abs(a.u) * X.voraus); plan = Math.min(plan, L.tempo[i]); }
+  const ziel = plan * (A && A.kurve ? A.kurve : X && X.kurve ? X.kurve : 1.02), ein = a.p.vMax / 90;
   // Turbo (kleine Autos): Auf der Geraden darf das Auto schneller sein als das Höchsttempo – dann nicht dagegen bremsen
   if (a.turbo > 0 && L.tempo[i] > a.p.vMax * 0.92) return false;
   if (a.u > ziel + 0.8 * ein) {

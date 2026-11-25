@@ -52,6 +52,7 @@ export class Rennen {
     // Verkehr auf den Straßen (nur Supercar-Strecken)
     this.verkehr = T.strasse && verkehr > 0 ? new Verkehr(T, { menge: verkehr, seed: T.n }) : null;
     this.L = this.slot ? null : ideallinie(T, muster, { rechts: !!this.verkehr });
+    this.LS = this.L;        // Linie und Tempo-Plan für dich (im Fahrgefühl „echter“ ein vorsichtigerer Plan, siehe linieFuer in ki.js)
     this.plan = this.slot ? slotPlan(T, muster) : null;
     this.autos = [];
     this.zeit = 0;           // Sekunden seit dem Start (grünes Licht)
@@ -141,7 +142,7 @@ export class Rennen {
         a.driftHand = this.art === 'modell' && hand;
         if (hand && this.turbo) a.brems = 0;
         if (this.hilfe.lenken) a.lenkWunsch = Math.max(-1, Math.min(1, eingabe.lenk * 0.6 + lenkZurLinie(a, T, this.L) * 0.55));
-        c.hilfeBremst = this.hilfe.bremsen ? bremsHilfe(a, T, this.L) : false;
+        c.hilfeBremst = this.hilfe.bremsen ? bremsHilfe(a, T, this.LS) : false;
         if (c.ziel !== null && this.modus === 'rennen') { fahren(c.auslauf || (c.auslauf = neuerFahrer(0.7)), a, T, this.L, andere, dt); }
       } else if (c.fahrer) {
         fahren(c.fahrer, a, T, this.L, andere, dt);

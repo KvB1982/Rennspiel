@@ -11,6 +11,7 @@ import { ladeSupercars } from './supercarbau.js';
 import { ladeFormel, ladeVerkehr } from './automodelle.js';
 import { ARTEN } from './verkehr.js';
 import { Kamera, SICHTEN } from './kamera.js';
+import { linieFuer } from './ki.js';
 import { Eingabe } from './eingabe.js';
 import { LenkradEmpfang } from './verbindung.js';
 import { Klang } from './klang.js';
@@ -265,7 +266,9 @@ export function starteSpiel() {
       rennen = rallye ? new Etappe(T, { auto: E.rallyeauto, lack: LACKE[E.lack_rallye] ? LACKE[E.lack_rallye].farbe : null, staerke: E.staerke, nr: ganz ? app.rallyeStand.nr + 1 : 0 })
         : new Rennen(T, { modus: E.modus, runden: Math.min(T.def.rundenMax || 99, sup ? E.runden_super : E.runden), gegner: sup ? E.gegner_super : modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: E.fahrzeug, spielerFarbe: E.farbe, tempo: modell ? TEMPO[E.fahrzeug][E.tempo] || 0 : 0, boxen: modell && !drift && E.boxen,
         auto: E.supercar, lack: sup && LACKE[E.lack] ? LACKE[E.lack].farbe : null, verkehr: sup ? VERKEHR[E.verkehr] ?? 1 : 0 });
-      kurven = rennen.L && !modell && !rallye ? kurvenFinden(T, rennen.L, rennen.ich.a.p) : null;
+      // Fahrgefühl „echter“: eigener, vorsichtigerer Tempo-Plan für dich (Bremszonen, Kurven-Gang, Bremshilfe)
+      if (rennen.L && !modell && !rallye) rennen.LS = linieFuer(T, rennen.L, rennen.ich.a.p, E.arcade === false);
+      kurven = rennen.L && !modell && !rallye ? kurvenFinden(T, rennen.LS, rennen.ich.a.p) : null;
       rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
       if (rennen.ich) { rennen.ich.a.tc = E.traktion ? true : false; rennen.ich.a.arcade = E.arcade !== false; }
       eingabe.autoGas = E.autogas && !slot;
@@ -281,7 +284,7 @@ export function starteSpiel() {
       }
       rennen.wennBestzeit = rennen.wennBestzeit || null;
       if (!buehne || buehne.qualitaet !== E.grafik) { buehne = new Buehne($('bild'), E.grafik); app.buehne = buehne; }
-      buehne.laden(T, rennen.autos, rennen.L, { linie: E.linie, verkehr: rennen.verkehr, etappe: rallye ? rennen : null, felder: rennen.felder || [] });
+      buehne.laden(T, rennen.autos, rennen.LS || rennen.L, { linie: E.linie, verkehr: rennen.verkehr, etappe: rallye ? rennen : null, felder: rennen.felder || [] });
       $('hEinheit').textContent = modell ? 'km/h im Maßstab' : 'km/h';
       kamera = new Kamera(buehne.kamera);
       kamera.setze(modell ? E.kamera_klein : rallye ? E.kamera_rallye : E.kamera);

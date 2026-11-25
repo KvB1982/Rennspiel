@@ -10,10 +10,11 @@ import { MASSSTAB } from './strecke.js';
 export const SICHTEN = { hinten: 'Hinter dem Auto', weit: 'Hinter dem Auto (weit)', cockpit: 'Im Cockpit', stand: 'Neben der Bahn stehen' };
 
 // Kopfneigung: In der Kurve legt sich das Bild schräg, als würde man den Kopf in die Kurve legen.
-// KOPF = so viel pro "g" Kurvenkraft (rad), KOPF_MAX = höchstens (0,13 rad sind gut 7 Grad).
+// KOPF = so viel pro "g" Kurvenkraft (rad), KOPF_MAX = höchstens (0,07 rad sind 4 Grad).
+// Seit 25.11.2026 nur noch gut halb so viel wie vorher – es war zu stark und hat gestört.
 // Im Cockpit ist sie immer an. Hinter dem Auto ist sie etwas sanfter und im Menü abschaltbar ("Kopf neigt sich in die Kurve").
-const KOPF = { super: 0.09, formel: 0.045, rallye: 0.06 }, KOPF_MAX = 0.13, KOPF_MAX_RALLYE = 0.09;   // Rallye: weniger, dort geht es dauernd links und rechts
-const KOPF_HINTEN = 0.8, KOPF_HINTEN_MAX = 0.1, KOPF_WEICH = 5;   // hinter dem Auto: Anteil, höchstens (rad), wie schnell das Bild folgt
+const KOPF = { super: 0.05, formel: 0.025, rallye: 0.035 }, KOPF_MAX = 0.07, KOPF_MAX_RALLYE = 0.05;   // Rallye: weniger, dort geht es dauernd links und rechts
+const KOPF_HINTEN = 0.7, KOPF_HINTEN_MAX = 0.045, KOPF_WEICH = 5;   // hinter dem Auto: Anteil, höchstens (rad), wie schnell das Bild folgt
 
 export class Kamera {
   constructor(cam) {
