@@ -310,15 +310,17 @@ Jeder Schritt ist für sich fertig und spielbar. Schritt 1 und 2 zusammen sind d
 
 ## 8. Was offen ist
 
-Entscheidungen, die Kristian treffen sollte (mit Vorschlag):
+Kristian hat am 25.11.2026 entschieden:
 
-1. **Eine Karriere für alle drei Disziplinen oder drei getrennte?** Vorschlag: eine, mit gemeinsamem Konto.
+1. **Eine Karriere je Profil**, mit gemeinsamem Konto für alle drei Disziplinen.
    Dann kann Rallye-Preisgeld das Supercar bezahlen, und man probiert eher alles aus.
-2. **Rallye-Schaden ja oder nein?** Vorschlag: ja, mild und abschaltbar. Ohne Schaden hat der Service-Park keinen Sinn.
-3. **Formel-Tuning als Team-Entwicklung oder als eigenes Auto?** Vorschlag: Team-Entwicklung (passt zur Formel),
-   aber dieselbe Werkstatt-Ansicht.
-4. **Wie lang ist ein Rennen in der Karriere?** Vorschlag: einstellbar kurz, mittel, lang; Preisgeld gleich.
-5. **Vorbilder im Autohaus nennen?** Heute steht das Vorbild im Menü. Für eine Fassung im App Store sollte es raus.
+2. **Rallye-Schaden: ja**, mild und abschaltbar (kommt erst nach der ersten Rallye-Saison).
+3. **Formel-Tuning als Team-Entwicklung**, mit derselben Werkstatt-Ansicht.
+4. **Rennlänge in der Karriere:** einstellbar kurz, mittel, lang; Preisgeld gleich; Standard kurz.
+5. **Vorbilder im Autohaus bleiben vorerst genannt.** Das Spiel bleibt in der Familie und in TestFlight.
+
+Geändert hat sich außerdem die Reihenfolge zum Bauen: erst Saison, dann Tuning, dann Karriere, und davor Fundament
+und Spannung. Das steht in `docs/konzept_weiterentwicklung.md` (Abschnitte 6.1, 9 und 10).
 
 Risiken:
 

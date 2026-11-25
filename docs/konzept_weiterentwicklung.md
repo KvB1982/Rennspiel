@@ -285,17 +285,17 @@ Der alte Plan beginnt mit dem Tuning. Empfehlung: **Saison zuerst.**
 - Rennen des Tages (4.5) bringt Preisgeld. So greifen freies Spiel und Karriere ineinander.
 - Wirtschaft erst mit `tools/karriere.mjs` durchspielen, dann von Kristian eine Stunde spielen lassen, dann Zahlen festlegen.
 
-### 6.5 Zu den fünf offenen Entscheidungen aus dem Plan vom 22.11.
+### 6.5 Die fünf Entscheidungen aus dem Plan vom 22.11. (entschieden am 25.11.2026)
 
-| Frage | Empfehlung |
+| Frage | Kristians Entscheidung |
 | --- | --- |
-| Eine Karriere oder drei? | Eine, mit gemeinsamem Konto (wie vorgeschlagen). Je Profil eine |
-| Rallye-Schaden? | Ja, mild und abschaltbar, aber erst in Stufe „Würze“. Die erste Rallye-Saison kommt ohne aus |
-| Formel-Tuning als Team-Entwicklung? | Ja. Gleiche Werkstatt-Ansicht, anderer Name |
-| Rennlänge in der Karriere? | Kurz, mittel, lang zur Wahl, gleiches Preisgeld. Standard „kurz“ (3 bis 5 Minuten) |
-| Vorbilder nennen? | Jetzt schon herausnehmen. Es kostet nichts und macht eine spätere Veröffentlichung leichter |
+| Eine Karriere oder drei? | **Eine Karriere je Profil**, mit gemeinsamem Konto für alle Disziplinen |
+| Rallye-Schaden? | **Ja**, mild und abschaltbar, aber erst in Stufe „Würze“. Die erste Rallye-Saison kommt ohne aus |
+| Formel-Tuning als Team-Entwicklung? | **Ja.** Gleiche Werkstatt-Ansicht, anderer Name |
+| Rennlänge in der Karriere? | **Kurz, mittel, lang zur Wahl**, gleiches Preisgeld. Standard „kurz“ (3 bis 5 Minuten) |
+| Vorbilder nennen? | **Ja, die Vorbilder bleiben vorerst im Menü genannt** (anders als empfohlen). Das Spiel bleibt in der Familie und in TestFlight, siehe Abschnitt 10 |
 
-Neue Entscheidungen aus diesem Konzept stehen in Abschnitt 10.
+Die Entscheidungen zu diesem Konzept stehen in Abschnitt 10.
 
 ## 7. iPad und iPhone
 
@@ -309,7 +309,8 @@ Neue Entscheidungen aus diesem Konzept stehen in Abschnitt 10.
 | Fernseher | iPad oder iPhone per AirPlay oder Kabel, Handys als Lenkräder | einmal prüfen (Verzögerung über AirPlay kann stören, Kabel ist besser), in `APP-ANLEITUNG.md` beschreiben |
 | TestFlight ohne Mac-Sitzung | Build nach jedem Merge von selbst | GitHub-Aktion mit macOS-Runner und App-Store-Connect-Schlüssel als Geheimnis. Das Skript `scripts/testflight.sh` kann den Schlüssel schon |
 
-Für eine Veröffentlichung im App Store kommen dazu: Namen und Formen ohne echte Vorbilder, Lizenz des einen
+Das Spiel bleibt bis auf Weiteres in der Familie und in TestFlight (Entscheidung vom 25.11.2026), deshalb ist das
+Folgende nicht dringend. Für eine Veröffentlichung im App Store kämen dazu: Namen und Formen ohne echte Vorbilder, Lizenz des einen
 CC-BY-SA-Modells klären oder das Modell ersetzen, Datenschutz-Angaben, Texte auf Englisch.
 
 ## 8. Technik im Überblick
@@ -347,9 +348,9 @@ Aufwand in Pull Requests, so wie hier gearbeitet wird (ein PR ist etwa ein Threa
 
 | Stufe | Inhalt | PRs | Abnahme |
 | --- | --- | --- | --- |
-| **0a Sofort** | Pause beim Verlassen, kleine Fehler (Review 5.1), Bestzeit getrennt vom Geist, Vorbilder aus dem Menü, Neigung in drei Stufen | 1 bis 2 | Anruf während des Rennens: Spiel steht |
+| **0a Sofort** | Pause beim Verlassen, kleine Fehler (Review 5.1), Bestzeit getrennt vom Geist, Neigung in drei Stufen | 1 bis 2 | Anruf während des Rennens: Spiel steht |
 | **0b Messen** | Eingabe-Rekorder, `nachfahren.mjs`, Messwerte-Anzeige, iPad-Tabelle | 2 | Kristian schickt drei Fahrten, das Werkzeug fährt sie nach |
-| **0c Sport-Modus** | läuft im Fahrphysik-Thread: stufenlose Pedale, Befunde aus Review 4.1 bis 4.5 | 2 bis 3 | saubere Runde ohne Arcade-Hilfe |
+| **0c Sport-Modus** | läuft im Fahrphysik-Thread (erster Teil in PR 43 gemergt: Modus fahrbar gemacht, Prüfwerkzeug `tools/echt.mjs`); offen: Umbenennen in „Sport“, stufenlose Pedale, Befunde aus Review 4.1 bis 4.5 | 2 bis 3 | saubere Runde ohne Arcade-Hilfe |
 | **0d Unterbau** | fester Zeitschritt, `stand.js` mit Profilen, `spiel.js` teilen, GitHub-Aktion, `CLAUDE.md` kürzen | 3 bis 4 | alles fühlt sich an wie vorher, Stand übersteht ein Update |
 | **1 Spannung** | Medaillen, Windschatten, Gegner mit Eigenart und Rivale, Qualifikation und Blitzstart, Fahrschule, Rennen des Tages | 5 bis 6 | „noch eine Runde für Gold“ |
 | **2a Zusammen I** | Abwechselnd mit Tabelle, Geist-Duell, Slotcar und Modellautos zu zweit bis viert an einem Bildschirm | 3 | Familien-Abend mit zwei Handys |
@@ -375,14 +376,15 @@ aufhören oder die Reihenfolge ändern. Die kleinste Fassung, die das Spiel deut
 | Tuning verdirbt das Fahrgefühl | Enge Grenzen, Prüfung mit echten Aufnahmen, Tuning erst nach der Saison |
 | Dokumentation wächst schneller als der Code | `CLAUDE.md` auf den heutigen Stand kürzen, Verlauf auslagern |
 
-### Was Kristian entscheiden sollte
+### Was Kristian entschieden hat (25.11.2026)
 
-1. **Reihenfolge:** Fundament und Spannung vor Saison, Saison vor Tuning (Empfehlung), oder gleich die Saison?
-2. **„echter“ wird „Sport“** mit ABS und Lenkung passend zum Reifen (Empfehlung), oder soll es einen Modus ganz ohne
-   Hilfen geben, auch wenn er nur mit Controller gut fahrbar ist?
-3. **Eingabe-Rekorder:** Einverstanden, nach Testfahrten eine Datei zu schicken? Sie enthält nur Lenkung, Gas, Bremse
-   und die Lage des Geräts.
-4. **Mehrspieler:** Was zuerst? Empfehlung: Abwechselnd und Slotcar zu viert, dann geteilter Bildschirm. Online nur auf Wunsch.
-5. **Wie öffentlich soll das Spiel werden?** Bleibt es bei TestFlight in der Familie, sind Vorbild-Namen und das
-   CC-BY-SA-Modell kein Problem. Für den App Store müssen sie vorher raus.
-6. Die fünf Fragen aus dem Plan vom 22.11. (Empfehlungen in Abschnitt 6.5).
+1. **Reihenfolge:** wie empfohlen. Erst Fundament (Stufe 0), dann Spannung (Stufe 1), dann Saison vor Tuning vor Karriere.
+2. **„echter“ wird „Sport“**, mit ABS und Lenkung passend zum Reifen. Einen Modus ganz ohne Hilfen gibt es nicht.
+3. **Eingabe-Rekorder:** einverstanden. Kristian schickt nach Testfahrten eine Datei (nur Lenkung, Gas, Bremse und
+   die Lage des Geräts).
+4. **Mehrspieler:** wie empfohlen. Zuerst Abwechselnd und Slotcar zu viert, dann geteilter Bildschirm. Online nur auf Wunsch.
+5. **Wie öffentlich:** Das Spiel bleibt bis auf Weiteres in der Familie und in TestFlight. Vorbild-Namen und das
+   CC-BY-SA-Modell bleiben deshalb, wie sie sind. Die Punkte für den App Store (Review 5.7) ruhen.
+6. Die fünf Fragen aus dem Plan vom 22.11.: siehe Abschnitt 6.5.
+
+Damit ist nichts mehr offen. Der nächste Schritt ist Stufe 0a, danach 0b (Abschnitt 9).
