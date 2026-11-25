@@ -45,7 +45,23 @@ export class Buehne {
     this.kamera = new THREE.PerspectiveCamera(65, 16 / 9, 0.1, 9000);
     this.szene = null;
     this.autos = [];
+    // Die Grafikkarte kann das Bild wegnehmen (iPad bei wenig Speicher). Ohne preventDefault käme es nie wieder.
+    this.wennVerloren = null; this.wennZurueck = null;
+    this.hoerer = { webglcontextlost: e => { e.preventDefault(); if (this.wennVerloren) this.wennVerloren(); }, webglcontextrestored: () => { if (this.wennZurueck) this.wennZurueck(); } };
+    for (const k in this.hoerer) canvas.addEventListener(k, this.hoerer[k]);
   }
+
+  // Diese Bühne wird nicht mehr gebraucht (andere Grafik-Stufe): alles freigeben
+  weg() {
+    const c = this.renderer.domElement;
+    for (const k in this.hoerer) c.removeEventListener(k, this.hoerer[k]);
+    if (this.szene) this.aufraeumen();
+    this.renderer.dispose();
+    try { this.renderer.forceContextLoss(); } catch (e) {}
+  }
+
+  // Dieselbe Strecke mit denselben Autos noch einmal aufbauen (nachdem die Grafikkarte das Bild weggenommen hatte)
+  neuLaden() { if (this.zuletzt) this.laden(...this.zuletzt); }
 
   groesse(w, h) {
     this.w = w; this.h = h;
@@ -81,6 +97,7 @@ export class Buehne {
   // verkehr = der Verkehr aus dem Rennen (Supercar-Strecken), sonst null
   laden(T, autos, L, { linie = false, verkehr = null, etappe = null, felder = [] } = {}) {
     if (this.szene) this.aufraeumen();
+    this.zuletzt = [T, autos, L, { linie, verkehr, etappe, felder }];
     this.sterne = null;
     const s = this.szene = new THREE.Scene();
     const def = T.def, st = stimmung(def), modell = !!def.modell;

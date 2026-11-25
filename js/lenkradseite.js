@@ -71,6 +71,7 @@ export function lenkradStarten(code, lokal, nah = false) {
   let letzteInfo = null;
   sender.wennDaten = d => {
     if (d.t === 'mitte') { neig.kalibrieren(); return; }
+    if (d.t === 'besetzt') { $('hlInfo').textContent = 'Es lenkt schon ein anderes Handy'; return; }
     if (d.t !== 'i') return;
     letzteInfo = d;
     $('hlTempo').textContent = Math.round(d.v);

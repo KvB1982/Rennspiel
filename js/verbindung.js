@@ -114,7 +114,8 @@ export class LenkradEmpfang {
     if (!('BroadcastChannel' in window)) return;
     if (this.kanal) this.kanal.close();
     this.kanal = new BroadcastChannel(VORSILBE + this.code);
-    this.kanal.onmessage = e => this.empfangen(e.data, { send: m => this.kanal.postMessage({ an: 'handy', ...m }) });
+    const conn = { send: m => this.kanal.postMessage({ an: 'handy', ...m }) };
+    this.kanal.onmessage = e => this.empfangen(e.data, conn);
   }
 
   peerStarten(Peer, versuch) {
@@ -146,7 +147,14 @@ export class LenkradEmpfang {
 
   empfangen(d, conn) {
     if (!d || typeof d !== 'object' || d.an === 'handy') return;
-    this.letzte = performance.now();
+    // Zwei Handys zugleich: Wer zuerst da war, lenkt. Das zweite muss warten, bis das erste weg ist
+    // (sonst lenken beide dasselbe Auto durcheinander).
+    const jetzt = performance.now();
+    if (this.antwort && conn !== this.antwort && jetzt - this.letzte < 2500) {
+      if (jetzt - (conn.gesagt || 0) > 1000) { conn.gesagt = jetzt; try { conn.send({ t: 'besetzt' }); } catch (e) {} }
+      return;
+    }
+    this.letzte = jetzt;
     if (d.t === 'hallo' && conn !== this.nahConn) this.geraet = String(d.name || 'Handy').slice(0, 30);
     this.antwort = conn;
     this.setzeStatus('verbunden');

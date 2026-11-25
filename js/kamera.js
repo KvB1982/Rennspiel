@@ -29,7 +29,7 @@ export class Kamera {
   }
   setze(modus) { this.modus = modus === 'haube' ? 'cockpit' : modus; this.frisch = true; }   // die Motorhauben-Kamera gibt es nicht mehr
 
-  update(dt, a, { modell = false, standorte = [], massstab = MASSSTAB, kopfNeigen = true } = {}) {
+  update(dt, a, { modell = false, standorte = [], massstab = MASSSTAB, kopfMal = 1 } = {}) {   // kopfMal: Kopfneigung aus (0), wenig (1) oder stark (2)
     const cam = this.cam, sc = modell ? massstab : 1;
     const sh = Math.sin(a.h), ch = Math.cos(a.h);
     const speed = Math.abs(a.u) / a.p.vMax;
@@ -81,7 +81,7 @@ export class Kamera {
       const bh = a.h + dw * (1 - DRIFT_BLICK), bs = Math.sin(bh), bc = Math.cos(bh);           // dorthin schaut der Kopf
       const [ex, ey, ez] = a.auge ? [a.auge[0], a.auge[1], a.auge[2]] : [0, 0.92, -0.12];
       // Der Kopf des Fahrers neigt sich in die Kurve hinein (bis etwa 7 Grad) – so spürt man die Kurve im Cockpit
-      const nick = a.neigung, kMax = rallye ? KOPF_MAX_RALLYE : KOPF_MAX, roll = Math.max(-kMax, Math.min(kMax, kurveG * kopfJeG));
+      const nick = a.neigung, kMax = rallye ? KOPF_MAX_RALLYE : KOPF_MAX, roll = Math.max(-kMax, Math.min(kMax, kurveG * kopfJeG)) * Math.max(1, kopfMal);   // im Cockpit neigt sich der Kopf immer, bei „stark“ doppelt
       cam.position.set(bx + sh * ez + ch * ex, a.y + ey, bz + ch * ez - sh * ex);
       if (modell) { cam.position.set(a.x + (sh * ez + ch * ex) * sc, a.y + ey * sc, a.z + (ch * ez - sh * ex) * sc); }
       cam.position.x += zit(); cam.position.y += zit();
@@ -110,7 +110,7 @@ export class Kamera {
     // nicht unter die Fahrbahn
     cam.position.copy(this.pos); cam.position.x += zit(); cam.position.y += zit();
     // Kopfneigung auch hinter dem Auto (abschaltbar): Das Bild legt sich weich in die Kurve
-    const kopfZiel = kopfNeigen ? Math.max(-KOPF_HINTEN_MAX, Math.min(KOPF_HINTEN_MAX, kurveG * kopfJeG * KOPF_HINTEN)) : 0;
+    const kopfZiel = Math.max(-KOPF_HINTEN_MAX, Math.min(KOPF_HINTEN_MAX, kurveG * kopfJeG * KOPF_HINTEN)) * kopfMal;
     this.kopf = this.frisch ? kopfZiel : this.kopf + (kopfZiel - this.kopf) * Math.min(1, dt * KOPF_WEICH);
     cam.up.set(rc * this.kopf, 1, -rs * this.kopf);
     cam.lookAt(a.x + rs * 3.5 * sc, a.y + (weit ? 0.3 : 0.75) * sc, a.z + rc * 3.5 * sc);
