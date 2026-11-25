@@ -48,3 +48,9 @@ Dann `BESTER` oben in `tools/fahrstand.mjs` und diese Datei anpassen. Ein festge
 - Neue Ideen möglichst als eigene, abschaltbare Werte einbauen, damit der beste Stand erreichbar bleibt.
 - Die Messwerte dieses Standes stehen in `CLAUDE.md` unter „Bekannte Grenzen“ (`tools/fahrgefuehl.mjs`, `tools/bremshilfe.mjs`,
   `MENSCH=1 node tools/rallye.mjs`).
+
+## Fahrgefühl „echter“ (seit 25.11.2026)
+
+Der beste Stand oben gilt für das Fahrgefühl „Arcade“. Für „echter“ gibt es seit 25.11.2026 eigene Werte `echt` (Rennwagen und Supercars),
+die nur ohne Arcade-Hilfe wirken. Nachmessen: `node tools/echt.mjs`. Einzelheiten stehen in `CLAUDE.md` unter „Bekannte Grenzen“.
+Die Neigung der Karosserie und des Kopfes in der Kurve ist seit demselben Tag etwa halb so groß (nur Bild, keine Zahl in `AUTOS`).

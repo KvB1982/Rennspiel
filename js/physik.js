@@ -33,6 +33,9 @@ export const AUTOS = {
     bremsGriff: 1.25,                 // beim Bremsen halten die Reifen längs mehr aus als zur Seite (Spiel-Wert: kräftigere Bremse)
     esp: { beta: 0.1, dreh: 6, quer: 0.4 },   // Schleuderschutz (siehe unten)
     arcade: { lenk: 1.3, folgen: 24, griff: 1.12, ein: 10, fang: 5, frei: 0.06, halt: 1.8, rand: 3.5, zug: 0.6, kurve: 1.2 },   // Arcade-Hilfe (siehe ARCADE unten)
+    // Fahrgefühl „echter“ (siehe ECHT in schritt): Aktiv-Lenkung (schraeg, regler, folgen, gMitte), Kurven-ABS, strafferer
+    // Schleuderschutz (esp), dazu ein vorsichtigerer Tempo-Plan für Bremszonen und Bremshilfe (sicher, bremsen, voraus, kurve; siehe ki.js)
+    echt: { schraeg: 0.12, regler: 0.3, folgen: 24, gMitte: 3, kurvenAbs: 0.8, sicher: 0.72, bremsen: 0.6, voraus: 0.5, kurve: 0.98, neben: 0.7, esp: { beta: 0.1, dreh: 14, heck: 3, quer: 0.3 } },
     lenkMax: 0.42, lenkTempo: 32,     // größter Lenkeinschlag (rad); ab diesem Tempo (m/s) lenkt man weniger
     gaenge: 8, drehzahlMax: 12500, vMax: 96, rueck: 14,
     schritte: 8, unten: 3,
@@ -180,7 +183,9 @@ export function schritt(a, T, dt) {
   a.grund = ad < hb ? (T.belag ? T.belag[f.i] : BELAG.asphalt) : (ad < hb + kerbB && kerb) ? BELAG.kerb : (aus === BELAG.mauer || aus === BELAG.asphalt) ? BELAG.asphalt : aus;
   if (T.pfuetzen && T.pfuetzen.length && ad < hb + 1 && inPfuetze(T, f.s, f.d)) a.grund = BELAG.wasser;
   // In der Luft (nach einer Kuppe) haben die Reifen keinen Halt: kein Lenken, kein Gas, keine Bremse
-  const gr = a.luft ? IN_DER_LUFT : GRUND[a.grund] || GRUND[BELAG.asphalt];
+  let gr = a.luft ? IN_DER_LUFT : GRUND[a.grund] || GRUND[BELAG.asphalt];
+  // „echter“: Auf Gras und Kies rutscht das Auto nicht ganz so schlimm weg, damit man nach einem Ausrutscher wieder zurückfindet
+  if (!a.arcade && p.echt && p.echt.neben && gr.haft < p.echt.neben) gr = { haft: p.echt.neben, zieh: gr.zieh };
 
   // Lenkrad dreht nicht sofort: die Vorderräder folgen dem Wunsch schnell, aber weich
   // Arcade-Hilfe: Bei Tempo darf man weiter einlenken als sonst (lenk) und die Räder folgen schneller (folgen)
@@ -204,8 +209,34 @@ export function schritt(a, T, dt) {
     const gegen = Math.sign(a.lenkWunsch) === Math.sign(a.v) ? Math.min(1, Math.abs(Math.atan2(a.v, a.u)) / 0.35) : 0;
     lenkGr = eng + (lenkGr - eng) * gegen;
   }
-  const ziel = a.lenkWunsch * lenkGr;
-  a.lenk += (ziel - a.lenk) * Math.min(1, dt * (A ? A.folgen : 14));
+  // ECHT – Fahrgefühl „echter“ (X): Hier schiebt keine unsichtbare Hand, alle Kräfte kommen aus den Reifen. Damit man das
+  // Auto trotzdem fahren kann, bekommt es, was moderne echte Autos auch haben: eine Lenkung, die zum Tempo passt,
+  // ein Kurven-ABS und einen kräftigen Schleuderschutz.
+  const X = !a.arcade && p.echt && !a.luft ? p.echt : null;
+  let ziel = a.lenkWunsch * lenkGr;
+  if (X && a.u > 2) {
+    // LENKUNG: Voll eingeschlagen heißt immer „so eng, wie die Reifen es bei diesem Tempo schaffen“. Früher war der
+    // Einschlag bei hohem Tempo so klein, dass die Vorderreifen nur halb so stark zogen, wie sie konnten – das Auto
+    // fuhr geradeaus von der Strecke, obwohl noch Haftung da war.
+    const w = a.lenkWunsch, L0 = p.a + p.b;
+    const ayMax = p.haft * gr.haft * (G + 0.5 * LUFT * p.abtrieb * a.u * a.u / p.masse);
+    // gMitte (Rennwagen): Bei hohem Tempo drücken die Flügel so stark, dass das Auto mit 8-facher Erdanziehung um die
+    // Kurve könnte. Dann wäre schon ein kleiner Dreh am Lenkrad ein Haken. Um die Mitte herum lenkt das Auto deshalb
+    // höchstens mit "gMitte" g pro vollem Lenkrad – ganz eingeschlagen bleibt trotzdem die engste Kurve.
+    const k = X.gMitte ? Math.min(1, X.gMitte * G / ayMax) : 1;
+    const f = w * (k + (1 - k) * w * w);
+    // so schnell soll sich das Auto drehen (langsam gefahren: so wie die Räder bei vollem Einschlag rollen würden)
+    const rVoll = Math.min(ayMax / a.u, a.u * Math.tan(p.lenkMax) / L0);
+    const rSoll = f * rVoll, grund = Math.atan(L0 * rSoll / a.u);
+    // mehr als "schraeg" über die engste Kurve hinaus schlägt die Lenkung nie ein – sonst rutschen die Vorderreifen nur
+    const voll = Math.min(p.lenkMax, Math.atan(L0 * rVoll / a.u) + X.schraeg);
+    // regler (Rennwagen): Aktiv-Lenkung. Sie vergleicht, wie schnell sich das Auto dreht, und stellt die Räder nach:
+    //   etwas mehr Einschlag, wenn es zu träge einlenkt, weniger (oder gegenlenken), wenn das Heck kommt.
+    // lin (Straßenautos): Der Einschlag wächst einfach mit dem Lenkrad, bis die Vorderreifen ganz zupacken.
+    ziel = X.regler ? grund + X.regler * (rSoll - a.r) : grund + w * X.schraeg * (X.lin + (1 - X.lin) * w * w);
+    ziel = Math.max(-voll, Math.min(voll, ziel));
+  }
+  a.lenk += (ziel - a.lenk) * Math.min(1, dt * (A ? A.folgen : X ? X.folgen : 14));
 
   let maxRutschV = 0, maxRutschH = 0;
   for (let k = 0; k < n; k++) {
@@ -217,7 +248,7 @@ export function schritt(a, T, dt) {
     let Fzf = p.masse * G * p.b / L + down * p.abtriebVorn;
     let Fzr = p.masse * G * p.a / L + down * (1 - p.abtriebVorn);
     // Straßenautos: Beim Beschleunigen drückt das Gewicht auf die Hinterräder, beim Bremsen auf die Vorderräder
-    if (p.super) { const um = Math.max(-0.15, Math.min(0.2, (a.ax || 0) * p.hoehe / (L * G))) * p.masse * G; Fzf -= um; Fzr += um; }
+    if (p.super) { const um = Math.max(-0.15, Math.min(0.2, (a.ax || 0) * p.hoehe / (L * G))) * p.masse * G * (X && X.last !== undefined ? X.last : 1); Fzf -= um; Fzr += um; }   // („echter“: last – das Gewicht wandert nur zum Teil, sonst wird das Heck beim Bremsen so leicht, dass das Auto pendelt)
     const mu = p.haft * gr.haft;
     // Die Hinterreifen sind breiter und haften etwas besser (das macht das Auto gutmütiger)
     const muH = mu * (p.hinten || 1);
@@ -249,6 +280,14 @@ export function schritt(a, T, dt) {
         const Fb = a.brems * p.bremse * (muF + muR) * bg;
         // Straßenautos haben ein Antiblockiersystem: Die Hinterräder bremsen nie bis an die Grenze (sonst bricht das Heck aus)
         Fbf = Math.min(Fb * p.bremseVorn, muF * 0.98 * bg); Fbr = Math.min(Fb * (1 - p.bremseVorn), muR * (p.super ? 0.6 : 0.98) * bg);
+        // „echter“: Kurven-ABS (das haben echte Autos auch). Wer beim Bremsen lenkt, bekommt etwas weniger Bremse –
+        // dafür bleibt Haftung zum Lenken übrig. Ohne das rutscht ein Auto, das voll bremst, einfach geradeaus weiter.
+        if (X && X.kurvenAbs && a.tc !== false) {
+          const q = Math.min(1, Math.abs(a.lenkWunsch) * 1.5) * X.kurvenAbs;       // so viel Haftung bleibt vorn fürs Lenken
+          // Hinten bleibt doppelt so viel übrig: Bremsen die Hinterräder in der Kurve kräftig mit, überholt das Heck die Nase.
+          const qH = Math.min(0.98, q * 2);
+          Fbf = Math.min(Fbf, muF * Math.sqrt(1 - q * q) * bg); Fbr = Math.min(Fbr, muR * Math.sqrt(1 - qH * qH) * bg);
+        }
       } else if (a.gas <= 0) {
         // steht das Auto, heißt Bremse: Rückwärtsgang (bis zum Rückwärts-Tempo "rueck")
         Fx = -a.brems * p.schubMax * 0.7 * Math.max(0, Math.min(1, (p.rueck + u) / (p.rueck * 0.25)));
@@ -310,7 +349,7 @@ export function schritt(a, T, dt) {
     // oder rutscht das Heck zu weit zur Seite, dreht ein Gegen-Moment es zurück und es bremst ein wenig.
     // Ein bisschen Driften (bis "beta") bleibt erlaubt. Ausgeschaltet zusammen mit der Traktionskontrolle.
     if (p.esp && a.tc !== false && au > (p.esp.ab ?? 4)) {
-      const E = p.esp;
+      const E = X && X.esp || p.esp;   // („echter“: eigener, strafferer Schleuderschutz)
       const rLenk = u * Math.tan(a.lenk) / L;                            // so schnell wollen die Räder drehen
       const rGrip = (muF + muR) / p.masse / au * 1.08;                    // so schnell geht es höchstens mit der Haftung
       const rZiel = Math.max(-rGrip, Math.min(rGrip, rLenk));
@@ -319,7 +358,7 @@ export function schritt(a, T, dt) {
       // dreht zu schnell in dieselbe Richtung (Heck kommt)
       // (Drift-Hilfe "nurWinkel": Das Drehen bleibt frei, sonst könnte man gar nicht driften – nur der Winkel wird begrenzt.)
       if (E.nurWinkel) { /* nichts */ }
-      else if (r * rZiel >= 0 && Math.abs(r) > Math.abs(rZiel)) korr -= (r - rZiel) * E.dreh;
+      else if (r * rZiel >= 0 && Math.abs(r) > Math.abs(rZiel)) korr -= (r - rZiel) * E.dreh * (E.heck || 1);   // heck: Kommt das Heck, greift er kräftiger ein
       else if (r * rZiel < 0) korr -= r * E.dreh;                         // dreht gegen die Lenkung
       // rutscht zu schräg: Nase in Fahrtrichtung drehen
       const zuviel = Math.abs(beta) - E.beta;
@@ -486,10 +525,10 @@ export function schritt(a, T, dt) {
   // Karosserie nickt beim Bremsen und neigt sich in der Kurve (nur Bild)
   const quer = a.u * a.r;
   // In der Kurve drückt die Fliehkraft das Auto nach außen: Es neigt sich sichtbar von der Kurve weg.
-  // Straßenautos sind weich gefedert (bis etwa 4 Grad), der Rennwagen ist hart (bis etwa 2 Grad).
-  // Das ist etwas mehr als in echt, damit man es im Spiel auch sieht.
+  // Straßenautos sind weich gefedert (bis etwa 2 Grad), der Rennwagen ist hart (bis gut 1 Grad).
+  // Vorher war es doppelt so viel – das hat beim Fahren gestört (Kristian, 25.11.2026).
   const querG = quer / (T.def.modell ? G * MASSSTAB_G : G);
-  const [jeG, hoechstens] = p.super ? [0.045, 0.07] : [0.014, 0.038];
+  const [jeG, hoechstens] = p.super ? [0.022, 0.035] : [0.008, 0.02]   // seit 25.11.2026 halb so viel: höchstens 2 Grad (Supercar) und gut 1 Grad (Rennwagen);
   a.kippen += (Math.max(-hoechstens, Math.min(hoechstens, querG * jeG)) - a.kippen) * Math.min(1, dt * 6);
   a.neigung += (((a.brems > 0 && a.u > 1 ? 1 : 0) * 0.012 - a.gas * 0.006) - a.neigung) * Math.min(1, dt * 5);
 }
