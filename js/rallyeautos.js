@@ -37,11 +37,21 @@ const BASIS = {
     // Gas weg und das Auto wird in der Kehre immer langsamer). "kurve": Die Bremshilfe lässt das Auto etwas schneller in die Kurve.
     // "hand": Die Handbremse wirft das Heck herum, bremst aber nur halb so stark ("brems"), und die Hälfte der Zugkraft bleibt ("zug").
     zug: 0.6, kurve: 1.1, hand: { brems: 0.5, zug: 0.5 },
+    // "unter": Lenkrad weiter als "ab" eingeschlagen und zu schnell für die Kurve → Gas weg und mitbremsen (das Auto wirft sich quer und wird langsamer)
+    unter: { ab: 0.25, tempo: 12, brems: 0.8, bremsH: 0.5, gasWeg: 1 },
     drift: { winkel: 0.5, hand: 0.95, ab: 0.4, lang: 4.5, abTempo: 4, lose: 1.0, feder: 60, ruhe: 10, eng: 0.3, engAb: 0.7 } },
   // Drift zum Selber-Steuern (siehe physik.js): "winkel" = so weit stellt sich das Auto in einer harten Kurve quer (rad),
   // "hand" = mit Handbremse, "ab" = ab so viel Kurvenkraft beginnt es (Anteil der Grenze), "abTempo" = erst ab diesem Tempo (m/s),
   // "lose" = wie viel mehr auf losem Boden, "feder"/"ruhe" = wie schnell das Heck kommt und wie schnell es sich beruhigt.
   // "eng"/"engAb" = in Haarnadelkurven (das Auto dreht sich schneller als engAb rad/s) kommt das Heck noch einmal so viel weiter herum.
+  // neben: Neben dem Weg bremst der Boden kräftig ("zieh" mal Erdanziehung) und der Motor zieht nur noch "zug" – bis hinunter auf "ab" m/s.
+  // "rand" = so viele Meter neben dem Weg sind noch frei (der Rand zählt nicht gleich als Wald).
+  // "pause"/"pauseZug": Zurück auf dem Weg kommt die Motorkraft erst nach und nach wieder (so lange, so wenig am Anfang).
+  neben: { zieh: 3, zug: 0, ab: 12, rand: 0.5, pause: 3, pauseZug: 0.15 },
+  // Fahrgefühl „echter“ bei der Rallye: dieselbe Hilfe wie Arcade, aber mit diesen Werten darüber gelegt. Die unsichtbare Hand am Wegrand
+  // schiebt nur noch halb so stark (rand) und hält das Auto nicht mehr in der Spur (spur), der lose Boden rutscht mehr (belag, griff),
+  // und das Auto darf weiter quer rutschen (frei).
+  echtHilfe: { rand: 1.6, spur: 0, belag: 0.45, frei: 0.1, griff: 1.2, unter: { ab: 0.4, tempo: 12, brems: 0.7, bremsH: 0.4, gasWeg: 1 } },
   tcRest: 0.9,                       // Traktionskontrolle (wenn an) lässt nur wenig Haftung für die Kurve übrig
   lenkMax: 0.62, lenkTempo: 24,
   gaenge: 6, drehzahlMax: 8200, rueck: 7, abregeln: true,
