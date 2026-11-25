@@ -25,5 +25,11 @@ export function baueRennen(E, T, rallyeNr = 0) {
   if (rennen.L && !modell && !rallye) rennen.LS = linieFuer(T, rennen.L, rennen.ich.a.p, E.arcade === false);
   rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
   if (rennen.ich) { rennen.ich.a.tc = E.traktion ? true : false; rennen.ich.a.arcade = E.arcade !== false; }
+  // Rallye: „echter“ heißt hier nicht „ganz ohne Hilfe“ (dann rutscht das Auto auf Schotter nur noch), sondern „weniger Hilfe“:
+  // Das Auto bekommt die Arcade-Hilfe mit den Werten aus echtHilfe darüber.
+  if (rallye && rennen.ich && E.arcade === false && rennen.ich.a.p.echtHilfe) {
+    const a = rennen.ich.a;
+    a.p = { ...a.p, arcade: { ...a.p.arcade, ...a.p.echtHilfe } }; a.arcade = true; a.sport = true;
+  }
   return rennen;
 }

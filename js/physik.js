@@ -137,6 +137,7 @@ const GRUND = {
   [BELAG.wasser]: { haft: 0.6, zieh: 0.32 },
 };
 const IN_DER_LUFT = { haft: 0, zieh: 0 };
+const au0 = a => Math.abs(a.u);
 
 // tempo: eigenes Höchsttempo (m/s) für die kleinen Autos (im Menü einstellbar)
 export function neuesAuto(art = 'f1', tempo = 0) {
@@ -187,6 +188,19 @@ export function schritt(a, T, dt) {
   // „echter“: Auf Gras und Kies rutscht das Auto nicht ganz so schlimm weg, damit man nach einem Ausrutscher wieder zurückfindet
   if (!a.arcade && p.echt && p.echt.neben && gr.haft < p.echt.neben) gr = { haft: p.echt.neben, zieh: gr.zieh };
 
+  // Rallye (neben): Neben dem Weg liegen Gras, Wurzeln und Gräben. Dort wird das Auto kräftig gebremst und zieht kaum noch –
+  // bis es nur noch "ab" schnell ist (dann kommt man gut zurück auf den Weg). Sonst wäre Abkürzen durch den Wald schneller als der Weg.
+  let nebenZug = 1;
+  if (p.neben && !a.luft && ad > hb + p.neben.rand && au0(a) > p.neben.ab) {
+    const m = Math.min(1, (au0(a) - p.neben.ab) / (p.neben.ab * 0.5));
+    gr = { haft: gr.haft, zieh: gr.zieh + p.neben.zieh * m }; nebenZug = 1 - (1 - p.neben.zug) * m;
+    a.fangen = p.neben.pause;
+  } else if (p.neben && a.fangen > 0) {
+    // zurück auf dem Weg: Das Auto muss sich erst fangen ("pause" Sekunden lang kommt die Kraft nur langsam wieder)
+    a.fangen = Math.max(0, a.fangen - dt);
+    nebenZug = 1 - (1 - p.neben.pauseZug) * Math.min(1, a.fangen / (p.neben.pause * 0.5));
+  }
+
   // Lenkrad dreht nicht sofort: die Vorderräder folgen dem Wunsch schnell, aber weich
   // Arcade-Hilfe: Bei Tempo darf man weiter einlenken als sonst (lenk) und die Räder folgen schneller (folgen)
   const A = a.arcade && p.arcade && !a.luft ? p.arcade : null;
@@ -198,6 +212,7 @@ export function schritt(a, T, dt) {
   // Arcade (sauber): Mehr Einschlag, als die Reifen in eine Kurve umsetzen können, bremst nur (die Vorderräder schieben
   // quer über den Boden). Deshalb drehen die Räder bei Tempo höchstens ein Stück ("sauber") weiter als nötig für die
   // engste Kurve, die die Haftung hergibt. Voll einlenken bleibt die engste Kurve – nur ohne Festbremsen. Gegenlenken ist frei.
+  let unterM = 0;   // Untersteuer-Bremse (0 … 1), siehe „unter“ weiter unten
   if (A && A.sauber && a.u > 2 * kl) {
     const lose = A.belag && gr.haft < 1 ? 1 + (1 / gr.haft - 1) * A.belag : 1;
     const rMax = p.haft * gr.haft * G * A.griff * lose / a.u;
@@ -208,7 +223,12 @@ export function schritt(a, T, dt) {
     // beim Gegenlenken geht es weich über zum vollen Einschlag (je weiter das Heck weg ist, desto mehr)
     const gegen = Math.sign(a.lenkWunsch) === Math.sign(a.v) ? Math.min(1, Math.abs(Math.atan2(a.v, a.u)) / 0.35) : 0;
     lenkGr = eng + (lenkGr - eng) * gegen;
+    // Rallye (unter): Lenkrad weit eingeschlagen und zu schnell für die Kurve → das Auto wirft sich quer und wird dabei langsamer
+    // (so wie ein echtes Rallyeauto im Drift Tempo abbaut). Ohne das fährt man mit Vollgas einfach geradeaus in den Wald.
+    if (A.unter && a.tc !== false && a.u > A.unter.tempo && !a.handbremse && !gegen && Math.atan((p.a + p.b) * rMax / a.u) < p.lenkMax)
+      unterM = Math.max(0, Math.min(1, (Math.abs(a.lenkWunsch) - A.unter.ab) / (1 - A.unter.ab)));
   }
+  a.unter = unterM;
   // ECHT – Fahrgefühl „echter“ (X): Hier schiebt keine unsichtbare Hand, alle Kräfte kommen aus den Reifen. Damit man das
   // Auto trotzdem fahren kann, bekommt es, was moderne echte Autos auch haben: eine Lenkung, die zum Tempo passt,
   // ein Kurven-ABS und einen kräftigen Schleuderschutz.
@@ -224,7 +244,9 @@ export function schritt(a, T, dt) {
     // Kurve könnte. Dann wäre schon ein kleiner Dreh am Lenkrad ein Haken. Um die Mitte herum lenkt das Auto deshalb
     // höchstens mit "gMitte" g pro vollem Lenkrad – ganz eingeschlagen bleibt trotzdem die engste Kurve.
     const k = X.gMitte ? Math.min(1, X.gMitte * G / ayMax) : 1;
-    const f = w * (k + (1 - k) * w * w);
+    // steil (Straßenautos): Schon das halbe Lenkrad holt den größten Teil der Haftung (wie bei einem echten Auto bei Tempo –
+    // dort braucht niemand den vollen Einschlag). 1 = gleichmäßig, 2 = halbes Lenkrad sind schon drei Viertel.
+    const f = X.steil ? Math.sign(w) * (1 - (1 - Math.abs(w)) ** X.steil) : w * (k + (1 - k) * w * w);
     // so schnell soll sich das Auto drehen (langsam gefahren: so wie die Räder bei vollem Einschlag rollen würden)
     const rVoll = Math.min(ayMax / a.u, a.u * Math.tan(p.lenkMax) / L0);
     const rSoll = f * rVoll, grund = Math.atan(L0 * rSoll / a.u);
@@ -235,6 +257,11 @@ export function schritt(a, T, dt) {
     // lin (Straßenautos): Der Einschlag wächst einfach mit dem Lenkrad, bis die Vorderreifen ganz zupacken.
     ziel = X.regler ? grund + X.regler * (rSoll - a.r) : grund + w * X.schraeg * (X.lin + (1 - X.lin) * w * w);
     ziel = Math.max(-voll, Math.min(voll, ziel));
+    // UNTERSTEUER-BREMSE (unter): Wer das Lenkrad (fast) am Anschlag hat und trotzdem zu schnell für die Kurve ist, dem hilft
+    // nur eins: langsamer werden. Echte Autos machen das selbst (der Schleuderschutz nimmt Gas weg und bremst). "ab" = ab so
+    // viel Lenkrad, "brems"/"bremsH" = so stark bremsen Vorder- und Hinterräder dann mit, auch wenn du auf dem Gas stehst.
+    if (X.unter && a.tc !== false && a.u > X.unter.tempo && ayMax / a.u < a.u * Math.tan(p.lenkMax) / L0)
+      unterM = Math.max(0, Math.min(1, (Math.abs(w) - X.unter.ab) / (1 - X.unter.ab)));
   }
   a.lenk += (ziel - a.lenk) * Math.min(1, dt * (A ? A.folgen : X ? X.folgen : 14));
 
@@ -257,6 +284,7 @@ export function schritt(a, T, dt) {
     let Fx = 0, Fbf = 0, Fbr = 0;
     if (a.gas > 0 && u > -0.5) {
       Fx = a.gas * Math.min(p.schubMax, p.leistung / Math.max(au, 1)) * (p.schub || 1) * (TB ? TB.schub : 1);
+      Fx *= nebenZug;
       // Drift-Hilfe: Steht das Auto schon zu quer, nimmt sie etwas Gas weg (dann greifen die Hinterräder wieder)
       if (p.esp && p.esp.nurWinkel && a.tc !== false && au > p.esp.ab) {
         const zuquer = Math.abs(Math.atan2(v, au)) - p.esp.beta;
@@ -293,6 +321,7 @@ export function schritt(a, T, dt) {
         Fx = -a.brems * p.schubMax * 0.7 * Math.max(0, Math.min(1, (p.rueck + u) / (p.rueck * 0.25)));
       }
     }
+    if (unterM > 0 && u > 0.3) { const UN = X ? X.unter : A.unter; Fx *= 1 - unterM * (UN.gasWeg ?? 1); Fbf = Math.max(Fbf, unterM * UN.brems * muF * bg); Fbr = Math.max(Fbr, unterM * UN.bremsH * muR * bg); }   // Untersteuer-Bremse
     if (hand) Fbr = Math.max(Fbr, muR * 0.92 * bg * (AH ? AH.brems : 1));
     if (u < -0.3 && a.gas > 0) { Fbf = Math.min(a.gas * muF * 0.5, muF); Fbr = Math.min(a.gas * muR * 0.5, muR); }
     // Hinterrad kann nicht mehr ziehen, als es Haftung hat. Die Traktionskontrolle (tc) lässt dazu noch Haftung
@@ -489,7 +518,7 @@ export function schritt(a, T, dt) {
       const quer = a.u * a.r / halt;                                      // wie hart geht es gerade um die Kurve? (1 = Grenze)
       // Nur eine richtige Kurve zählt: Kurzes Hin- und Herlenken auf der Geraden mittelt sich weg (a.driftQ)
       a.driftQ = (a.driftQ || 0) + (Math.max(-1.2, Math.min(1.2, quer)) - (a.driftQ || 0)) * Math.min(1, dt * DR.lang);
-      const hart = Math.min(1, Math.max(0, (Math.abs(a.driftQ) - DR.ab) / (1 - DR.ab)));
+      const hart = Math.min(1, Math.max((a.unter || 0) * (Math.sign(a.lenkWunsch) === Math.sign(a.driftQ) ? 1 : 0), (Math.abs(a.driftQ) - DR.ab) / (1 - DR.ab)));
       const lose = 1 + (1 - Math.min(1, gr.haft)) * DR.lose;             // loser Boden: mehr Drift
       const schnell = Math.min(1, (tempo - DR.abTempo) / DR.abTempo);
       // Enge Kurve (Haarnadel): Das Auto dreht sich dort schnell – dann kommt das Heck noch weiter herum (eng)

@@ -33,8 +33,10 @@ const BASIS = {
   arcade: { lenk: 1.6, folgen: 24, griff: 1.3, ein: 9, fang: 4, frei: 0.14, halt: 1.6, rand: 3.5, zug: 0.6, kurve: 1.06 },
   // Fahrgefühl „echter“ (siehe ECHT in physik.js und linieFuer in ki.js): Lenkung, die zum Tempo passt (schraeg, lin, folgen = Räder folgen sofort), das Gewicht wandert
   // beim Bremsen nur zum Teil nach vorn (last), Kurven-ABS, strafferer Schleuderschutz (esp), vorsichtigerer Tempo-Plan (sicher, bremsen, voraus, kurve),
+  // steil = schon das halbe Lenkrad holt drei Viertel der Haftung, unter = Untersteuer-Bremse: Lenkrad fast am Anschlag und zu schnell → das Auto
+  // nimmt Gas weg und bremst selbst mit (beides seit 26.11.2026 nach Kristians echten Fahrten: „untersteuert extrem, ich komme kaum in die Kurve“),
   // neben = so viel Halt bleibt mindestens neben der Fahrbahn (damit man nach einem Ausrutscher zurückfindet)
-  echt: { schraeg: 0.12, lin: 1, folgen: 60, last: 0.4, kurvenAbs: 0.8, sicher: 0.72, bremsen: 0.6, voraus: 0.5, kurve: 0.98, neben: 0.7, esp: { beta: 0.1, dreh: 14, heck: 3, quer: 0.3 } },
+  echt: { schraeg: 0.12, lin: 1, steil: 2, unter: { ab: 0.6, tempo: 12, brems: 0.7, bremsH: 0.4 }, folgen: 60, last: 0.4, kurvenAbs: 0.8, sicher: 0.72, bremsen: 0.6, voraus: 0.5, kurve: 0.98, neben: 0.7, esp: { beta: 0.1, dreh: 14, heck: 3, quer: 0.3 } },
   gaenge: 7, drehzahlMax: 8500, rueck: 8, abregeln: true,
   schritte: 8, unten: 3,
   tcRest: 0.82,                     // Traktionskontrolle lässt mehr Haftung für die Kurve übrig als beim Rennwagen
