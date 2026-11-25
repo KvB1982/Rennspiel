@@ -98,6 +98,11 @@ export class Buehne {
   laden(T, autos, L, { linie = false, verkehr = null, etappe = null, felder = [] } = {}) {
     if (this.szene) this.aufraeumen();
     this.zuletzt = [T, autos, L, { linie, verkehr, etappe, felder }];
+    // Jede Strecke fängt wieder mit voller Bildschärfe an. Früher blieb das Bild für den Rest des Abends unscharf,
+    // wenn es auf EINER Strecke einmal kurz geruckelt hatte (gesehen in Kristians Fahrten vom 25.11.2026).
+    this.grenze = Infinity; this.ruhig = 0; this.bildZeit = 1 / 60;
+    this.pruefUhr = -3;   // die ersten Sekunden nach dem Bauen zählen nicht (da ruckelt es immer kurz)
+    if (this.punkte !== this.punkteMax) { this.punkte = this.punkteMax; this.renderer.setPixelRatio(this.punkte); if (this.w) this.renderer.setSize(this.w, this.h, false); }
     this.sterne = null;
     const s = this.szene = new THREE.Scene();
     const def = T.def, st = stimmung(def), modell = !!def.modell;
