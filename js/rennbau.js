@@ -18,16 +18,19 @@ export const VERKEHR = { aus: 0, wenig: 0.5, normal: 1, viel: 1.6 };
 export function baueRennen(E, T, rallyeNr = 0) {
   const rallye = E.fahrzeug === 'rallye', slot = E.fahrzeug === 'slot', sup = E.fahrzeug === 'super', drift = E.fahrzeug === 'drift';
   const modell = E.fahrzeug === 'modell' || slot || drift;
-  const rennen = rallye ? new Etappe(T, { auto: E.rallyeauto, lack: LACKE[E.lack_rallye] ? LACKE[E.lack_rallye].farbe : null, staerke: E.staerke, nr: rallyeNr })
+  const rennen = rallye ? new Etappe(T, { auto: E.rallyeauto, lack: LACKE[E.lack_rallye] ? LACKE[E.lack_rallye].farbe : null, staerke: E.staerke, nr: rallyeNr, sport: E.arcade === false })
     : new Rennen(T, { modus: E.modus, runden: Math.min(T.def.rundenMax || 99, sup ? E.runden_super : E.runden), gegner: sup ? E.gegner_super : modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: E.fahrzeug, spielerFarbe: E.farbe, tempo: modell ? TEMPO[E.fahrzeug][E.tempo] || 0 : 0, boxen: modell && !drift && E.boxen,
       auto: E.supercar, lack: sup && LACKE[E.lack] ? LACKE[E.lack].farbe : null, verkehr: sup ? VERKEHR[E.verkehr] ?? 1 : 0 });
   // Fahrgefühl „echter“: eigener, vorsichtigerer Tempo-Plan für dich (Bremszonen, Kurven-Gang, Bremshilfe)
-  if (rennen.L && !modell && !rallye) rennen.LS = linieFuer(T, rennen.L, rennen.ich.a.p, E.arcade === false);
+  if (rennen.L && !modell && !rallye && !rennen.ich.a.p.echtHilfe) rennen.LS = linieFuer(T, rennen.L, rennen.ich.a.p, E.arcade === false);
+  // … und die Computerfahrer fahren dann nach demselben Plan (mal ihrer Stärke). Sie behalten ihre Arcade-Hilfe und bleiben
+  // sauber auf der Bahn – aber sie sind nicht mehr schneller, als dein Auto im Fahrgefühl „echter“ überhaupt kann.
+  if (rennen.LS && rennen.LS !== rennen.L) rennen.LG = rennen.LS;
   rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
   if (rennen.ich) { rennen.ich.a.tc = E.traktion ? true : false; rennen.ich.a.arcade = E.arcade !== false; }
   // Rallye: „echter“ heißt hier nicht „ganz ohne Hilfe“ (dann rutscht das Auto auf Schotter nur noch), sondern „weniger Hilfe“:
   // Das Auto bekommt die Arcade-Hilfe mit den Werten aus echtHilfe darüber.
-  if (rallye && rennen.ich && E.arcade === false && rennen.ich.a.p.echtHilfe) {
+  if (rennen.ich && E.arcade === false && rennen.ich.a.p.echtHilfe) {
     const a = rennen.ich.a;
     a.p = { ...a.p, arcade: { ...a.p.arcade, ...a.p.echtHilfe } }; a.arcade = true; a.sport = true;
   }

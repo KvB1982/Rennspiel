@@ -138,6 +138,14 @@ const GRUND = {
 };
 const IN_DER_LUFT = { haft: 0, zieh: 0 };
 const au0 = a => Math.abs(a.u);
+// Kommt gleich eine Kurve in die Richtung, in die du lenkst (0 = nein … 1 = ja, und zwar eine, für die du zu schnell bist)?
+// Die Untersteuer-Bremse fragt das: Wer nur auf der Geraden am Lenkrad wackelt, soll nicht gebremst werden.
+// seite = +1 links, −1 rechts; ayMax = so viel Kurvenkraft geben die Reifen her
+function kurveKommt(a, T, seite, ayMax) {
+  const u = Math.abs(a.u); let k = 0;
+  for (let t = 0; t <= 0.8; t += 0.2) k = Math.max(k, T.k[T.index(a.s + u * t)] * seite);
+  return Math.max(0, Math.min(1, (k * u * u / ayMax - 0.5) / 0.3));
+}
 
 // tempo: eigenes Höchsttempo (m/s) für die kleinen Autos (im Menü einstellbar)
 export function neuesAuto(art = 'f1', tempo = 0) {
@@ -226,7 +234,7 @@ export function schritt(a, T, dt) {
     // Rallye (unter): Lenkrad weit eingeschlagen und zu schnell für die Kurve → das Auto wirft sich quer und wird dabei langsamer
     // (so wie ein echtes Rallyeauto im Drift Tempo abbaut). Ohne das fährt man mit Vollgas einfach geradeaus in den Wald.
     if (A.unter && a.tc !== false && a.u > A.unter.tempo && !a.handbremse && !gegen && Math.atan((p.a + p.b) * rMax / a.u) < p.lenkMax)
-      unterM = Math.max(0, Math.min(1, (Math.abs(a.lenkWunsch) - A.unter.ab) / (1 - A.unter.ab)));
+      unterM = Math.max(0, Math.min(1, (Math.abs(a.lenkWunsch) - A.unter.ab) / (1 - A.unter.ab))) * kurveKommt(a, T, Math.sign(a.lenkWunsch), rMax * a.u);
   }
   a.unter = unterM;
   // ECHT – Fahrgefühl „echter“ (X): Hier schiebt keine unsichtbare Hand, alle Kräfte kommen aus den Reifen. Damit man das
@@ -261,7 +269,7 @@ export function schritt(a, T, dt) {
     // nur eins: langsamer werden. Echte Autos machen das selbst (der Schleuderschutz nimmt Gas weg und bremst). "ab" = ab so
     // viel Lenkrad, "brems"/"bremsH" = so stark bremsen Vorder- und Hinterräder dann mit, auch wenn du auf dem Gas stehst.
     if (X.unter && a.tc !== false && a.u > X.unter.tempo && ayMax / a.u < a.u * Math.tan(p.lenkMax) / L0)
-      unterM = Math.max(0, Math.min(1, (Math.abs(w) - X.unter.ab) / (1 - X.unter.ab)));
+      unterM = Math.max(0, Math.min(1, (Math.abs(w) - X.unter.ab) / (1 - X.unter.ab))) * kurveKommt(a, T, Math.sign(w), ayMax);
   }
   a.lenk += (ziel - a.lenk) * Math.min(1, dt * (A ? A.folgen : X ? X.folgen : 14));
 

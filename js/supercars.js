@@ -23,7 +23,7 @@ const BASIS = {
   rollen: 0.013,
   bremse: 1.0, bremseVorn: 0.68,
   zugGriff: 2.4, schub: 1.9,        // sehr kräftiger Antritt: Reifen halten längs mehr aus, Motor zieht 1,9-mal so stark (Spiel-Werte, mit Absicht viel stärker als echt)
-  bremsGriff: 1.9,                 // kräftige Spiel-Bremse: längs halten die Reifen mehr aus als zur Seite
+  bremsGriff: 2.7,                 // sehr kräftige Spiel-Bremse: längs halten die Reifen mehr aus als zur Seite (1,9 war Kristian zu schwach: von 200 km/h jetzt 55 m statt 77 m)
   esp: { beta: 0.4, dreh: 5, quer: 0.3 },   // Schleuderschutz: bis gut 20° Driften ist erlaubt, erst dann fängt er das Auto (Kristian will driften können)
   lenkMax: 0.5, lenkTempo: 22,
   // Arcade-Hilfe (nur für dich, siehe physik.js): lenk = bei Tempo so viel mehr Lenkeinschlag, folgen = so schnell folgen die Räder,
@@ -36,7 +36,11 @@ const BASIS = {
   // steil = schon das halbe Lenkrad holt drei Viertel der Haftung, unter = Untersteuer-Bremse: Lenkrad fast am Anschlag und zu schnell → das Auto
   // nimmt Gas weg und bremst selbst mit (beides seit 26.11.2026 nach Kristians echten Fahrten: „untersteuert extrem, ich komme kaum in die Kurve“),
   // neben = so viel Halt bleibt mindestens neben der Fahrbahn (damit man nach einem Ausrutscher zurückfindet)
-  echt: { schraeg: 0.12, lin: 1, steil: 2, unter: { ab: 0.6, tempo: 12, brems: 0.7, bremsH: 0.4 }, folgen: 60, last: 0.4, kurvenAbs: 0.8, sicher: 0.72, bremsen: 0.6, voraus: 0.5, kurve: 0.98, neben: 0.7, esp: { beta: 0.1, dreh: 14, heck: 3, quer: 0.3 } },
+  // Fahrgefühl „echter“ im Spiel (seit 26.11.2026): dieselbe Hilfe wie Arcade, nur weniger davon. Die unsichtbare Führung am
+  // Straßenrand ist schwächer (rand), das Heck darf weiter herumkommen (frei), das Auto dreht nicht ganz so willig ein (griff),
+  // und die Bremshilfe bremst etwas weiter herunter (kurve). Die Werte hier ersetzen die gleichnamigen in arcade.
+  echtHilfe: { rand: 2, frei: 0.24, griff: 1.2, halt: 1.2, kurve: 0.97 },
+  echt: { schraeg: 0.12, lin: 1, steil: 2, unter: { ab: 0.6, tempo: 12, brems: 0.7, bremsH: 0.4 }, folgen: 60, last: 0.4, kurvenAbs: 0.8, sicher: 0.82, bremsen: 0.75, voraus: 0.5, kurve: 0.98, neben: 0.7, esp: { beta: 0.1, dreh: 14, heck: 3, quer: 0.3 } },
   gaenge: 7, drehzahlMax: 8500, rueck: 8, abregeln: true,
   schritte: 8, unten: 3,
   tcRest: 0.82,                     // Traktionskontrolle lässt mehr Haftung für die Kurve übrig als beim Rennwagen
