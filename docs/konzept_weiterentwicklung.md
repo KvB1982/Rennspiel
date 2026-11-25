@@ -349,7 +349,7 @@ Aufwand in Pull Requests, so wie hier gearbeitet wird (ein PR ist etwa ein Threa
 | Stufe | Inhalt | PRs | Abnahme |
 | --- | --- | --- | --- |
 | **0a Sofort** (gebaut am 25.11.2026) | Pause beim Verlassen, kleine Fehler (Review 5.1), Bestzeit getrennt vom Geist, Neigung in drei Stufen | 1 bis 2 | Anruf während des Rennens: Spiel steht |
-| **0b Messen** | Eingabe-Rekorder, `nachfahren.mjs`, Messwerte-Anzeige, iPad-Tabelle | 2 | Kristian schickt drei Fahrten, das Werkzeug fährt sie nach |
+| **0b Messen** (gebaut am 25.11.2026, wartet auf Kristians erste drei Fahrten) | Eingabe-Rekorder, `nachfahren.mjs`, Messwerte-Anzeige, iPad-Tabelle | 2 | Kristian schickt drei Fahrten, das Werkzeug fährt sie nach |
 | **0c Sport-Modus** | läuft im Fahrphysik-Thread (erster Teil in PR 43 gemergt: Modus fahrbar gemacht, Prüfwerkzeug `tools/echt.mjs`); offen: Umbenennen in „Sport“, stufenlose Pedale, Befunde aus Review 4.1 bis 4.5 | 2 bis 3 | saubere Runde ohne Arcade-Hilfe |
 | **0d Unterbau** | fester Zeitschritt, `stand.js` mit Profilen, `spiel.js` teilen, GitHub-Aktion, `CLAUDE.md` kürzen | 3 bis 4 | alles fühlt sich an wie vorher, Stand übersteht ein Update |
 | **1 Spannung** | Medaillen, Windschatten, Gegner mit Eigenart und Rivale, Qualifikation und Blitzstart, Fahrschule, Rennen des Tages | 5 bis 6 | „noch eine Runde für Gold“ |
@@ -387,4 +387,4 @@ aufhören oder die Reihenfolge ändern. Die kleinste Fassung, die das Spiel deut
    CC-BY-SA-Modell bleiben deshalb, wie sie sind. Die Punkte für den App Store (Review 5.7) ruhen.
 6. Die fünf Fragen aus dem Plan vom 22.11.: siehe Abschnitt 6.5.
 
-Damit ist nichts mehr offen. Der nächste Schritt ist Stufe 0a, danach 0b (Abschnitt 9).
+Damit ist nichts mehr offen. Stufe 0a und 0b sind gebaut (25.11.2026). Als Nächstes schickt Kristian drei aufgenommene Fahrten; danach gibt er die nächste Stufe frei (Abschnitt 9).
