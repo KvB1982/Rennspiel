@@ -39,6 +39,9 @@ function zufallAus(text) {
   return () => { h = (h + 0x6D2B79F5) >>> 0; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
+// Fahrgefühl „echter“: Dein Auto bekommt weniger Hilfe und ist langsamer. Damit du trotzdem mithalten kannst, brauchen
+// die anderen dann so viel mal länger (geschätzt aus künstlichen Fahrern mit Bremshilfe).
+export const SPORT_GEGNER = 1.12;
 export function rivalen(staerke = 'mittel', anzahl = 9) {
   const [lo, hi] = STAERKE_RALLYE[staerke] || STAERKE_RALLYE.mittel;
   const r = zufallAus('rivalen' + staerke);
@@ -218,7 +221,7 @@ export function zuschauerStellen(T, ansagen) {
 // ---------------------------------------------------------------- Die Prüfung
 export class Etappe {
   // auto = id des Rallyeautos, lack = Farbe (oder null), staerke = wie schnell die anderen sind, nr = Nummer der WP
-  constructor(T, { auto = 'sturmfalke', lack = null, staerke = 'mittel', nr = 1, nummer = 1 } = {}) {
+  constructor(T, { auto = 'sturmfalke', lack = null, staerke = 'mittel', nr = 1, nummer = 1, sport = false } = {}) {
     this.T = T; this.modus = 'rallye'; this.rallye = true; this.nr = nr;
     this.super = true; this.slot = false; this.boxen = false; this.verkehr = null; this.runden = 1; this.sc = 1;
     const S = rallyeauto(auto);
@@ -247,7 +250,7 @@ export class Etappe {
     const r = zufallAus(T.def.id + staerke);
     const tZiel = zeitBei(T, this.plan, this.zielS);
     this.rivalen = rivalen(staerke).map(R => {
-      const f = R.faktor * (1 + (r() - 0.5) * 0.03);
+      const f = R.faktor * (1 + (r() - 0.5) * 0.03) * (sport ? SPORT_GEGNER : 1);
       return { ...R, zw: this.zwS.map(s => zeitBei(T, this.plan, s) * f), zeit: tZiel * f };
     });
     this.ansagen = ansagenBauen(T, this.plan);
