@@ -40,7 +40,7 @@ export class Klang {
 
   // erst nach einem Fingertipp oder Klick erlaubt der Browser Töne
   wecken() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    if (this.ctx) { if (this.ctx.state === 'suspended' && !document.hidden) { this.schlaeft = false; this.ctx.resume(); } return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     const c = this.ctx = new AC();
@@ -145,6 +145,10 @@ export class Klang {
     if (this.quietsch) aus(this.quietsch.g);
     aus(this.reifen); aus(this.wind); aus(this.rumpel); aus(this.knirsch); aus(this.platscher);
   }
+
+  // App im Hintergrund: Der Ton hält ganz an (sonst brummt der Motor weiter, während man telefoniert)
+  schlafen() { this.ruhe(); this.schlaeft = true; if (this.ctx && this.ctx.state === 'running') try { this.ctx.suspend(); } catch (e) {} }
+  aufwachen() { this.schlaeft = false; if (this.ctx && this.ctx.state === 'suspended') try { this.ctx.resume(); } catch (e) {} }
 
   schalten(an) {
     this.an = an;

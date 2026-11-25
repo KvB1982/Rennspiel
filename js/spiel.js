@@ -26,7 +26,7 @@ const $ = id => document.getElementById(id);
 // ---------------------------------------------------------------- Einstellungen (werden im Browser gemerkt)
 const STANDARD = {
   fahrzeug: 'f1', modus: 'rennen', strecke: 'kueste', strecke_modell: 'wohnzimmer', strecke_slot: 'slot_oval', strecke_drift: 'drift_matte', strecke_super: 'metropole', strecke_rallye: 'wp_seen', tempo: 'mittel',
-  rallyeauto: 'sturmfalke', lack_rallye: 0, beifahrer: 'beides', kamera_rallye: 'hinten', kopfneigen: true,
+  rallyeauto: 'sturmfalke', lack_rallye: 0, beifahrer: 'beides', kamera_rallye: 'hinten', kopfneigen: 'wenig',
   supercar: 'falkner', lack: 0, verkehr: 'normal', runden_super: 1, gegner_super: 5,
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
   kamera_klein: 'hinten',   // kleine Autos: hinter dem Auto, im Cockpit oder neben der Bahn stehen ('stand')
@@ -42,23 +42,37 @@ const TEMPO = { modell: { langsam: 1.2, mittel: 1.8, schnell: 2.4 }, slot: { lan
 const streckenFeld = () => E.fahrzeug === 'modell' ? 'strecke_modell' : E.fahrzeug === 'slot' ? 'strecke_slot' : E.fahrzeug === 'drift' ? 'strecke_drift' : E.fahrzeug === 'super' ? 'strecke_super' : E.fahrzeug === 'rallye' ? 'strecke_rallye' : 'strecke';
 // Wie viel Verkehr: Zahl für verkehr.js (0 = keiner)
 const VERKEHR = { aus: 0, wenig: 0.5, normal: 1, viel: 1.6 };
+// Kopfneigung in der Kurve: So stark legt sich das Bild in die Kurve (mal). "wenig" ist der Stand vom 25.11.2026.
+const KOPF_STUFEN = { aus: 0, wenig: 1, stark: 2 };
 const istKlein = () => E.fahrzeug === 'modell' || E.fahrzeug === 'slot' || E.fahrzeug === 'drift';   // die kleinen Autos (Maßstab 1:30, Drift 1:43)
 const E = Object.assign({}, STANDARD);
 // iPad und iPhone: zuerst "mittel" (weniger Bildpunkte, weniger Häuser und Bäume), bis man selbst etwas anderes wählt
 if (istApfelGeraet()) { E.grafik = 'mittel'; E.neigen = true; }   // und zuerst durch Neigen steuern
 try { Object.assign(E, JSON.parse(localStorage.getItem('rennspiel.einst') || '{}')); } catch (e) {}
+if (E.kopfneigen === true) E.kopfneigen = 'wenig'; else if (E.kopfneigen === false) E.kopfneigen = 'aus';   // früher gab es nur an und aus
+if (!(E.kopfneigen in KOPF_STUFEN)) E.kopfneigen = 'wenig';
 if (E.kamera_rallye === 'haube') E.kamera_rallye = 'cockpit';   // die Motorhauben-Kamera ist jetzt ein richtiges Cockpit
 const merken = () => { try { localStorage.setItem('rennspiel.einst', JSON.stringify(E)); } catch (e) {} };
 
 // Bestzeiten und Geist-Runden
 const bestKey = (id, art) => 'rennspiel.geist.' + id + '.' + art;
 const ladeGeist = (id, art) => { try { return JSON.parse(localStorage.getItem(bestKey(id, art)) || 'null'); } catch (e) { return null; } };
-const speichereGeist = (id, art, g) => { try { localStorage.setItem(bestKey(id, art), JSON.stringify(g)); } catch (e) {} };
+const speichereGeist = (id, art, g) => { try { localStorage.setItem(bestKey(id, art), JSON.stringify(g)); return true; } catch (e) { return false; } };
+// Die Bestzeit selbst steht in einem eigenen, winzigen Eintrag. Der Geist (die ganze aufgezeichnete Runde) ist groß:
+// Ist der Speicher des Geräts voll, geht nur der Geist verloren – die Bestzeit bleibt.
+const zeitKey = (id, art) => 'rennspiel.best.' + id + '.' + art;
+const ladeBest = (id, art) => {
+  let z = null; try { const v = parseFloat(localStorage.getItem(zeitKey(id, art))); if (v > 0) z = v; } catch (e) {}
+  const g = ladeGeist(id, art);   // alte Spielstände: Dort stand die Bestzeit nur im Geist
+  return g && g.zeit > 0 && (z === null || g.zeit < z) ? g.zeit : z;
+};
+const speichereBest = (id, art, zeit) => { try { localStorage.setItem(zeitKey(id, art), String(zeit)); } catch (e) {} };
 
 // Bestzeiten der kleinen Autos gelten je Höchsttempo (sonst wären sie nicht vergleichbar)
 const geistArt = () => E.fahrzeug === 'f1' ? '' : E.fahrzeug === 'super' ? '.' + E.supercar : E.fahrzeug === 'rallye' ? '.' + E.rallyeauto : '.' + E.tempo + (E.fahrzeug === 'slot' ? '' : '.3');   // .3: seit es Turbo und die Arcade-Hilfe für die kleinen Autos gibt, zählen die alten Bestzeiten nicht mehr
-// Die ganze Rallye: drei Prüfungen nacheinander
+// Die ganze Rallye: alle Prüfungen nacheinander
 const RALLYE_FOLGE = ['wp_seen', 'wp_nebel', 'wp_pass', 'wp_alm'];
+const ZAHLWORT = ['null', 'eine', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben', 'acht'];
 const streckenCache = new Map();
 const holeStrecke = id => { if (!streckenCache.has(id)) streckenCache.set(id, baueStrecke(strecke(id))); return streckenCache.get(id); };
 
@@ -88,7 +102,7 @@ export function starteSpiel() {
     const [mz, mr] = [$('mModus').querySelector('[data-wert=zeit]'), $('mModus').querySelector('[data-wert=rennen]')];
     if (E.fahrzeug === 'rallye') {
       mz.innerHTML = '<span class="gross">⏱️</span><b>Eine Prüfung</b><small>Eine Wertungsprüfung gegen die Uhr – mit Geist-Auto deiner Bestzeit</small>';
-      mr.innerHTML = '<span class="gross">🏆</span><b>Ganze Rallye</b><small>Alle drei Prüfungen nacheinander, die Zeiten werden zusammengezählt</small>';
+      mr.innerHTML = '<span class="gross">🏆</span><b>Ganze Rallye</b><small>Alle ' + ZAHLWORT[RALLYE_FOLGE.length] + ' Prüfungen nacheinander, die Zeiten werden zusammengezählt</small>';
     } else {
       mz.innerHTML = '<span class="gross">⏱️</span><b>Zeitfahren</b><small>Allein gegen die Uhr, mit Geist-Auto deiner besten Runde</small>';
       mr.innerHTML = '<span class="gross">🏆</span><b>Rennen</b><small>Gegen Computerfahrer, mit Startampel</small>';
@@ -97,9 +111,9 @@ export function starteSpiel() {
     for (const def of liste) {
       const b = document.createElement('button'); b.dataset.wert = def.id;
       const T0 = holeStrecke(def.id);
-      const g = ladeGeist(def.id, E.fahrzeug + geistArt());
+      const best = ladeBest(def.id, E.fahrzeug + geistArt());
       const laenge = def.modell ? (T0.laenge).toFixed(1) + ' m' : (T0.laenge / 1000).toFixed(2) + ' km';
-      b.innerHTML = `<canvas width="300" height="150"></canvas><b>${def.name}</b><small>${def.ort} · ${laenge}</small><small>${def.text}</small>${g ? `<span class="best">⏱ Bestzeit ${zeitText(g.zeit)}</span>` : ''}`;
+      b.innerHTML = `<canvas width="300" height="150"></canvas><b>${def.name}</b><small>${def.ort} · ${laenge}</small><small>${def.text}</small>${best ? `<span class="best">⏱ Bestzeit ${zeitText(best)}</span>` : ''}`;
       const cv = b.querySelector('canvas');
       // hinter dem Streckenplan: ein Bild aus dem Spiel, etwas abgedunkelt, damit man die Linie gut sieht
       cv.style.backgroundImage = `linear-gradient(rgba(8,12,20,.3), rgba(8,12,20,.55)), url(bilder/menue/strecke_${def.id}.webp)`;
@@ -146,7 +160,7 @@ export function starteSpiel() {
     if (!modell && !rallye) zeile('Kamera', 'kamera', [['hinten', 'hinter dem Auto'], ['weit', 'weiter weg'], ['cockpit', 'im Cockpit']]);
     zeile('Kamera', 'kamera_klein', [['hinten', 'hinter dem Auto'], ['cockpit', 'im Cockpit'], ['stand', 'neben der Bahn']], modell);
     // Kopfneigung: Auch hinter dem Auto legt sich das Bild in die Kurve (im Cockpit immer)
-    zeile('Kopf neigt sich in die Kurve', 'kopfneigen', [[true, 'an'], [false, 'aus']], !slot);
+    zeile('Kopf neigt sich in die Kurve', 'kopfneigen', [['aus', 'aus'], ['wenig', 'wenig'], ['stark', 'stark']], !slot);
     zeile('Höchsttempo', 'tempo', [['langsam', 'langsam'], ['mittel', 'mittel'], ['schnell', 'schnell']], modell);
     zeile('Tanken und Reifen', 'boxen', [[true, 'an'], [false, 'aus']], modell && rennenAn && !drift);
     zeile('Ideallinie und Bremszonen', 'linie', [[true, 'an'], [false, 'aus']], !modell && !rallye);
@@ -252,8 +266,18 @@ export function starteSpiel() {
   // ---------------------------------------------------------------- Spiel starten
   const zeige = (id, an) => { $(id).hidden = !an; };
   function starten() {
+    $('ladenText').textContent = 'Strecke wird gebaut …'; zeige('ladenZurueck', false);
     zeige('laden', true);
-    setTimeout(async () => {
+    // Geht beim Bauen etwas schief, soll das Ladebild nicht für immer stehen bleiben
+    setTimeout(() => bauen().catch(e => {
+      console.error(e);
+      laeuft = false; pausiert = false; klang.ruhe(); wachAus();
+      zeige('hud', false); zeige('pause', false); zeige('ergebnis', false);
+      $('ladenText').textContent = 'Das hat leider nicht geklappt'; zeige('ladenZurueck', true);
+    }), 30);
+  }
+  async function bauen() {
+    {
       const rallye = E.fahrzeug === 'rallye';
       await Promise.all([ladeModelle(), ladeBilder(), ...(E.fahrzeug === 'super' ? [ladeSupercars(), ladeVerkehr(Object.keys(ARTEN))] : rallye ? [ladeRallyeautos()] : [ladeFormel()])]);   // fertige 3D-Modelle (nur beim ersten Start; ohne Internet geht es nach ein paar Sekunden mit Kisten weiter)
       const modell = istKlein(), slot = E.fahrzeug === 'slot', sup = E.fahrzeug === 'super', drift = E.fahrzeug === 'drift';
@@ -278,12 +302,19 @@ export function starteSpiel() {
         const g = ladeGeist(id, E.fahrzeug + geistArt());
         if (g) { rennen.setzeGeist(g); }
         rennen.wennBestzeit = neu => {
-          const alt = ladeGeist(id, E.fahrzeug + geistArt());
-          if (!alt || neu.zeit < alt.zeit) speichereGeist(id, E.fahrzeug + geistArt(), neu);
+          const art = E.fahrzeug + geistArt(), best = ladeBest(id, art), alt = ladeGeist(id, art);
+          if (best === null || neu.zeit < best) speichereBest(id, art, neu.zeit);   // zuerst die Zeit (klein), dann der Geist (groß)
+          if (!alt || neu.zeit < alt.zeit) speichereGeist(id, art, neu);
         };
       }
       rennen.wennBestzeit = rennen.wennBestzeit || null;
-      if (!buehne || buehne.qualitaet !== E.grafik) { buehne = new Buehne($('bild'), E.grafik); app.buehne = buehne; }
+      if (!buehne || buehne.qualitaet !== E.grafik) {
+        // Andere Grafik-Stufe: Der alte Zeichner wird freigegeben und bekommt eine frische Malfläche
+        // (sonst bliebe sein Speicher belegt, und die Kantenglättung würde sich erst nach einem Neustart ändern).
+        if (buehne) { const alt = $('bild'), neu = alt.cloneNode(false); buehne.weg(); alt.replaceWith(neu); }
+        buehne = new Buehne($('bild'), E.grafik); app.buehne = buehne;
+        buehne.wennVerloren = grafikWeg; buehne.wennZurueck = grafikDa;
+      }
       buehne.laden(T, rennen.autos, rennen.LS || rennen.L, { linie: E.linie, verkehr: rennen.verkehr, etappe: rallye ? rennen : null, felder: rennen.felder || [] });
       $('hEinheit').textContent = modell ? 'km/h im Maßstab' : 'km/h';
       kamera = new Kamera(buehne.kamera);
@@ -305,11 +336,38 @@ export function starteSpiel() {
       kartenGrund = null;
       laeuft = true; pausiert = false; fertigGezeigt = false; letzteZeit = performance.now(); app.rennen = rennen; app.T = T; app.kamera = kamera;
       lenkradAnzeigen();
-    }, 30);
+      wachAn();
+    }
+  }
+  $('ladenZurueck').addEventListener('click', () => { zeige('laden', false); zumMenue(); });
+
+  // ---------------------------------------------------------------- Bildschirm wach halten, Pause beim Verlassen
+  // Wer nur neigt, tippt nicht: Ohne das hier würde der Bildschirm im Browser nach einer Weile dunkel.
+  let wach = null;
+  async function wachAn() { try { if (!wach && 'wakeLock' in navigator && !document.hidden) { wach = await navigator.wakeLock.request('screen'); wach.addEventListener('release', () => { wach = null; }); } } catch (e) {} }
+  function wachAus() { try { if (wach) wach.release(); } catch (e) {} wach = null; }
+  // App im Hintergrund, anderer Tab, Anruf: Das Rennen hält an und der Ton ist aus.
+  // Beim Zurückkommen bleibt die Pause stehen, bis man „Weiterfahren“ tippt.
+  function wegGegangen() { if (laeuft && !pausiert) pauseAn(); klang.schlafen(); }
+  function wiederDa() { klang.aufwachen(); if (laeuft) wachAn(); letzteZeit = performance.now(); }
+  document.addEventListener('visibilitychange', () => document.hidden ? wegGegangen() : wiederDa());
+  window.addEventListener('pagehide', wegGegangen);
+  document.addEventListener('pause', wegGegangen);    // die App meldet so, dass sie nicht mehr vorn ist (auch bei einem Anruf)
+  document.addEventListener('resume', wiederDa);
+
+  // Die Grafikkarte kann dem Spiel das Bild wegnehmen (das iPad macht das, wenn der Speicher knapp wird).
+  // Dann: Pause, und wenn das Bild wieder da ist, die Strecke neu aufbauen.
+  function grafikWeg() { app.grafikWeg = true; if (laeuft) pauseAn(); }
+  function grafikDa() {
+    app.grafikWeg = false;
+    if (!laeuft || !buehne) return;
+    try { buehne.neuLaden(); kamera = new Kamera(buehne.kamera); kamera.setze(app.kamera ? app.kamera.modus : 'hinten'); app.kamera = kamera; groesse(); melden('Das Bild ist wieder da', 'info', 3); }
+    catch (e) { console.error(e); zumMenue(); }
   }
 
   function zumMenue() {
     laeuft = false; pausiert = false; app.rallyeStand = null;
+    wachAus();
     if (sprecher) sprecher.stopp();
     zeige('hud', false); zeige('pause', false); zeige('ergebnis', false); zeige('menue', true);
     klang.ruhe();   // im Menü ist alles still
@@ -490,7 +548,7 @@ export function starteSpiel() {
   // ---------------------------------------------------------------- Rallye: Anzeige und Ergebnis
   function hudRallye() {
     const R = rennen, c = R.ich, a = c.a;
-    $('hPlatz').innerHTML = R.nr ? 'WP ' + R.nr + '<small>/3</small>' : '⏱';
+    $('hPlatz').innerHTML = R.nr ? 'WP ' + R.nr + '<small>/' + RALLYE_FOLGE.length + '</small>' : '⏱';
     const rest = Math.max(0, R.zielS - R.weg);
     $('hRunde').textContent = R.phase === 'start' ? 'Start in ' + Math.max(1, Math.ceil(R.countdown)) + ' …' : R.phase === 'los' ? (rest >= 1000 ? (rest / 1000).toFixed(1) + ' km' : Math.round(rest / 10) * 10 + ' m') + ' bis zum Ziel' : 'Im Ziel';
     // Liste: an der letzten Zwischenzeit die drei Schnellsten und du; nach dem Ziel die Wertung
@@ -605,11 +663,11 @@ export function starteSpiel() {
       app.warDienst = dienst;
       // Ampel piept
       if (R.phase === 'ampel' && R.ampel !== app.letzteAmpel) { if (R.ampel > 0) klang.piep(440, 0.15, 0.2); app.letzteAmpel = R.ampel; }
-      if (R.phase === 'fertig' && !fertigGezeigt) { fertigGezeigt = true; setTimeout(ergebnisZeigen, 1200); }
+      if (R.phase === 'fertig' && !fertigGezeigt) { fertigGezeigt = true; const dieses = R; setTimeout(() => { if (laeuft && rennen === dieses) ergebnisZeigen(); }, 1200); }   // wer inzwischen im Menü ist oder neu gestartet hat, bekommt kein Ergebnis mehr darübergelegt
       // Rallye: Der Beifahrer liest die nächste Ansage vor
       if (R.rallye && R.ansageNeu) { const g = R.ansageNeu; R.ansageNeu = null; if (E.beifahrer === 'beides') sprecher.sagen(g.sprache, g.s - R.weg); }
     }
-    kamera.update(dt, R.ich.a, { modell: !!T.def.modell, standorte: buehne.welt.standorte, massstab: T.sc, kopfNeigen: E.kopfneigen !== false });
+    kamera.update(dt, R.ich.a, { modell: !!T.def.modell, standorte: buehne.welt.standorte, massstab: T.sc, kopfMal: KOPF_STUFEN[E.kopfneigen] ?? 1 });
     if (!pausiert) buehne.schritt(dt, R.ich.a);
     if (!malen) return;
     buehne.malen(dt, R.ich.a, R.geistBei(), R.phase === 'ampel' ? R.ampel : 0, false, kamera.modus === 'cockpit' ? R.ich : null);

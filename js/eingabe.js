@@ -45,6 +45,7 @@ export class Eingabe {
   }
 
   holeBefehl() { return this.befehle.shift(); }
+  tasteGedrueckt() { const T = this.tasten; return ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyW', 'KeyS', 'Space'].some(k => T.has(k)); }
 
   update(dt) {
     // 1. Handy
@@ -64,7 +65,10 @@ export class Eingabe {
       const a = p.buttons[0] && p.buttons[0].pressed, b = p.buttons[1] && p.buttons[1].pressed;
       const knopf = (i, was) => { const gedr = p.buttons[i] && p.buttons[i].pressed; if (gedr && !this.padKnoepfe[i]) this.befehle.push(was); this.padKnoepfe[i] = gedr; };
       knopf(3, 'kamera'); knopf(9, 'pause'); knopf(2, 'zurueck');
-      if (Math.abs(ax) > 0.12 || rt > 0.05 || lt > 0.05 || a || b) this.quelle = 'gamepad';
+      const benutzt = Math.abs(ax) > 0.12 || rt > 0.05 || lt > 0.05 || a || b;
+      if (benutzt) this.quelle = 'gamepad';
+      // Liegt der Controller nur herum und jemand drückt eine Taste, ein Pedal auf dem Bildschirm oder neigt das Gerät deutlich, ist das wieder dran
+      else if (this.quelle === 'gamepad' && (this.tasteGedrueckt() || this.pedal.gas || this.pedal.brems || (this.neigung.an && Math.abs(this.neigung.lenk) > 0.3))) this.quelle = 'tastatur';
       if (this.quelle === 'gamepad') {
         const x = Math.abs(ax) < 0.08 ? 0 : ax;
         this.lenk = -Math.sign(x) * Math.pow(Math.abs(x), 1.4);

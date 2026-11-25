@@ -348,7 +348,7 @@ Aufwand in Pull Requests, so wie hier gearbeitet wird (ein PR ist etwa ein Threa
 
 | Stufe | Inhalt | PRs | Abnahme |
 | --- | --- | --- | --- |
-| **0a Sofort** | Pause beim Verlassen, kleine Fehler (Review 5.1), Bestzeit getrennt vom Geist, Neigung in drei Stufen | 1 bis 2 | Anruf während des Rennens: Spiel steht |
+| **0a Sofort** (gebaut am 25.11.2026) | Pause beim Verlassen, kleine Fehler (Review 5.1), Bestzeit getrennt vom Geist, Neigung in drei Stufen | 1 bis 2 | Anruf während des Rennens: Spiel steht |
 | **0b Messen** | Eingabe-Rekorder, `nachfahren.mjs`, Messwerte-Anzeige, iPad-Tabelle | 2 | Kristian schickt drei Fahrten, das Werkzeug fährt sie nach |
 | **0c Sport-Modus** | läuft im Fahrphysik-Thread (erster Teil in PR 43 gemergt: Modus fahrbar gemacht, Prüfwerkzeug `tools/echt.mjs`); offen: Umbenennen in „Sport“, stufenlose Pedale, Befunde aus Review 4.1 bis 4.5 | 2 bis 3 | saubere Runde ohne Arcade-Hilfe |
 | **0d Unterbau** | fester Zeitschritt, `stand.js` mit Profilen, `spiel.js` teilen, GitHub-Aktion, `CLAUDE.md` kürzen | 3 bis 4 | alles fühlt sich an wie vorher, Stand übersteht ein Update |
