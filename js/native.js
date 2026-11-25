@@ -9,6 +9,10 @@ if (inApp) document.documentElement.classList.add('app');
 // oder Bluetooth (Apples Multipeer), ganz ohne Internet.
 export const nahPlugin = () => (inApp && C.Plugins && C.Plugins.LenkradLink) || null;
 
+// Das Plugin "Teilen" (auch in AppDelegate.swift): öffnet das Teilen-Fenster von iPad und iPhone mit einer Datei
+// (für „Fahrt sichern“: AirDrop, In Dateien sichern, Mail …).
+export const teilPlugin = () => (inApp && C.Plugins && C.Plugins.Teilen) || null;
+
 // Kurz rütteln (nur iPhones haben einen Vibrationsmotor, das iPad bleibt still)
 let zuletzt = 0;
 export function ruetteln(stark = 0.5) {

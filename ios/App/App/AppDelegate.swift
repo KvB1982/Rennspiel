@@ -50,6 +50,52 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 class MainViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(LenkradLinkPlugin())
+        bridge?.registerPluginInstance(TeilenPlugin())
+    }
+}
+
+// MARK: - Teilen: eine Datei aus dem Spiel weitergeben („Fahrt sichern“)
+
+/// Schreibt einen Text als Datei und öffnet das Teilen-Fenster (AirDrop, In Dateien sichern, Mail …).
+/// Aufruf aus dem Spiel: js/native.js (teilPlugin) und js/spiel.js (fahrtSichern). Methode: datei({ name, text }).
+@objc(TeilenPlugin)
+public class TeilenPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "TeilenPlugin"
+    public let jsName = "Teilen"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "datei", returnType: CAPPluginReturnPromise)
+    ]
+
+    @objc func datei(_ call: CAPPluginCall) {
+        guard let text = call.getString("text") else {
+            call.reject("Kein Text")
+            return
+        }
+        let name = (call.getString("name") ?? "fahrt.json").replacingOccurrences(of: "/", with: "_")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        do {
+            try text.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            call.reject("Die Datei konnte nicht geschrieben werden")
+            return
+        }
+        DispatchQueue.main.async { [weak self] in
+            guard let fenster = self?.bridge?.viewController else {
+                call.reject("Kein Fenster")
+                return
+            }
+            let blatt = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+            // Auf dem iPad ist das Teilen-Fenster eine Sprechblase und braucht eine Stelle, an der sie hängt: die Bildmitte
+            if let blase = blatt.popoverPresentationController {
+                blase.sourceView = fenster.view
+                blase.sourceRect = CGRect(x: fenster.view.bounds.midX, y: fenster.view.bounds.midY, width: 0, height: 0)
+                blase.permittedArrowDirections = []
+            }
+            blatt.completionWithItemsHandler = { _, fertig, _, _ in
+                call.resolve(["geteilt": fertig])
+            }
+            fenster.present(blatt, animated: true)
+        }
     }
 }
 

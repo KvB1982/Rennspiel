@@ -2,7 +2,7 @@
 
 import { STRECKEN, strecke } from './strecken.js';
 import { baueStrecke, MASSSTAB } from './strecke.js';
-import { Rennen, TEAMS, zeitText } from './rennen.js';
+import { TEAMS, zeitText } from './rennen.js';
 import { aufStrecke, kmh } from './physik.js';
 import { Buehne } from './szene.js';
 import { ladeModelle } from './modelle.js';
@@ -11,13 +11,14 @@ import { ladeSupercars } from './supercarbau.js';
 import { ladeFormel, ladeVerkehr } from './automodelle.js';
 import { ARTEN } from './verkehr.js';
 import { Kamera, SICHTEN } from './kamera.js';
-import { linieFuer } from './ki.js';
 import { Eingabe } from './eingabe.js';
 import { LenkradEmpfang } from './verbindung.js';
 import { Klang } from './klang.js';
 import { SUPERCARS, LACKE, supercar } from './supercars.js';
-import { inApp, istApfelGeraet } from './native.js';
-import { Etappe, zeitText as rallyeZeit } from './rallye.js';
+import { inApp, istApfelGeraet, teilPlugin } from './native.js';
+import { zeitText as rallyeZeit } from './rallye.js';
+import { baueRennen, TEMPO } from './rennbau.js';
+import { Rekorder, raster } from './rekorder.js';
 import { RALLYEAUTOS, rallyeauto } from './rallyeautos.js';
 import { ladeRallyeautos } from './supercarbau.js';
 
@@ -31,17 +32,12 @@ const STANDARD = {
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
   kamera_klein: 'hinten',   // kleine Autos: hinter dem Auto, im Cockpit oder neben der Bahn stehen ('stand')
   bremshilfe: true, lenkhilfe: false, traktion: true, arcade: true, autogas: false, grafik: 'hoch', linie: true, boxen: true,
+  messwerte: false,   // kleine Anzeige für Tüftler: Bilder pro Sekunde, Dreiecke, Lenkung, Gas, Bremse
   hud: false,      // Gang und Kurven-Gang groß in der Bildmitte (wie in der Scheibe eines echten Autos) statt unten rechts
   neigStufe: 3,    // wie weit man das Gerät dafür neigen muss (2 = weit … 5 = ganz wenig; Grad stehen in VOLL in neigung.js)
   neigen: false,   // dieses Gerät selbst neigen (Gas und Bremse auf dem Bildschirm), wenn kein Handy-Lenkrad verbunden ist
 };
-// Höchsttempo der kleinen Autos in Metern pro Sekunde. 1,8 m/s sehen beim Maßstab 1:30 aus wie knapp 200 km/h.
-// (Ferngesteuertes Auto: Das ist das Tempo auf der Geraden – in den Kurven bestimmt die Haftung, wie schnell es geht.)
-// Drift-Rallye (Maßstab 1:43): 1,2 m/s sehen aus wie gut 180 km/h – langsam genug, um das Auto quer zu halten.
-const TEMPO = { modell: { langsam: 1.2, mittel: 1.8, schnell: 2.4 }, slot: { langsam: 2.6, mittel: 3.5, schnell: 4.5 }, drift: { langsam: 0.7, mittel: 0.9, schnell: 1.15 } };
 const streckenFeld = () => E.fahrzeug === 'modell' ? 'strecke_modell' : E.fahrzeug === 'slot' ? 'strecke_slot' : E.fahrzeug === 'drift' ? 'strecke_drift' : E.fahrzeug === 'super' ? 'strecke_super' : E.fahrzeug === 'rallye' ? 'strecke_rallye' : 'strecke';
-// Wie viel Verkehr: Zahl für verkehr.js (0 = keiner)
-const VERKEHR = { aus: 0, wenig: 0.5, normal: 1, viel: 1.6 };
 // Kopfneigung in der Kurve: So stark legt sich das Bild in die Kurve (mal). "wenig" ist der Stand vom 25.11.2026.
 const KOPF_STUFEN = { aus: 0, wenig: 1, stark: 2 };
 const istKlein = () => E.fahrzeug === 'modell' || E.fahrzeug === 'slot' || E.fahrzeug === 'drift';   // die kleinen Autos (Maßstab 1:30, Drift 1:43)
@@ -83,7 +79,8 @@ export function starteSpiel() {
   let buehne = null, kamera = null, rennen = null, T = null;
   let kurven = null;   // für jede Stelle der Strecke: wo die nächste Kurve ist und welcher Gang dort passt
   let laeuft = false, pausiert = false, letzteZeit = 0, infoTakt = 0, meldungBis = 0, fertigGezeigt = false;
-  const app = { E, empfang, eingabe, klang };
+  const rek = new Rekorder();   // schreibt jede Fahrt mit (js/rekorder.js); „Fahrt sichern“ macht daraus eine Datei
+  const app = { E, empfang, eingabe, klang, rek };
   const sprecher = new Beifahrer();
   window.__rennspiel = app;
 
@@ -177,6 +174,7 @@ export function starteSpiel() {
     zeile('Dieses Gerät neigen', 'neigen', [[true, 'an'], [false, 'aus']], neigenGeht);
     zeile('Lenken beim Neigen', 'neigStufe', [[2, 'ruhig'], [3, 'normal'], [4, 'direkt'], [5, 'sehr direkt']], neigenGeht && E.neigen);
     zeile('Grafik', 'grafik', [['hoch', 'schön'], ['mittel', 'mittel'], ['niedrig', 'schnell']]);
+    zeile('Messwerte anzeigen', 'messwerte', [[false, 'aus'], [true, 'an']]);
     // Farbe des eigenen Autos (Supercar: Lackfarbe, sonst Rennstall)
     const z = document.createElement('div'); z.className = 'zeile'; z.innerHTML = `<span>${sup || rallye ? 'Lackfarbe' : 'Dein Rennstall'}</span><div class="wahl"></div>`;
     const lackFeld = rallye ? 'lack_rallye' : 'lack';
@@ -287,14 +285,11 @@ export function starteSpiel() {
       const id = ganz ? RALLYE_FOLGE[app.rallyeStand.nr] : E[streckenFeld()];
       T = holeStrecke(id);
       if (sprecher) sprecher.stopp();
-      rennen = rallye ? new Etappe(T, { auto: E.rallyeauto, lack: LACKE[E.lack_rallye] ? LACKE[E.lack_rallye].farbe : null, staerke: E.staerke, nr: ganz ? app.rallyeStand.nr + 1 : 0 })
-        : new Rennen(T, { modus: E.modus, runden: Math.min(T.def.rundenMax || 99, sup ? E.runden_super : E.runden), gegner: sup ? E.gegner_super : modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: E.fahrzeug, spielerFarbe: E.farbe, tempo: modell ? TEMPO[E.fahrzeug][E.tempo] || 0 : 0, boxen: modell && !drift && E.boxen,
-        auto: E.supercar, lack: sup && LACKE[E.lack] ? LACKE[E.lack].farbe : null, verkehr: sup ? VERKEHR[E.verkehr] ?? 1 : 0 });
-      // Fahrgefühl „echter“: eigener, vorsichtigerer Tempo-Plan für dich (Bremszonen, Kurven-Gang, Bremshilfe)
-      if (rennen.L && !modell && !rallye) rennen.LS = linieFuer(T, rennen.L, rennen.ich.a.p, E.arcade === false);
+      rennen = baueRennen(E, T, ganz ? app.rallyeStand.nr + 1 : 0);   // Auto, Gegner, Hilfen (js/rennbau.js)
       kurven = rennen.L && !modell && !rallye ? kurvenFinden(T, rennen.LS, rennen.ich.a.p) : null;
-      rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
-      if (rennen.ich) { rennen.ich.a.tc = E.traktion ? true : false; rennen.ich.a.arcade = E.arcade !== false; }
+      // Aufnahme der Fahrt beginnt: alles aufschreiben, was man zum Nachfahren wissen muss
+      rek.start({ wann: new Date().toISOString(), strecke: id, rallyeNr: ganz ? app.rallyeStand.nr + 1 : 0, E: JSON.parse(JSON.stringify(E)),
+        ampelAus: rennen.ampelAus ?? null, geraet: { ua: navigator.userAgent, breite: innerWidth, hoehe: innerHeight, punkte: devicePixelRatio || 1, app: inApp } });
       eingabe.autoGas = E.autogas && !slot;
       eingabe.sanft = 1;   // (früher lenkten die Tasten beim ferngesteuerten Auto langsamer – jetzt soll es direkt einlenken)
       eingabe.handbremseDa = drift || rallye || E.fahrzeug === 'modell';
@@ -314,6 +309,7 @@ export function starteSpiel() {
         if (buehne) { const alt = $('bild'), neu = alt.cloneNode(false); buehne.weg(); alt.replaceWith(neu); }
         buehne = new Buehne($('bild'), E.grafik); app.buehne = buehne;
         buehne.wennVerloren = grafikWeg; buehne.wennZurueck = grafikDa;
+        buehne.renderer.info.autoReset = false;   // Dreiecke und Zeichenaufrufe zählen wir selbst für ein ganzes Bild (siehe bild)
       }
       buehne.laden(T, rennen.autos, rennen.LS || rennen.L, { linie: E.linie, verkehr: rennen.verkehr, etappe: rallye ? rennen : null, felder: rennen.felder || [] });
       $('hEinheit').textContent = modell ? 'km/h im Maßstab' : 'km/h';
@@ -394,6 +390,7 @@ export function starteSpiel() {
   }
   function zurueckAufStrecke() {
     const c = rennen && rennen.ich; if (!c || rennen.slot) return;
+    rek.ereignis('zurueck');
     if (rennen.rallye) return rennen.zuruecksetzen();
     const d = Math.max(-T.hb[c.a.idx] * 0.5, Math.min(T.hb[c.a.idx] * 0.5, c.a.d));
     aufStrecke(c.a, T, c.a.s, d);
@@ -637,6 +634,51 @@ export function starteSpiel() {
   const groesse = () => { if (buehne) buehne.groesse(innerWidth, innerHeight); };
   addEventListener('resize', groesse);
 
+  // ---------------------------------------------------------------- Messwerte (Menü „Messwerte anzeigen“)
+  const mess = { zeit: 1 / 60, bps: 60, lang: 0, dreiecke: 0, aufrufe: 0, takt: 0 };
+  app.mess = mess;
+  function messwerteMalen() {
+    const box = $('hMess');
+    if (box.hidden === !!E.messwerte) box.hidden = !E.messwerte;
+    if (!E.messwerte) return;
+    const balken = (id, w) => { $(id).style.width = Math.round(Math.abs(w) * 100) + '%'; };
+    // Lenkung: Balken wächst von der Mitte nach links oder rechts
+    const l = eingabe.lenk, lb = $('mLenk');
+    lb.style.width = Math.abs(l) * 50 + '%'; lb.style.left = (l > 0 ? 50 - l * 50 : 50) + '%';
+    balken('mGas', eingabe.gas); balken('mBrems', eingabe.brems);
+    if (++mess.takt % 15) return;   // die Zahlen nur 4-mal pro Sekunde, sonst flimmern sie
+    const tsd = n => n.toLocaleString('de-DE');
+    $('mText').textContent = Math.round(mess.bps) + ' Bilder/s · ' + (mess.zeit * 1000).toFixed(1) + ' ms (längstes ' + (mess.lang * 1000).toFixed(0) + ')\n'
+      + tsd(mess.dreiecke) + ' Dreiecke · ' + mess.aufrufe + ' Aufrufe · Schärfe ' + buehne.punkte.toFixed(2).replace('.', ',') + '\n'
+      + 'Steuerung: ' + eingabe.quelle + (eingabe.quelle === 'neigen' ? ' ' + eingabe.neigung.winkel.toFixed(0) + '°' : '') + ' · Aufnahme ' + Math.round(rek.n / 60) + ' s';
+  }
+
+  // ---------------------------------------------------------------- Fahrt sichern
+  // Macht aus der Aufnahme eine Datei. In der App geht das Teilen-Fenster auf (AirDrop, Dateien, Mail …),
+  // im Browser auf Handy und iPad das Teilen des Browsers, am Rechner wird die Datei heruntergeladen.
+  async function fahrtSichern(knopf) {
+    if (!rek.kopf || !rek.n) return;
+    const c = rennen && rennen.ich;
+    if (c) rek.fertig({ phase: rennen.phase, zeit: rennen.zeit, ziel: c.ziel, beste: c.beste, letzte: c.letzte, zeiten: c.zeiten || [], platz: c.platz || 0, runde: c.runde || 0 });
+    const text = JSON.stringify(rek.paket());
+    const zwei = n => String(n).padStart(2, '0'), d = new Date();
+    const auto = E.fahrzeug === 'super' ? E.supercar : E.fahrzeug === 'rallye' ? E.rallyeauto : E.fahrzeug;
+    const name = `fahrt_${rek.kopf.strecke}_${auto}_${d.getFullYear()}${zwei(d.getMonth() + 1)}${zwei(d.getDate())}_${zwei(d.getHours())}${zwei(d.getMinutes())}${zwei(d.getSeconds())}.json`;
+    app.letzteDatei = { name, text };
+    const alt = knopf.textContent, sag = t => { knopf.textContent = t; setTimeout(() => { knopf.textContent = alt; }, 2500); };
+    try {
+      const T0 = teilPlugin();
+      if (T0) { const r = await T0.datei({ name, text }); return sag(r && r.geteilt ? '✓ Gesichert' : 'Nicht gesichert'); }
+      const datei = typeof File === 'function' ? new File([text], name, { type: 'application/json' }) : null;
+      if (datei && 'ontouchstart' in window && navigator.canShare && navigator.canShare({ files: [datei] })) { await navigator.share({ files: [datei], title: name }); return sag('✓ Gesichert'); }
+      const adr = URL.createObjectURL(new Blob([text], { type: 'application/json' })), l = document.createElement('a');
+      l.href = adr; l.download = name; document.body.appendChild(l); l.click(); l.remove();
+      setTimeout(() => URL.revokeObjectURL(adr), 5000);
+      sag('✓ Datei liegt bei den Downloads');
+    } catch (e) { if (e && e.name === 'AbortError') return sag('Nicht gesichert'); console.error(e); sag('Das hat nicht geklappt'); }
+  }
+  for (const b of document.querySelectorAll('[data-a=sichern]')) b.addEventListener('click', () => fahrtSichern(b));
+
   function bild(dt, malen = true) {
     eingabe.update(dt);
     let b;
@@ -649,8 +691,11 @@ export function starteSpiel() {
     pedaleZeigen();
     const R = rennen;
     if (!pausiert) {
-      R.update(dt, { lenk: eingabe.lenk, gas: eingabe.gas, brems: eingabe.brems, hand: eingabe.hand });
-      const klein = !!T.def.modell;
+      // Die Eingaben werden auf feste Stufen gerundet und mitgeschrieben – so lässt sich die Fahrt später genau nachfahren
+      const ein = raster(dt, eingabe), klein = !!T.def.modell, ich = R.ich.a;
+      R.update(ein.dt, ein);
+      rek.bild(ein, ich, { neben: ich.idx >= 0 && Math.abs(ich.d) > T.hb[ich.idx] + 0.5 * T.sc, wand: ich.stoss > (klein ? 0.1 : 2), laeuft: R.phase === 'los', quelle: eingabe.quelle, winkel: eingabe.neigung.winkel });
+      if (rek.n % 120 === 0 && buehne) rek.messwert([Math.round(mess.bps), buehne.punkte, mess.dreiecke, mess.aufrufe]);
       if (R.beruehrt) { klang.rumms(R.beruehrt * 0.08, klein); R.beruehrt = 0; }
       if (R.ich.a.stoss > (klein ? 0.1 : 3)) klang.rumms(Math.min(1, R.ich.a.stoss / (klein ? 1 : 25)), klein);
       // Slotcar fliegt raus: lauter Plastik-Knall
@@ -670,8 +715,11 @@ export function starteSpiel() {
     kamera.update(dt, R.ich.a, { modell: !!T.def.modell, standorte: buehne.welt.standorte, massstab: T.sc, kopfMal: KOPF_STUFEN[E.kopfneigen] ?? 1 });
     if (!pausiert) buehne.schritt(dt, R.ich.a);
     if (!malen) return;
+    buehne.renderer.info.reset();
     buehne.malen(dt, R.ich.a, R.geistBei(), R.phase === 'ampel' ? R.ampel : 0, false, kamera.modus === 'cockpit' ? R.ich : null);
     hudMalen();
+    mess.dreiecke = buehne.renderer.info.render.triangles; mess.aufrufe = buehne.renderer.info.render.calls;
+    messwerteMalen();
     // nächster Gegner (für den Klang)
     let naechster = null;
     for (const o of R.autos) if (!o.ich) { const d = Math.hypot(o.a.x - R.ich.a.x, o.a.z - R.ich.a.z); if (!naechster || d < naechster.ab) naechster = { a: o.a, ab: d }; }
@@ -690,6 +738,8 @@ export function starteSpiel() {
     const roh = (t - letzteZeit) / 1000 || 0.016;
     const dt = Math.max(0, Math.min(0.05, roh));
     letzteZeit = t;
+    // Wie flüssig läuft es? Bildzeit weich gemittelt, dazu das längste Bild der letzten Sekunde
+    if (roh > 0 && roh < 0.25) { mess.zeit += (roh - mess.zeit) * 0.05; mess.bps = 1 / mess.zeit; mess.lang = Math.max(mess.lang * 0.985, roh); }
     if (!app.angehalten) bild(dt);
     // Ruckelt es (z. B. auf dem iPad mit vielen Häusern), malt die Bühne mit weniger Bildpunkten
     if (laeuft && !pausiert && !app.angehalten && buehne) buehne.tempoPruefen(roh);

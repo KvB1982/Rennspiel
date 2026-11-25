@@ -1,0 +1,29 @@
+// Rennspiel – aus den Einstellungen ein Rennen oder eine Rallye-Prüfung bauen (ohne three.js).
+// Das Spiel (spiel.js) und das Werkzeug zum Nachfahren (tools/nachfahren.mjs) benutzen beide diese Datei.
+// So ist sicher: Eine aufgenommene Fahrt wird mit genau denselben Hilfen und demselben Auto nachgefahren.
+
+import { Rennen } from './rennen.js';
+import { Etappe } from './rallye.js';
+import { LACKE } from './supercars.js';
+import { linieFuer } from './ki.js';
+
+// Höchsttempo der kleinen Autos in Metern pro Sekunde. 1,8 m/s sehen beim Maßstab 1:30 aus wie knapp 200 km/h.
+// (Ferngesteuertes Auto: Das ist das Tempo auf der Geraden – in den Kurven bestimmt die Haftung, wie schnell es geht.)
+// Drift-Rallye (Maßstab 1:43): 1,2 m/s sehen aus wie gut 180 km/h – langsam genug, um das Auto quer zu halten.
+export const TEMPO = { modell: { langsam: 1.2, mittel: 1.8, schnell: 2.4 }, slot: { langsam: 2.6, mittel: 3.5, schnell: 4.5 }, drift: { langsam: 0.7, mittel: 0.9, schnell: 1.15 } };
+// Wie viel Verkehr: Zahl für verkehr.js (0 = keiner)
+export const VERKEHR = { aus: 0, wenig: 0.5, normal: 1, viel: 1.6 };
+
+// E = die Einstellungen aus dem Menü, T = die Strecke, rallyeNr = Nummer der Prüfung in der ganzen Rallye (0 = einzelne Prüfung)
+export function baueRennen(E, T, rallyeNr = 0) {
+  const rallye = E.fahrzeug === 'rallye', slot = E.fahrzeug === 'slot', sup = E.fahrzeug === 'super', drift = E.fahrzeug === 'drift';
+  const modell = E.fahrzeug === 'modell' || slot || drift;
+  const rennen = rallye ? new Etappe(T, { auto: E.rallyeauto, lack: LACKE[E.lack_rallye] ? LACKE[E.lack_rallye].farbe : null, staerke: E.staerke, nr: rallyeNr })
+    : new Rennen(T, { modus: E.modus, runden: Math.min(T.def.rundenMax || 99, sup ? E.runden_super : E.runden), gegner: sup ? E.gegner_super : modell ? Math.min(3, E.gegner) : E.gegner, staerke: E.staerke, art: E.fahrzeug, spielerFarbe: E.farbe, tempo: modell ? TEMPO[E.fahrzeug][E.tempo] || 0 : 0, boxen: modell && !drift && E.boxen,
+      auto: E.supercar, lack: sup && LACKE[E.lack] ? LACKE[E.lack].farbe : null, verkehr: sup ? VERKEHR[E.verkehr] ?? 1 : 0 });
+  // Fahrgefühl „echter“: eigener, vorsichtigerer Tempo-Plan für dich (Bremszonen, Kurven-Gang, Bremshilfe)
+  if (rennen.L && !modell && !rallye) rennen.LS = linieFuer(T, rennen.L, rennen.ich.a.p, E.arcade === false);
+  rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
+  if (rennen.ich) { rennen.ich.a.tc = E.traktion ? true : false; rennen.ich.a.arcade = E.arcade !== false; }
+  return rennen;
+}

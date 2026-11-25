@@ -38,6 +38,7 @@
     <div id="hHud" hidden><div id="hudDz"><i></i></div><div id="hudReihe"><div id="hudKmh"><b>0</b><small>km/h</small></div><div id="hudGang">N</div><div id="hudKurve"></div></div></div>
     <div id="hTacho"><div id="hDz"><i></i></div><div id="hKmh">0</div><div id="hEinheit">km/h</div><div id="hGang">N</div></div>
     <canvas id="hKarte" width="240" height="240"></canvas>
+    <div id="hMess" hidden><pre id="mText"></pre><div class="mb"><i id="mLenk"></i><u></u></div><div class="mb gas"><i id="mGas"></i></div><div class="mb brems"><i id="mBrems"></i></div></div>
     <div id="hKnoepfe">
       <span id="hHandy" title="Handy-Lenkrad"></span>
       <button id="hKamera" title="Kamera wechseln (C)">🎥</button>
@@ -108,13 +109,14 @@
       <button data-a="neu">Neu starten</button>
       <button data-a="kamera">Kamera wechseln</button>
       <button data-a="mitte">Lenkrad: Mitte neu setzen</button>
+      <button data-a="sichern" title="Aufnahme dieser Fahrt als Datei sichern (zum Nachmessen)">💾 Fahrt sichern</button>
       <button data-a="menue">Zurück zum Menü</button>
     </div>
   </div>
 
   <!-- Ergebnis -->
   <div id="ergebnis" class="fenster" hidden><div><h2 id="eTitel"></h2><table id="eTabelle"></table>
-    <button data-a="weiter" id="eWeiter" hidden>Nächste Prüfung ▶</button><button data-a="neu">Nochmal</button><button data-a="menue">Zum Menü</button></div></div>
+    <button data-a="weiter" id="eWeiter" hidden>Nächste Prüfung ▶</button><button data-a="neu">Nochmal</button><button data-a="sichern" title="Aufnahme dieser Fahrt als Datei sichern (zum Nachmessen)">💾 Fahrt sichern</button><button data-a="menue">Zum Menü</button></div></div>
 
   <div id="laden" class="fenster" hidden><div><h2 id="ladenText">Strecke wird gebaut …</h2><button id="ladenZurueck" hidden>Zurück zum Menü</button></div></div>
 

@@ -178,3 +178,11 @@ html.app #lbNah { display: block; }
    in der Rallye bleibt oben Platz für die Karten des Beifahrers. */
 #hud.mitte #hMeldung { top: 37%; }
 #hHud.rallye { top: max(17%, 118px); }
+
+/* Messwerte (Menü „Messwerte anzeigen“): kleine Tafel rechts unter den Zeiten, darunter Balken für Lenkung, Gas, Bremse */
+#hMess { position: absolute; right: max(14px, env(safe-area-inset-right)); top: 150px; background: rgba(8,12,20,.72); border-radius: 8px; padding: 6px 9px; font-size: 11px; pointer-events: none; min-width: 230px; }
+#hMess pre { margin: 0 0 5px; font: 11px/1.45 ui-monospace, Menlo, monospace; white-space: pre; }
+#hMess .mb { position: relative; height: 7px; background: rgba(255,255,255,.14); border-radius: 3px; margin-top: 3px; overflow: hidden; }
+#hMess .mb i { position: absolute; top: 0; bottom: 0; left: 0; background: #fff; }
+#hMess .mb u { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.6); }
+#hMess .gas i { background: var(--gruen); } #hMess .brems i { background: #ff6b5e; }
