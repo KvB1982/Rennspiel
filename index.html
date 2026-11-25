@@ -51,6 +51,7 @@
   <!-- Hauptmenü -->
   <div id="menue">
     <header><h1>🏁 Rennspiel</h1><p>Formel-Rennen, Rallye, Supercars und Modellautos – mit dem Handy als Lenkrad</p></header>
+    <div id="mProfil"></div>
     <div id="mSpalten">
       <section id="mLinks">
         <h2>1 · Fahrzeug</h2>
@@ -117,6 +118,19 @@
   <!-- Ergebnis -->
   <div id="ergebnis" class="fenster" hidden><div><h2 id="eTitel"></h2><table id="eTabelle"></table>
     <button data-a="weiter" id="eWeiter" hidden>Nächste Prüfung ▶</button><button data-a="neu">Nochmal</button><button data-a="sichern" title="Aufnahme dieser Fahrt als Datei sichern (zum Nachmessen)">💾 Fahrt sichern</button><button data-a="menue">Zum Menü</button></div></div>
+
+  <!-- Wer fährt? Namen ändern, Spielstand sichern und laden -->
+  <div id="profilFenster" class="fenster" hidden><div>
+    <h2 id="pfTitel"></h2>
+    <input id="pfName" maxlength="14" placeholder="Name" autocomplete="off">
+    <button data-a="ok">Fertig</button>
+    <button data-a="loeschen" id="pfLoeschen">Diesen Fahrer löschen</button>
+    <button data-a="standSichern" title="Alle Fahrer mit Bestzeiten und Geistern in eine Datei schreiben">💾 Spielstand sichern (alle Fahrer)</button>
+    <button data-a="standLaden" title="Ersetzt den jetzigen Spielstand durch den aus der Datei">📂 Spielstand laden</button>
+    <input id="pfDatei" type="file" accept=".json,application/json" hidden>
+    <p class="klein" id="pfMeldung"></p>
+    <button data-a="zu">Abbrechen</button>
+  </div></div>
 
   <div id="laden" class="fenster" hidden><div><h2 id="ladenText">Strecke wird gebaut …</h2><button id="ladenZurueck" hidden>Zurück zum Menü</button></div></div>
 

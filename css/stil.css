@@ -186,3 +186,12 @@ html.app #lbNah { display: block; }
 #hMess .mb i { position: absolute; top: 0; bottom: 0; left: 0; background: #fff; }
 #hMess .mb u { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.6); }
 #hMess .gas i { background: var(--gruen); } #hMess .brems i { background: #ff6b5e; }
+
+/* Wer fährt? Knöpfe für die Profile oben im Menü und das Fenster dazu */
+#mProfil { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; margin: 0 0 12px; }
+#mProfil > span { color: var(--leise); margin-right: 4px; }
+.profil { background: var(--karte); border: 1px solid var(--rand); border-radius: 999px; padding: 6px 13px; display: inline-flex; align-items: center; gap: 7px; }
+.profil.an { border-color: #fff; background: #26344a; font-weight: bold; }
+.profil i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+#profilFenster input[type=text], #pfName { padding: 12px; border-radius: 12px; border: 1px solid var(--rand); background: #0e1420; color: var(--text); font-size: 18px; text-align: center; }
+#profilFenster .klein { max-width: 300px; margin: 0; text-align: center; color: var(--leise); }

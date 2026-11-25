@@ -19,6 +19,7 @@ import { inApp, istApfelGeraet, teilPlugin } from './native.js';
 import { zeitText as rallyeZeit } from './rallye.js';
 import { baueRennen, TEMPO } from './rennbau.js';
 import { Rekorder, raster } from './rekorder.js';
+import { Stand, PROFILE_MAX } from './stand.js';
 import { RALLYEAUTOS, rallyeauto } from './rallyeautos.js';
 import { ladeRallyeautos } from './supercarbau.js';
 
@@ -41,28 +42,31 @@ const streckenFeld = () => E.fahrzeug === 'modell' ? 'strecke_modell' : E.fahrze
 // Kopfneigung in der Kurve: So stark legt sich das Bild in die Kurve (mal). "wenig" ist der Stand vom 25.11.2026.
 const KOPF_STUFEN = { aus: 0, wenig: 1, stark: 2 };
 const istKlein = () => E.fahrzeug === 'modell' || E.fahrzeug === 'slot' || E.fahrzeug === 'drift';   // die kleinen Autos (Maßstab 1:30, Drift 1:43)
-const E = Object.assign({}, STANDARD);
-// iPad und iPhone: zuerst "mittel" (weniger Bildpunkte, weniger Häuser und Bäume), bis man selbst etwas anderes wählt
-if (istApfelGeraet()) { E.grafik = 'mittel'; E.neigen = true; }   // und zuerst durch Neigen steuern
-try { Object.assign(E, JSON.parse(localStorage.getItem('rennspiel.einst') || '{}')); } catch (e) {}
-if (E.kopfneigen === true) E.kopfneigen = 'wenig'; else if (E.kopfneigen === false) E.kopfneigen = 'aus';   // früher gab es nur an und aus
-if (!(E.kopfneigen in KOPF_STUFEN)) E.kopfneigen = 'wenig';
-if (E.kamera_rallye === 'haube') E.kamera_rallye = 'cockpit';   // die Motorhauben-Kamera ist jetzt ein richtiges Cockpit
-const merken = () => { try { localStorage.setItem('rennspiel.einst', JSON.stringify(E)); } catch (e) {} };
+// Der Spielstand: Profile („Wer fährt?“), Einstellungen, Bestzeiten, Drift-Rekorde, Geister (js/stand.js)
+const speicher = (() => { try { localStorage.getItem('x'); return localStorage; } catch (e) { const m = new Map(); return { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), key: i => [...m.keys()][i], get length() { return m.size; } }; } })();
+const stand = new Stand(speicher);
+const PROFIL_FARBEN = ['#e3342f', '#3aa0ff', '#2fd06a', '#ffd24a', '#c56bff', '#ff8a3a'];
+const E = {};
+// Die Einstellungen des Profils holen, das gerade fährt (beim Start und nach „Wer fährt?“)
+function einstLaden() {
+  for (const k of Object.keys(E)) delete E[k];
+  Object.assign(E, STANDARD);
+  // iPad und iPhone: zuerst "mittel" (weniger Bildpunkte, weniger Häuser und Bäume), bis man selbst etwas anderes wählt
+  if (istApfelGeraet()) { E.grafik = 'mittel'; E.neigen = true; }   // und zuerst durch Neigen steuern
+  Object.assign(E, stand.einst());
+  if (E.kopfneigen === true) E.kopfneigen = 'wenig'; else if (E.kopfneigen === false) E.kopfneigen = 'aus';   // früher gab es nur an und aus
+  if (!(E.kopfneigen in KOPF_STUFEN)) E.kopfneigen = 'wenig';
+  if (E.kamera_rallye === 'haube') E.kamera_rallye = 'cockpit';   // die Motorhauben-Kamera ist jetzt ein richtiges Cockpit
+}
+einstLaden();
+const merken = () => stand.einstMerken(E);
 
-// Bestzeiten und Geist-Runden
-const bestKey = (id, art) => 'rennspiel.geist.' + id + '.' + art;
-const ladeGeist = (id, art) => { try { return JSON.parse(localStorage.getItem(bestKey(id, art)) || 'null'); } catch (e) { return null; } };
-const speichereGeist = (id, art, g) => { try { localStorage.setItem(bestKey(id, art), JSON.stringify(g)); return true; } catch (e) { return false; } };
-// Die Bestzeit selbst steht in einem eigenen, winzigen Eintrag. Der Geist (die ganze aufgezeichnete Runde) ist groß:
-// Ist der Speicher des Geräts voll, geht nur der Geist verloren – die Bestzeit bleibt.
-const zeitKey = (id, art) => 'rennspiel.best.' + id + '.' + art;
-const ladeBest = (id, art) => {
-  let z = null; try { const v = parseFloat(localStorage.getItem(zeitKey(id, art))); if (v > 0) z = v; } catch (e) {}
-  const g = ladeGeist(id, art);   // alte Spielstände: Dort stand die Bestzeit nur im Geist
-  return g && g.zeit > 0 && (z === null || g.zeit < z) ? g.zeit : z;
-};
-const speichereBest = (id, art, zeit) => { try { localStorage.setItem(zeitKey(id, art), String(zeit)); } catch (e) {} };
+// Bestzeiten und Geist-Runden. Die Bestzeit steht im Spielstand (winzig), der Geist (die ganze aufgezeichnete Runde)
+// in einem eigenen Eintrag: Ist der Speicher des Geräts voll, geht nur ein Geist verloren – die Bestzeit bleibt.
+const ladeGeist = (id, art) => stand.geist(id, art);
+const speichereGeist = (id, art, g) => stand.geistSetzen(id, art, g);
+const ladeBest = (id, art) => stand.best(id, art);
+const speichereBest = (id, art, zeit) => stand.bestSetzen(id, art, zeit);
 
 // Bestzeiten der kleinen Autos gelten je Höchsttempo (sonst wären sie nicht vergleichbar)
 const geistArt = () => E.fahrzeug === 'f1' ? '' : E.fahrzeug === 'super' ? '.' + E.supercar : E.fahrzeug === 'rallye' ? '.' + E.rallyeauto : '.' + E.tempo + (E.fahrzeug === 'slot' ? '' : '.3');   // .3: seit es Turbo und die Arcade-Hilfe für die kleinen Autos gibt, zählen die alten Bestzeiten nicht mehr
@@ -80,13 +84,62 @@ export function starteSpiel() {
   let kurven = null;   // für jede Stelle der Strecke: wo die nächste Kurve ist und welcher Gang dort passt
   let laeuft = false, pausiert = false, letzteZeit = 0, infoTakt = 0, meldungBis = 0, fertigGezeigt = false;
   const rek = new Rekorder();   // schreibt jede Fahrt mit (js/rekorder.js); „Fahrt sichern“ macht daraus eine Datei
-  const app = { E, empfang, eingabe, klang, rek };
+  const app = { E, empfang, eingabe, klang, rek, stand };
   const sprecher = new Beifahrer();
   window.__rennspiel = app;
 
   // ---------------------------------------------------------------- Menü
   const waehle = (box, wert) => [...$(box).children].forEach(b => b.classList.toggle('an', b.dataset.wert === String(wert)));
+  // „Wer fährt?“: ein Knopf je Profil, dazu Neu und Bearbeiten
+  const profileBauen = () => {
+    const box = $('mProfil'); box.innerHTML = '<span>Wer fährt?</span>';
+    for (const p of stand.profile) {
+      const b = document.createElement('button'); b.className = 'profil' + (p.id === stand.aktiv.id ? ' an' : '');
+      const punkt = document.createElement('i'); punkt.style.background = PROFIL_FARBEN[p.farbe % PROFIL_FARBEN.length];
+      b.append(punkt, p.name);
+      b.addEventListener('click', () => { if (p.id === stand.aktiv.id) return profilFenster(p); stand.wechseln(p.id); einstLaden(); menueBauen(); });
+      box.appendChild(b);
+    }
+    if (stand.profile.length < PROFILE_MAX) { const neu = document.createElement('button'); neu.className = 'profil'; neu.textContent = '＋ Neu'; neu.addEventListener('click', () => profilFenster(null)); box.appendChild(neu); }
+    const mehr = document.createElement('button'); mehr.className = 'profil'; mehr.textContent = '✎'; mehr.title = 'Namen ändern, Spielstand sichern und laden'; mehr.addEventListener('click', () => profilFenster(stand.aktiv)); box.appendChild(mehr);
+  };
+  // Das Fenster dazu: Namen eingeben oder ändern, Profil löschen, Spielstand als Datei sichern und laden
+  let profilOffen = null;
+  function profilFenster(p) {
+    profilOffen = p;
+    $('pfTitel').textContent = p ? 'Fahrer „' + p.name + '“' : 'Neuer Fahrer';
+    $('pfName').value = p ? p.name : '';
+    $('pfLoeschen').hidden = !p || stand.profile.length < 2; $('pfLoeschen').textContent = 'Diesen Fahrer löschen';
+    $('pfMeldung').textContent = p ? '' : 'Jeder Fahrer hat eigene Einstellungen, Bestzeiten und Geister.';
+    zeige('profilFenster', true);
+    if (!p) $('pfName').focus();
+  }
+  $('profilFenster').addEventListener('click', e => {
+    const a = e.target.dataset.a; if (!a) return;
+    if (a === 'ok') {
+      const name = $('pfName').value;
+      if (profilOffen) stand.umbenennen(profilOffen.id, name);
+      else { merken(); if (stand.profilNeu(name)) einstLaden(); }
+      zeige('profilFenster', false); menueBauen();
+    } else if (a === 'zu') zeige('profilFenster', false);
+    else if (a === 'loeschen') {
+      // Zwei Tipps, damit nichts aus Versehen verschwindet
+      if (e.target.textContent !== 'Wirklich löschen? Bestzeiten sind dann weg') { e.target.textContent = 'Wirklich löschen? Bestzeiten sind dann weg'; return; }
+      stand.loeschen(profilOffen.id); einstLaden(); zeige('profilFenster', false); menueBauen();
+    } else if (a === 'standSichern') {
+      const zwei = n => String(n).padStart(2, '0'), d = new Date();
+      dateiTeilen(`rennspiel_stand_${d.getFullYear()}${zwei(d.getMonth() + 1)}${zwei(d.getDate())}.json`, stand.paket(), e.target);
+    } else if (a === 'standLaden') $('pfDatei').click();
+  });
+  $('pfDatei').addEventListener('change', async e => {
+    const f = e.target.files && e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    let ok = false; try { ok = stand.einspielen(await f.text()); } catch (err) { console.error(err); }
+    if (!ok) { $('pfMeldung').textContent = 'Diese Datei ist kein Spielstand vom Rennspiel. Es wurde nichts geändert.'; return; }
+    einstLaden(); zeige('profilFenster', false); menueBauen();
+  });
   const menueBauen = () => {
+    profileBauen();
     waehle('mFahrzeug', E.fahrzeug); waehle('mModus', E.modus);
     // Strecken passend zum Fahrzeug
     const box = $('mStrecke'); box.innerHTML = '';
@@ -533,9 +586,8 @@ export function starteSpiel() {
     const sieger = R.reihenfolge[0];
     if (R.drift) {
       const D = R.ich.drift || { gesamt: 0, bester: 0 };
-      const key = 'rennspiel.drift2.' + T.def.id + '.' + E.tempo;
-      let alt = 0; try { alt = +localStorage.getItem(key) || 0; } catch (e) {}
-      if (D.gesamt > alt) { try { localStorage.setItem(key, String(D.gesamt)); } catch (e) {} }
+      const alt = stand.drift(T.def.id, E.tempo);
+      stand.driftSetzen(T.def.id, E.tempo, D.gesamt);
       $('eTitel').textContent += ` · 🌀 ${D.gesamt.toLocaleString('de-DE')} Drift-Punkte` + (D.gesamt > alt && alt > 0 ? ' (neuer Rekord!)' : '');
     }
     $('eTabelle').innerHTML = R.reihenfolge.map(o => `<tr class="${o.ich ? 'ich' : ''}"><td>${o.platz}.</td><td>${o.ich ? 'Du' : o.name}</td><td>${o.team}</td><td>${o.ziel !== null ? (o === sieger ? zeitText(o.ziel) : '+' + (o.ziel - sieger.ziel).toFixed(3)) : 'noch unterwegs'}</td><td>beste ${zeitText(o.beste)}</td></tr>`).join('');
@@ -664,6 +716,10 @@ export function starteSpiel() {
     const zwei = n => String(n).padStart(2, '0'), d = new Date();
     const auto = E.fahrzeug === 'super' ? E.supercar : E.fahrzeug === 'rallye' ? E.rallyeauto : E.fahrzeug;
     const name = `fahrt_${rek.kopf.strecke}_${auto}_${d.getFullYear()}${zwei(d.getMonth() + 1)}${zwei(d.getDate())}_${zwei(d.getHours())}${zwei(d.getMinutes())}${zwei(d.getSeconds())}.json`;
+    dateiTeilen(name, text, knopf);
+  }
+  // Eine Datei aus dem Spiel herausgeben (Fahrt oder Spielstand). Der Knopf zeigt kurz, ob es geklappt hat.
+  async function dateiTeilen(name, text, knopf) {
     app.letzteDatei = { name, text };
     const alt = knopf.textContent, sag = t => { knopf.textContent = t; setTimeout(() => { knopf.textContent = alt; }, 2500); };
     try {
