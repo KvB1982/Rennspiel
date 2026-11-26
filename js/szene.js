@@ -234,8 +234,11 @@ export class Buehne {
   malen(dt, ziel, geistLage, ampel = 0, ampelGruen = false, ichSicht = null) {
     this.uhr += dt;
     for (const { c, m } of this.autos) {
-      autoStellen(m, c.a, this.uhr);
       const imAuto = ichSicht === c;
+      // Rallye-Drift im Cockpit: Von innen sieht es seltsam aus, wenn sich das Auto unter einem weit quer dreht.
+      // Deshalb dreht sich das eigene Auto im Cockpit nur ein kleines Stück (von außen wie immer).
+      c.a.driftMal = imAuto ? 0.3 : 1;
+      autoStellen(m, c.a, this.uhr);
       m.helm[0].visible = m.helm[1].visible = !imAuto;
       for (const h of m.halo) h.visible = !imAuto;   // der Bügel wäre sonst genau vor den Augen
       if (m.innen) m.innen.visible = imAuto;

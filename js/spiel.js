@@ -209,7 +209,7 @@ export function starteSpiel() {
     }
     if (!modell && !rallye) zeile('Kamera', 'kamera', [['hinten', 'hinter dem Auto'], ['weit', 'weiter weg'], ['cockpit', 'im Cockpit']]);
     zeile('Kamera', 'kamera_klein', [['hinten', 'hinter dem Auto'], ['cockpit', 'im Cockpit'], ['stand', 'neben der Bahn']], modell);
-    // Kopfneigung: Auch hinter dem Auto legt sich das Bild in die Kurve (im Cockpit immer)
+    // Kopfneigung: Das Bild legt sich in die Kurve (hinter dem Auto und im Cockpit; „aus“ gilt für beide)
     zeile('Kopf neigt sich in die Kurve', 'kopfneigen', [['aus', 'aus'], ['wenig', 'wenig'], ['stark', 'stark']], !slot);
     zeile('Höchsttempo', 'tempo', [['langsam', 'langsam'], ['mittel', 'mittel'], ['schnell', 'schnell']], modell);
     zeile('Tanken und Reifen', 'boxen', [[true, 'an'], [false, 'aus']], modell && rennenAn && !drift);

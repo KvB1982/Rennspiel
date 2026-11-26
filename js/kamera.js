@@ -12,7 +12,8 @@ export const SICHTEN = { hinten: 'Hinter dem Auto', weit: 'Hinter dem Auto (weit
 // Kopfneigung: In der Kurve legt sich das Bild schräg, als würde man den Kopf in die Kurve legen.
 // KOPF = so viel pro "g" Kurvenkraft (rad), KOPF_MAX = höchstens (0,07 rad sind 4 Grad).
 // Seit 25.11.2026 nur noch gut halb so viel wie vorher – es war zu stark und hat gestört.
-// Im Cockpit ist sie immer an. Hinter dem Auto ist sie etwas sanfter und im Menü abschaltbar ("Kopf neigt sich in die Kurve").
+// Im Menü einstellbar ("Kopf neigt sich in die Kurve": aus, wenig, stark) – seit 27.11.2026 gilt "aus" auch im Cockpit,
+// und im Cockpit folgt der Kopf weich (KOPF_WEICH) statt sofort: Schnelles Links-Rechts ließ das Bild sonst hin und her wanken.
 const KOPF = { super: 0.05, formel: 0.025, rallye: 0.035 }, KOPF_MAX = 0.07, KOPF_MAX_RALLYE = 0.05;   // Rallye: weniger, dort geht es dauernd links und rechts
 const KOPF_HINTEN = 0.7, KOPF_HINTEN_MAX = 0.045, KOPF_WEICH = 5;   // hinter dem Auto: Anteil, höchstens (rad), wie schnell das Bild folgt
 
@@ -74,14 +75,18 @@ export class Kamera {
       // Supercar: Augen links im Auto, höher (a.auge kommt vom 3D-Modell)
       // Rallye im Drift: Das Auto dreht sich im Bild um seine Vorderachse (siehe autoStellen) – du sitzt drin und drehst dich mit.
       // Der Kopf schaut dabei halb zurück in Fahrtrichtung (DRIFT_BLICK), so wie ein Fahrer im Drift durch die Seite der Scheibe schaut.
-      const DRIFT_BLICK = 0.5;
-      const dw = a.drift || 0, vorn = dw ? (a.p.a || 0) : 0;
+      // Seit 27.11.2026: Das Auto dreht sich im Cockpit nur noch wenig (driftMal, siehe szene.js), und der Kopf schaut ganz
+      // in Fahrtrichtung – vorher drehte sich das Auto unter einem hin und her, das fühlte sich falsch an.
+      const DRIFT_BLICK = 1;
+      const dw = (a.drift || 0) * (a.driftMal ?? 1), vorn = dw ? (a.p.a || 0) : 0;
       const sh = Math.sin(a.h + dw), ch = Math.cos(a.h + dw);
       const bx = a.x + vorn * (Math.sin(a.h) - sh), bz = a.z + vorn * (Math.cos(a.h) - ch);   // hier steht das Auto im Bild
       const bh = a.h + dw * (1 - DRIFT_BLICK), bs = Math.sin(bh), bc = Math.cos(bh);           // dorthin schaut der Kopf
       const [ex, ey, ez] = a.auge ? [a.auge[0], a.auge[1], a.auge[2]] : [0, 0.92, -0.12];
-      // Der Kopf des Fahrers neigt sich in die Kurve hinein (bis etwa 7 Grad) – so spürt man die Kurve im Cockpit
-      const nick = a.neigung, kMax = rallye ? KOPF_MAX_RALLYE : KOPF_MAX, roll = Math.max(-kMax, Math.min(kMax, kurveG * kopfJeG)) * Math.max(1, kopfMal);   // im Cockpit neigt sich der Kopf immer, bei „stark“ doppelt
+      // Der Kopf des Fahrers neigt sich in die Kurve hinein (bis etwa 4 Grad) – so spürt man die Kurve im Cockpit
+      const nick = a.neigung, kMax = rallye ? KOPF_MAX_RALLYE : KOPF_MAX, rollZiel = Math.max(-kMax, Math.min(kMax, kurveG * kopfJeG)) * kopfMal;   // „aus“ = gar nicht, „stark“ = doppelt
+      this.kopf = this.frisch ? rollZiel : this.kopf + (rollZiel - this.kopf) * Math.min(1, dt * KOPF_WEICH);
+      const roll = this.kopf;
       cam.position.set(bx + sh * ez + ch * ex, a.y + ey, bz + ch * ez - sh * ex);
       if (modell) { cam.position.set(a.x + (sh * ez + ch * ex) * sc, a.y + ey * sc, a.z + (ch * ez - sh * ex) * sc); }
       cam.position.x += zit(); cam.position.y += zit();
@@ -105,7 +110,11 @@ export class Kamera {
     let d = wohin - this.richtung; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
     if (this.frisch) this.richtung = wohin; else this.richtung += d * Math.min(1, dt * (Math.abs(a.u) < 3 * sc ? 2.5 : 5));
     const rs = Math.sin(this.richtung), rc = Math.cos(this.richtung);
-    const ziel = new THREE.Vector3(a.x - rs * ab, a.y + hoch, a.z - rc * ab);
+    // Die Kamera neigt sich mit der Straße: Bergab steht sie höher und schaut hinunter, damit man die Strecke sieht
+    // (this.steig folgt der Steigung weich, sonst würde das Bild auf jeder Bodenwelle nicken).
+    const steigZiel = Math.max(-0.3, Math.min(0.3, a.luft ? 0 : a.nick || 0));
+    this.steig = this.frisch ? steigZiel : (this.steig || 0) + (steigZiel - (this.steig || 0)) * Math.min(1, dt * 3);
+    const ziel = new THREE.Vector3(a.x - rs * ab, a.y + hoch - this.steig * ab, a.z - rc * ab);
     if (this.frisch) this.pos.copy(ziel); else this.pos.lerp(ziel, 1 - Math.exp(-dt * 20));
     // nicht unter die Fahrbahn
     cam.position.copy(this.pos); cam.position.x += zit(); cam.position.y += zit();
@@ -113,7 +122,7 @@ export class Kamera {
     const kopfZiel = Math.max(-KOPF_HINTEN_MAX, Math.min(KOPF_HINTEN_MAX, kurveG * kopfJeG * KOPF_HINTEN)) * kopfMal;
     this.kopf = this.frisch ? kopfZiel : this.kopf + (kopfZiel - this.kopf) * Math.min(1, dt * KOPF_WEICH);
     cam.up.set(rc * this.kopf, 1, -rs * this.kopf);
-    cam.lookAt(a.x + rs * 3.5 * sc, a.y + (weit ? 0.3 : 0.75) * sc, a.z + rc * 3.5 * sc);
+    cam.lookAt(a.x + rs * 3.5 * sc, a.y + (weit ? 0.3 : 0.75) * sc + this.steig * 3.5 * sc, a.z + rc * 3.5 * sc);
     cam.up.set(0, 1, 0);
     const fov = (weit ? 46 : 48) + speed * (rallye ? 32 : modell ? 24 : 15) + this.schub * 7;   // je schneller, desto weiter der Blick: so fühlt sich Tempo nach Tempo an
     cam.fov += (fov - cam.fov) * Math.min(1, dt * 3);

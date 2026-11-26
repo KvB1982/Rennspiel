@@ -179,6 +179,30 @@ html.app #lbNah { display: block; }
 #hud.mitte #hMeldung { top: 37%; }
 #hHud.rallye { top: max(17%, 118px); }
 
+/* Kleine Bildschirme (iPhone quer, nur etwa 390 Punkte hoch): HUD und Karten des Beifahrers nahmen fast das ganze Bild ein.
+   Hier ist alles etwa halb so groß und sitzt ganz oben, damit die Straße frei bleibt. */
+@media (max-height: 500px) {
+  #hHud { top: 6px; width: 190px; transform: translateX(-50%); }
+  #hudDz { height: 4px; }
+  #hudReihe { gap: 8px; margin-top: 0; }
+  #hudKmh b { font-size: 18px; } #hudKmh small { font-size: 9px; }
+  #hudGang { font-size: 34px; }
+  #hudKurve b { font-size: 20px; } #hudKurve small { font-size: 10px; }
+  #hud.mitte #hMeldung { top: 30%; }
+  /* Rallye: Die Karten des Beifahrers stehen oben in der Mitte, das HUD rutscht klein links daneben */
+  #hHud.rallye { top: 6px; left: 30%; width: 150px; }
+  #hAnsage { top: 4px; gap: 5px; }
+  #hAnsage .karte { padding: 2px 6px 3px; min-width: 46px; border-radius: 9px; }
+  #hAnsage svg { width: 34px; height: 34px; }
+  #hAnsage .karte:not(.erst) svg { width: 24px; height: 24px; }
+  #hAnsage .zahl { font-size: 18px; }
+  #hAnsage .karte:not(.erst) .zahl { font-size: 13px; }
+  #hAnsage .was { font-size: 10px; }
+  #hAnsage .weg { font-size: 9px; }
+  #hAnsage .zeichen { font-size: 24px; line-height: 34px; height: 34px; }
+  #hAnsage .karte:not(.erst) .zeichen { font-size: 16px; line-height: 24px; height: 24px; }
+}
+
 /* Messwerte (Menü „Messwerte anzeigen“): kleine Tafel rechts unter den Zeiten, darunter Balken für Lenkung, Gas, Bremse */
 #hMess { position: absolute; right: max(14px, env(safe-area-inset-right)); top: 150px; background: rgba(8,12,20,.72); border-radius: 8px; padding: 6px 9px; font-size: 11px; pointer-events: none; min-width: 230px; }
 #hMess pre { margin: 0 0 5px; font: 11px/1.45 ui-monospace, Menlo, monospace; white-space: pre; }
