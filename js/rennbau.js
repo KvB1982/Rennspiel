@@ -28,6 +28,9 @@ export function baueRennen(E, T, rallyeNr = 0) {
   if (rennen.LS && rennen.LS !== rennen.L) rennen.LG = rennen.LS;
   rennen.hilfe.bremsen = E.bremshilfe && !slot; rennen.hilfe.lenken = E.lenkhilfe && !slot;
   if (rennen.ich) { rennen.ich.a.tc = E.traktion ? true : false; rennen.ich.a.arcade = E.arcade !== false; }
+  // Fahrgefühl „Neu“: das schlichte Fahrmodell ohne ziehende Hilfen (nur Autos, die Werte dafür haben: die Rallyeautos).
+  // Für alle anderen Autos zählt „Neu“ wie Arcade.
+  if (rennen.ich && E.arcade === 'neu' && rennen.ich.a.p.schlicht) { rennen.ich.a.arcade = false; rennen.ich.a.schlicht = true; }
   // Rallye: „echter“ heißt hier nicht „ganz ohne Hilfe“ (dann rutscht das Auto auf Schotter nur noch), sondern „weniger Hilfe“:
   // Das Auto bekommt die Arcade-Hilfe mit den Werten aus echtHilfe darüber.
   if (rennen.ich && E.arcade === false && rennen.ich.a.p.echtHilfe) {

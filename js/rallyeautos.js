@@ -40,6 +40,10 @@ const BASIS = {
     // "unter": Lenkrad weiter als "ab" eingeschlagen und zu schnell für die Kurve → Gas weg und mitbremsen (das Auto wirft sich quer und wird langsamer)
     unter: { ab: 0.25, tempo: 12, brems: 0.8, bremsH: 0.5, gasWeg: 1 },
     drift: { winkel: 0.5, hand: 0.95, ab: 0.4, lang: 4.5, abTempo: 4, lose: 1.0, feder: 60, ruhe: 10, eng: 0.3, engAb: 0.7 } },
+  // Das neue, schlichte Fahrmodell (Menü „Fahrgefühl: Neu“, siehe schlichtSchritt in physik.js): echtes Rutschen, keine ziehenden Hilfen.
+  // Neben dem Weg bremst der Boden (zieh), aber der Motor geht nicht aus und es gibt keine Pause danach.
+  schlicht: { haft: 1.3, belag: 0.3, direkt: 4, kreis: 6.5, langsam: 2, dreh: 1.75, gas: 0.5, driftAuf: 3, driftAb: 8, stabil: 1.5, folgen: 60, steif: 14, zug: 2.0, zugQuer: 0.25, brems: 1.7, handDreh: 1.8, handStabil: 0.5, handBrems: 0.35, kurve: 1.0, wand: 0.6,
+    neben: { zieh: 3.5, zug: 0.15, ab: 9, rand: 0.5, pause: 0, pauseZug: 1 } },
   // Drift zum Selber-Steuern (siehe physik.js): "winkel" = so weit stellt sich das Auto in einer harten Kurve quer (rad),
   // "hand" = mit Handbremse, "ab" = ab so viel Kurvenkraft beginnt es (Anteil der Grenze), "abTempo" = erst ab diesem Tempo (m/s),
   // "lose" = wie viel mehr auf losem Boden, "feder"/"ruhe" = wie schnell das Heck kommt und wie schnell es sich beruhigt.
