@@ -183,7 +183,7 @@ export function starteSpiel() {
       for (const [wert, text] of werte) {
         const b = document.createElement('button'); b.textContent = text; b.dataset.wert = wert;
         if (String(E[schluessel]) === String(wert)) b.classList.add('an');
-        b.addEventListener('click', () => { E[schluessel] = typeof STANDARD[schluessel] === 'number' ? +wert : typeof STANDARD[schluessel] === 'boolean' ? String(wert) === 'true' : wert; merken(); menueBauen(); });
+        b.addEventListener('click', () => { E[schluessel] = typeof STANDARD[schluessel] === 'number' ? +wert : wert; merken(); menueBauen(); });   // an/aus bleibt an/aus, ein Wort wie 'neu' bleibt ein Wort
         w.appendChild(b);
       }
       ein.appendChild(z);
