@@ -219,7 +219,9 @@ export function starteSpiel() {
     zeile('Bremshilfe', 'bremshilfe', [[true, 'an'], [false, 'aus']], !slot);
     zeile('Lenkhilfe', 'lenkhilfe', [[true, 'an'], [false, 'aus']], !slot);
     // Arcade-Hilfe (Rennwagen und Supercars): direkte Lenkung, und der Computer hilft unsichtbar, auf der Straße zu bleiben
-    zeile('Fahrgefühl', 'arcade', [[true, 'Arcade'], [false, 'echter']], !modell || E.fahrzeug === 'modell');
+    // Rallye: dazu „Neu“ = das schlichte Fahrmodell ohne ziehende Hilfen (schlichtSchritt in physik.js), zum Vergleichen mit den alten
+    if (E.arcade === 'neu' && E.fahrzeug !== 'rallye') E.arcade = true;
+    zeile('Fahrgefühl', 'arcade', E.fahrzeug === 'rallye' ? [[true, 'Arcade'], [false, 'echter'], ['neu', 'Neu (zum Ausprobieren)']] : [[true, 'Arcade'], [false, 'echter']], !modell || E.fahrzeug === 'modell');
     zeile('Traktionskontrolle', 'traktion', [[true, 'an'], [false, 'aus']], !slot && !drift);
     // Drift-Hilfe: dreht das Auto zurück, bevor es sich ganz quer stellt (gleiche Einstellung wie die Traktionskontrolle)
     zeile('Drift-Hilfe', 'traktion', [[true, 'an'], [false, 'aus (schwer)']], drift);

@@ -48,7 +48,7 @@ const quellen = {}; for (let i = 0; i < F.n; i++) quellen[F.quelle(i)] = (quelle
 const quelle = Object.entries(quellen).sort((a, b) => b[1] - a[1]).map(([q, n]) => q + (n < F.n ? ' ' + proz(n, F.n) : '')).join(', ');
 console.log(`\n=== Fahrt vom ${String(P.wann).replace('T', ' ').slice(0, 16)} (Weltzeit) ===`);
 console.log(`Strecke ${def.name} (${P.strecke}), Auto ${auto}, ${E.fahrzeug === 'rallye' ? 'Rallye' : E.modus === 'zeit' ? 'Zeitfahren' : 'Rennen mit ' + (E.fahrzeug === 'super' ? E.gegner_super : E.gegner) + ' Gegnern'}`);
-console.log(`Fahrgefühl ${E.arcade !== false ? 'Arcade' : 'echter'}, Bremshilfe ${E.bremshilfe ? 'an' : 'aus'}, Lenkhilfe ${E.lenkhilfe ? 'an' : 'aus'}, Traktion ${E.traktion ? 'an' : 'aus'}, Gas von allein ${E.autogas ? 'an' : 'aus'}`);
+console.log(`Fahrgefühl ${E.arcade === 'neu' ? 'Neu' : E.arcade !== false ? 'Arcade' : 'echter'}, Bremshilfe ${E.bremshilfe ? 'an' : 'aus'}, Lenkhilfe ${E.lenkhilfe ? 'an' : 'aus'}, Traktion ${E.traktion ? 'an' : 'aus'}, Gas von allein ${E.autogas ? 'an' : 'aus'}`);
 console.log(`Steuerung: ${quelle}${F.neig ? ' (Neige-Stufe ' + E.neigStufe + ')' : ''} · Grafik ${E.grafik} · Kamera ${E.fahrzeug === 'rallye' ? E.kamera_rallye : T.def.modell ? E.kamera_klein : E.kamera}`);
 if (P.geraet) console.log(`Gerät: ${P.geraet.app ? 'App' : 'Browser'}, ${P.geraet.breite} × ${P.geraet.hoehe} Punkte (mal ${P.geraet.punkte}) · ${String(P.geraet.ua).slice(0, 90)}`);
 console.log(`Aufnahme: ${zeit(dauer)} lang, ${F.n} ${F.schritt ? "Rechenschritte von 1/120 s" : "Bilder"}${P.abgeschnitten ? ' (nach 20 Minuten abgeschnitten)' : ''}`);
@@ -262,7 +262,7 @@ if (mitFahrer) {
   for (const a0 of ausfluege) svg += `<rect x="${sx(tBei[a0.ab])}" y="${sy}" width="${Math.max(1.5, a0.dauer / dauer * (B - 40)).toFixed(1)}" height="${4 * (sh + 22) - 22}" fill="#ff5a4d" opacity=".22"/>`;
   for (const i of wand) svg += `<path d="M${sx(tBei[i])},${sy}v${4 * (sh + 22) - 22}" stroke="#ffb020" stroke-width="2"/>`;
   const HG = sy + 4 * (sh + 22) + 10;
-  const kopf = `${def.name} · ${auto} · ${E.arcade !== false ? 'Arcade' : 'echter'} · ${String(P.wann).slice(0, 10)} · grün = auf der Fahrbahn, rot = daneben, gelber Ring = Wand, gestrichelt = Ideallinie`;
+  const kopf = `${def.name} · ${auto} · ${E.arcade === 'neu' ? 'Neu' : E.arcade !== false ? 'Arcade' : 'echter'} · ${String(P.wann).slice(0, 10)} · grün = auf der Fahrbahn, rot = daneben, gelber Ring = Wand, gestrichelt = Ideallinie`;
   writeFileSync(bildPfad, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${B} ${HG}" width="${B}" height="${HG}" font-family="sans-serif"><rect width="100%" height="100%" fill="#0f141d"/><text x="20" y="16" fill="#c9d3e0" font-size="13">${kopf}</text>${svg}</svg>`);
   console.log('\nBild: ' + bildPfad);
 }

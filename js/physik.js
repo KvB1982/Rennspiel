@@ -174,7 +174,10 @@ export const lenkGrenze = (p, u) => p.lenkMax / (1 + (Math.abs(u) / p.lenkTempo)
 
 // Einen Zeitschritt rechnen. T = Strecke (für Untergrund, Höhe, Begrenzung).
 export function schritt(a, T, dt) {
-  const p = a.p, leichtAn = !!p.leicht && a.tc === true, n = leichtAn ? 0 : p.schritte, h = dt / p.schritte;
+  const p = a.p, leichtAn = !!p.leicht && a.tc === true;
+  // SL: das neue, schlichte Fahrmodell (Menü „Fahrgefühl: Neu“) – es rechnet ganz für sich, siehe schlichtSchritt weiter unten
+  const SL = a.schlicht && p.schlicht ? p.schlicht : null;
+  const n = leichtAn || SL ? 0 : p.schritte, h = dt / p.schritte;
   // kl: Bei den kleinen Autos sind alle Längen und Tempo-Grenzen der Hilfen mit verkleinert (große Autos: 1)
   const kl = T.def.modell ? T.sc : 1;
   // Turbo (kleine Autos): eine kurze Zeit lang mehr Höchsttempo und mehr Zugkraft (a.turbo = Sekunden, die er noch brennt)
@@ -199,14 +202,15 @@ export function schritt(a, T, dt) {
   // Rallye (neben): Neben dem Weg liegen Gras, Wurzeln und Gräben. Dort wird das Auto kräftig gebremst und zieht kaum noch –
   // bis es nur noch "ab" schnell ist (dann kommt man gut zurück auf den Weg). Sonst wäre Abkürzen durch den Wald schneller als der Weg.
   let nebenZug = 1;
-  if (p.neben && !a.luft && ad > hb + p.neben.rand && au0(a) > p.neben.ab) {
-    const m = Math.min(1, (au0(a) - p.neben.ab) / (p.neben.ab * 0.5));
-    gr = { haft: gr.haft, zieh: gr.zieh + p.neben.zieh * m }; nebenZug = 1 - (1 - p.neben.zug) * m;
-    a.fangen = p.neben.pause;
-  } else if (p.neben && a.fangen > 0) {
+  const NB = SL ? SL.neben : p.neben;   // (das schlichte Modell hat eigene, mildere Werte und keine Pause)
+  if (NB && !a.luft && ad > hb + NB.rand && au0(a) > NB.ab) {
+    const m = Math.min(1, (au0(a) - NB.ab) / (NB.ab * 0.5));
+    gr = { haft: gr.haft * (1 - (1 - (NB.haft ?? 1)) * m), zieh: gr.zieh + NB.zieh * m }; nebenZug = 1 - (1 - NB.zug) * m;
+    a.fangen = NB.pause;
+  } else if (NB && a.fangen > 0) {
     // zurück auf dem Weg: Das Auto muss sich erst fangen ("pause" Sekunden lang kommt die Kraft nur langsam wieder)
     a.fangen = Math.max(0, a.fangen - dt);
-    nebenZug = 1 - (1 - p.neben.pauseZug) * Math.min(1, a.fangen / (p.neben.pause * 0.5));
+    nebenZug = 1 - (1 - NB.pauseZug) * Math.min(1, a.fangen / (NB.pause * 0.5));
   }
 
   // Lenkrad dreht nicht sofort: die Vorderräder folgen dem Wunsch schnell, aber weich
@@ -449,6 +453,7 @@ export function schritt(a, T, dt) {
   a.rutschVorn = Math.min(1, Math.max(0, maxRutschV - 0.75) * 2.5);
   a.rutschHinten = Math.min(1, Math.max(0, maxRutschH - 0.75) * 2.5);
   if (leichtAn) driftLeicht(a, gr, dt, vMax, TB);
+  else if (SL) schlichtSchritt(a, gr, dt, nebenZug);
 
   // 3. Strecken-Helfer (Arcade-Hilfe): Fährt das Auto auf den Rand der Fahrbahn zu, lenkt die Straße es unsichtbar
   //    etwas zurück: Fahrtrichtung und Auto drehen sich gemeinsam ein Stück in Richtung der Straße. Je näher am Rand
@@ -499,7 +504,7 @@ export function schritt(a, T, dt) {
         a.r = 0;
       } else {
         wx -= nx * gegen * 1.35; wz -= nz * gegen * 1.35;     // abprallen (ein wenig zurück)
-        const reib = Math.max(0, 1 - gegen * 0.06);            // an der Wand entlang schleifen bremst
+        const reib = Math.max(0, 1 - gegen * 0.06) * (SL && gegen > 2 ? SL.wand : 1);   // an der Wand entlang schleifen bremst (schlichtes Modell: Ein richtiger Einschlag kostet viel Tempo)
         wx *= reib; wz *= reib;
         a.u = sh * wx + ch * wz; a.v = ch * wx - sh * wz;
         a.r *= 0.5;
@@ -634,6 +639,80 @@ function driftLeicht(a, gr, dt, vMax = a.p.vMax, TB = null) {
   a.rutschHinten = cl((Math.abs(b2) - 0.12) / 0.3, 0, 1); a.rutschVorn = a.rutschHinten * 0.4;
 }
 
+// SCHLICHT – das neue, einfache Fahrmodell (seit 27.11.2026, Rallye, Menü „Fahrgefühl: Neu“).
+// Kristian am 26.11.2026: „wie auf Schienen … die Hilfe zieht einen im letzten Moment rum … fühlt sich kein bisschen an wie ein
+// echtes Auto“. Hier gibt es deshalb KEINE unsichtbaren Hände: keinen Strecken-Helfer, keinen Spur-Helfer, keine Bremse,
+// die von selbst kommt, und keinen gemalten Drift. Es gelten nur vier einfache Regeln:
+//   1. Das Lenkrad dreht das AUTO (die Nase) – sofort und immer gleich. Deshalb kann es sich nie von allein drehen.
+//   2. Die Reifen ziehen das Auto dorthin, wohin die Nase zeigt – aber nur so stark, wie der Boden Halt gibt.
+//      Bist du zu schnell, reicht der Halt nicht: Das Auto rutscht wirklich nach außen (echter Drift, v ist das Rutschen).
+//   3. Rutschen bremst. Mit Gas zieht der Motor das Auto in Richtung der Nase – so kommt man quer um die Kurve.
+//   4. Lässt du das Lenkrad los, stellt sich das Auto von selbst wieder gerade in Fahrtrichtung (stabil).
+// Werte in p.schlicht: haft (Halt der Reifen, mal p.haft), belag (wie viel loser Boden ausmacht: 1 = voll, 0 = gar nicht),
+// direkt (bei 1/direkt Lenkrad ist die engste Kurve erreicht), kreis (engster Kreis in m), langsam (bei wenig Tempo ist bei
+// 1/langsam Lenkrad der engste Kreis erreicht),
+// dreh (so viel mehr dreht sich die Nase bei vollem Lenkrad, als der Halt hergibt – daraus entsteht der Drift),
+// gas (mit Gas noch so viel mehr), stabil (wie stark es sich gerade stellt), folgen (wie schnell die Nase dem Lenkrad folgt),
+// steif (wie hart die Reifen zupacken), zug und brems (Halt beim Beschleunigen und Bremsen), zugQuer (so viel Zug bleibt im Drift),
+// handDreh/handStabil/handBrems (Handbremse: Heck fliegt herum, fängt sich weniger, bremst etwas).
+function schlichtSchritt(a, gr, dt, nebenZug) {
+  const p = a.p, S = p.schlicht, w = a.lenkWunsch || 0, n = 4, h = dt / n;
+  const cl = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  const boden = gr.haft > 0 ? Math.pow(gr.haft, S.belag) : 0;      // loser Boden: weniger Halt (in der Luft: gar keiner)
+  const halt = p.haft * S.haft * boden * G;                        // so viel Kurvenkraft geht höchstens (m/s²)
+  const hand = !!a.handbremse && a.u > 0.5;
+  let beta = 0, axLetzt = 0;
+  for (let k = 0; k < n; k++) {
+    const u = a.u, v = a.v, au = Math.abs(u);
+    beta = au > 1 ? Math.atan2(v, au) : 0;                         // so schräg rutscht das Auto (minus = Heck nach links außen … Nase zeigt nach links hinein)
+    // 1. Lenkrad → so schnell soll sich die Nase drehen
+    if (halt > 0) {
+      // Bis zum Lenkrad-Ausschlag 1/direkt wird die Kurve immer enger – dort ist die engste Kurve erreicht, die der Boden hält.
+      // Wer noch weiter einlenkt, dreht die Nase weiter hinein, als das Auto fahren kann: Das Heck kommt, das Auto driftet
+      // (dreh, mit Gas noch mehr). Mit Handbremse fliegt das Heck sofort herum.
+      const grenz = halt / Math.max(au, 2), kante = 1 / S.direkt;
+      const lin = Math.min(1, Math.abs(w) * S.direkt), ueber = Math.max(0, Math.abs(w) - kante) / (1 - kante);
+      // Das Heck braucht einen Moment, bis es kommt (driftAuf), und fängt sich schneller wieder (driftAb): Ein kurzer Ruck am
+      // Lenkrad stellt das Auto deshalb nicht gleich quer – wer das Lenkrad hält, driftet.
+      a.heck = (a.heck || 0) + (ueber - (a.heck || 0)) * Math.min(1, h * (ueber > (a.heck || 0) ? S.driftAuf : S.driftAb));
+      const mehr = hand ? S.handDreh * lin : lin + (S.dreh + S.gas * a.gas - 1) * a.heck;
+      // Langsam gefahren zählt, wie weit die Räder eingeschlagen sind: halbes Lenkrad = halb so enger Kreis (sonst wäre das
+      // Auto bei wenig Tempo zappelig, weil schon ein Hauch am Lenkrad der volle Einschlag wäre).
+      const rVoll = Math.min(Math.min(1, Math.abs(w) * S.langsam) * au / (hand ? S.kreis * 0.6 : S.kreis), mehr * grenz);
+      const rZiel = Math.sign(w) * rVoll * Math.sign(u || 1) + S.stabil * beta * (hand ? S.handStabil : 1);
+      a.r += (rZiel - a.r) * Math.min(1, h * S.folgen);
+    }
+    // 2. Die Reifen holen das Rutschen zurück – höchstens mit dem Halt des Bodens (blockierte Hinterräder: weniger)
+    const quer = cl(-S.steif * v, -halt, halt) * (hand ? 0.75 : 1);
+    // 3. Gas, Bremse, Luft und Boden
+    let ax = 0;
+    // (Reifen, die gerade mit aller Kraft das Rutschen halten, können nicht auch noch voll beschleunigen: Im Drift bleibt "zugQuer" davon.)
+    const frei = 1 - (1 - S.zugQuer) * Math.min(1, Math.abs(quer) / Math.max(halt, 0.01)) ** 2;
+    if (a.gas > 0 && u > -0.5) ax += a.gas * Math.min(Math.min(p.schubMax, p.leistung / Math.max(au, 1)) * (p.schub || 1) / p.masse, halt * S.zug * frei) * nebenZug * (hand ? 0.5 : 1);
+    if (a.brems > 0) {
+      if (u > 0.3) ax -= a.brems * halt * S.brems;
+      else if (a.gas <= 0) ax -= a.brems * p.schubMax * 0.7 / p.masse * cl(((p.rueck || 8) + u) / ((p.rueck || 8) * 0.25), 0, 1);   // im Stand: rückwärts
+    }
+    if (u < -0.3 && a.gas > 0) ax += a.gas * halt * 0.5;
+    if (hand) ax -= halt * S.handBrems;
+    const sgn = u > 0.05 ? 1 : u < -0.05 ? -1 : 0;
+    ax -= sgn * (0.5 * LUFT * p.widerstand * u * u / p.masse + p.rollen * G + gr.zieh * G);
+    axLetzt = ax;
+    a.u += (ax + v * a.r) * h;
+    a.v += (quer - u * a.r) * h;
+    // ganz langsam: einfach dorthin rollen, wohin die Räder zeigen (kein Zittern im Stand)
+    if (au < 2) { const m = au / 2; a.v *= m; a.r = a.r * m + u * w / (S.kreis * 0.7) * (1 - m); }
+    if (Math.abs(a.u) < 0.05 && a.gas <= 0 && a.brems <= 0) a.u *= 0.9;
+    const sh = Math.sin(a.h), ch = Math.cos(a.h);
+    a.x += (sh * a.u + ch * a.v) * h; a.z += (ch * a.u - sh * a.v) * h;
+    a.h += a.r * h;
+  }
+  a.ax = axLetzt; a.Fyr = a.Fyf = 0; a.unter = 0;
+  // fürs Bild: Die Vorderräder zeigen dorthin, wohin das Auto fährt (im Drift sieht das wie Gegenlenken aus)
+  a.lenk += (cl(w * p.lenkMax * 0.5 + beta, -p.lenkMax, p.lenkMax) - a.lenk) * Math.min(1, dt * 14);
+  a.rutschHinten = cl((Math.abs(beta) - 0.07) / 0.25, 0, 1); a.rutschVorn = a.rutschHinten * 0.4;
+}
+
 function luftHelfer(a, T, f, dt) {
   const i = f.i, rw = Math.atan2(T.tx[i], T.tz[i]);
   let d = rw - a.h; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
@@ -679,7 +758,7 @@ function huepfen(a, T, f, dt) {
   if (a.luft) {
     // Arcade: Das Auto fällt schneller, als es in echt würde (fall) – so sind die Sprünge kurz und knackig,
     // und man hat schnell wieder Räder am Boden zum Lenken
-    const fall = a.arcade && a.p.arcade && a.p.arcade.fall || 1;
+    const fall = (a.arcade || a.schlicht) && a.p.arcade && a.p.arcade.fall || 1;
     a.vy -= G * fall * dt; a.y += a.vy * dt; a.flug += dt;
     // In der Luft dreht sich das Auto weiter, wie es abgesprungen ist – aber gebremst (Spiel-Wert: sonst landet man zu oft quer)
     a.r *= Math.exp(-dt * 2.5);
@@ -687,14 +766,14 @@ function huepfen(a, T, f, dt) {
       // aufsetzen: je steiler das Auto im Vergleich zur Straße fällt, desto härter
       const hart = Math.max(0, steig * vLang - a.vy);
       a.landung = hart; a.luft = false; a.y = boden; a.vy = steig * vLang;
-      const weich = a.arcade && a.p.arcade && a.p.arcade.fall;     // Arcade: Landen kostet kaum Tempo und das Auto steht sofort gerade
+      const weich = (a.arcade || a.schlicht) && a.p.arcade && a.p.arcade.fall;     // Arcade: Landen kostet kaum Tempo und das Auto steht sofort gerade
       if (hart > 5) { a.u *= 1 - Math.min(weich ? 0.04 : 0.12, (hart - 5) * 0.015); a.stoss = Math.max(a.stoss, (hart - 5) * 1.5); }
       if (weich) { a.v *= 0.3; a.r *= 0.3; }
     }
   } else {
     a.vy = steig * vLang; a.y = boden;
     // (Arcade: erst bei einer deutlichen Kuppe abheben, nicht schon auf jeder Bodenwelle)
-    const ab = a.arcade && a.p.arcade && a.p.arcade.abheben || 1;
+    const ab = (a.arcade || a.schlicht) && a.p.arcade && a.p.arcade.abheben || 1;
     if (-kv * vLang * vLang > G * ab && Math.abs(vLang) > 8) { a.luft = true; a.flug = 0; }
   }
   // Das Auto neigt sich mit der Straße (bergauf: Nase hoch); im Flug folgt es der Flugbahn, die Nase sinkt langsam
