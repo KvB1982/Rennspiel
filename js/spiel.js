@@ -462,8 +462,15 @@ export function starteSpiel() {
     else if (a === 'weiter') { app.rallyeStand.nr++; starten(); }
     else if (a === 'menue') zumMenue();
   });
-  $('hPause').addEventListener('click', () => pausiert ? pauseAus() : pauseAn());
-  $('hKamera').addEventListener('click', kameraWeiter);
+  // Die zwei Knöpfe während der Fahrt gehen schon beim Berühren los: Liegt beim Neigen ein Daumen auf Gas oder Bremse,
+  // kommt auf iPhone und iPad sonst oft gar kein „Klick“ an.
+  const tipp = (b, tun) => {
+    let eben = 0;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); eben = performance.now(); tun(); });
+    b.addEventListener('click', () => { if (performance.now() - eben > 700) tun(); });
+  };
+  tipp($('hPause'), () => pausiert ? pauseAus() : pauseAn());
+  tipp($('hKamera'), kameraWeiter);
   // Pedale auf dem Bildschirm (wenn dieses Gerät selbst das Lenkrad ist)
   const pf = new Map();
   // Die Pedale gibt es nur, solange dieses Gerät selbst das Lenkrad ist. Verbindet sich ein Handy, verschwinden sie.
