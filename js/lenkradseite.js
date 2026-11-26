@@ -104,10 +104,18 @@ export function lenkradStarten(code, lokal, nah = false) {
   document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
   document.addEventListener('gesturestart', e => e.preventDefault());
 
-  document.querySelectorAll('[data-k]').forEach(b => b.addEventListener('click', () => { sender.senden({ t: 'k', k: b.dataset.k }); if (inApp) ruetteln(0.2); else if (navigator.vibrate) navigator.vibrate(15); }));
-  $('hlMitte').addEventListener('click', () => { neig.kalibrieren(); });
+  // Knöpfe oben: Sie gehen schon los, wenn der Finger sie berührt (nicht erst beim Loslassen).
+  // Grund: Ein „Klick“ kommt auf dem iPhone oft gar nicht an, wenn schon ein Daumen auf Gas oder Bremse liegt
+  // oder der Finger beim Tippen ein kleines Stück rutscht – und beim Lenken wackelt das Handy ja immer.
+  const tipp = (b, tun) => {
+    let eben = 0;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); eben = performance.now(); b.classList.add('gedrueckt'); setTimeout(() => b.classList.remove('gedrueckt'), 180); tun(); });
+    b.addEventListener('click', () => { if (performance.now() - eben > 700) tun(); });   // Tastatur oder Geräte ohne Finger
+  };
+  document.querySelectorAll('[data-k]').forEach(b => tipp(b, () => { sender.senden({ t: 'k', k: b.dataset.k }); if (inApp) ruetteln(0.2); else if (navigator.vibrate) navigator.vibrate(15); }));
+  tipp($('hlMitte'), () => { neig.kalibrieren(); });
   const empfText = () => $('hlEmpf').textContent = '🎚 ' + VOLL[neig.stufe - 1] + '°';
-  $('hlEmpf').addEventListener('click', () => { neig.stufeWeiter(); empfText(); });
+  tipp($('hlEmpf'), () => { neig.stufeWeiter(); empfText(); });
   empfText();
 
   // Start: Sensor erlauben, Bildschirm wach halten, Vollbild (Android)
