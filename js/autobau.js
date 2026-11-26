@@ -237,9 +237,9 @@ export function baueAuto({ farbe = 0x1e5bd8, zweit = 0xffffff, num = 1, massstab
 export function autoStellen(m, a, uhr = 0) {
   const g = m.gruppe;
   // Drift (Rallye): Das Auto dreht sich im Bild um seine Vorderachse – das Heck schwenkt nach außen
-  const dw = a.drift || 0, vorn = dw ? (a.p.a || 0) : 0;
+  const dw = (a.drift || 0) * (a.driftMal ?? 1), vorn = dw ? (a.p.a || 0) : 0;   // driftMal: im Cockpit dreht sich das eigene Auto nur wenig (siehe szene.js)
   g.position.set(a.x + vorn * (Math.sin(a.h) - Math.sin(a.h + dw)), a.y, a.z + vorn * (Math.cos(a.h) - Math.cos(a.h + dw)));
-  // Bergauf hebt sich die Nase (a.nick = Steigung, nur bei Strecken mit Sprüngen ausgerechnet)
+  // Bergauf hebt sich die Nase (a.nick = Steigung der Straße unter dem Auto)
   g.rotation.order = 'YXZ';
   g.rotation.set(-Math.atan(a.nick || 0), a.h + dw, 0);
   m.koerper.rotation.x = a.neigung; m.koerper.rotation.z = a.kippen;

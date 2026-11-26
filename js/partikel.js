@@ -95,7 +95,7 @@ export class Spritzer {
     const vx = sh0 * a.u + ch0 * a.v, vz = ch0 * a.u - sh0 * a.v, v = Math.hypot(vx, vz);
     const p = a.p, b = p.b || 1.3, aa = p.a || 1.2;
     // Im Drift steht das Auto im Bild quer (um die Vorderachse gedreht): Staub und Steine kommen von dort, wo die Räder zu sehen sind
-    const dw = a.drift || 0, sh = Math.sin(a.h + dw), ch = Math.cos(a.h + dw);
+    const dw = (a.drift || 0) * (a.driftMal ?? 1), sh = Math.sin(a.h + dw), ch = Math.cos(a.h + dw);
     const ax = a.x + (dw ? aa * (sh0 - sh) : 0), az = a.z + (dw ? aa * (ch0 - ch) : 0);
     // gelandet nach einem Sprung: eine große Staubwolke
     if (this.warLuft && !a.luft && v > 8) this.wolke(a, Math.min(1, v / 35));

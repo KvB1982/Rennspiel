@@ -508,7 +508,14 @@ export function schritt(a, T, dt) {
       }
     }
   }
-  if (T.def.rallye) huepfen(a, T, f2, dt); else a.y = f2.y;
+  if (T.def.rallye) huepfen(a, T, f2, dt);
+  else {
+    a.y = f2.y;
+    // Das Auto neigt sich mit der Straße: bergab zeigt die Nase nach unten, bergauf nach oben (nur fürs Bild und die Kamera).
+    // Fährt man falsch herum, ist bergauf und bergab vertauscht.
+    const lang = Math.sin(a.h) * f2.tx + Math.cos(a.h) * f2.tz;
+    a.nick = (a.nick || 0) + ((T.steig ? T.steig[f2.i] : 0) * lang - (a.nick || 0)) * Math.min(1, dt * 8);
+  }
 
   // DRIFT ZUM SELBER-STEUERN (Rallye, nur mit Arcade-Hilfe): Die Reifen halten das Auto sicher auf dem Weg – aber im Bild
   // stellt es sich quer wie ein Rallyeauto im Drift. Wie weit, bestimmst du:
