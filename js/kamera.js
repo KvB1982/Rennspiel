@@ -85,7 +85,9 @@ export class Kamera {
       const [ex, ey, ez] = a.auge ? [a.auge[0], a.auge[1], a.auge[2]] : [0, 0.92, -0.12];
       // Der Kopf des Fahrers neigt sich in die Kurve hinein (bis etwa 4 Grad) – so spürt man die Kurve im Cockpit
       const nick = a.neigung, kMax = rallye ? KOPF_MAX_RALLYE : KOPF_MAX, rollZiel = Math.max(-kMax, Math.min(kMax, kurveG * kopfJeG)) * kopfMal;   // „aus“ = gar nicht, „stark“ = doppelt
-      this.kopf = this.frisch ? rollZiel : this.kopf + (rollZiel - this.kopf) * Math.min(1, dt * KOPF_WEICH);
+      // Formel-Rennwagen: wie am 25.11.2026 (den Stand fand Kristian gut) – der Kopf neigt sich im Cockpit immer und sofort.
+      if (a.art === 'f1') this.kopf = Math.max(-kMax, Math.min(kMax, kurveG * kopfJeG)) * Math.max(1, kopfMal);
+      else this.kopf = this.frisch ? rollZiel : this.kopf + (rollZiel - this.kopf) * Math.min(1, dt * KOPF_WEICH);
       const roll = this.kopf;
       cam.position.set(bx + sh * ez + ch * ex, a.y + ey, bz + ch * ez - sh * ex);
       if (modell) { cam.position.set(a.x + (sh * ez + ch * ex) * sc, a.y + ey * sc, a.z + (ch * ez - sh * ex) * sc); }
