@@ -1,0 +1,310 @@
+{
+ "hinweis": "Texte für generate_speech (language_code de). Jeder Stapel ist EIN Auftrag; die Roh-Datei heißt wie \"datei\". Geschnitten wird mit stimmen.py. \"pause\" = ab so vielen Sekunden Stille beginnt ein neues Stück (sonst 0,6).",
+ "stapel": [
+  {
+   "datei": "b1.mp3",
+   "ordner": "beifahrer",
+   "stimme": "Roger",
+   "ansagen": [
+    [
+     "links_1",
+     "Links eins."
+    ],
+    [
+     "links_2",
+     "Links zwei."
+    ],
+    [
+     "links_3",
+     "Links drei."
+    ],
+    [
+     "links_4",
+     "Links vier."
+    ],
+    [
+     "links_5",
+     "Links fünf."
+    ],
+    [
+     "links_6",
+     "Links sechs."
+    ],
+    [
+     "rechts_1",
+     "Rechts eins."
+    ],
+    [
+     "rechts_2",
+     "Rechts zwei."
+    ],
+    [
+     "rechts_3",
+     "Rechts drei."
+    ],
+    [
+     "rechts_4",
+     "Rechts vier."
+    ],
+    [
+     "rechts_5",
+     "Rechts fünf."
+    ],
+    [
+     "rechts_6",
+     "Rechts sechs."
+    ],
+    [
+     "links_kehre",
+     "Links Kehre!"
+    ],
+    [
+     "rechts_kehre",
+     "Rechts Kehre!"
+    ]
+   ],
+   "text": "Links eins. [long pause] Links zwei. [long pause] Links drei. [long pause] Links vier. [long pause] Links fünf. [long pause] Links sechs. [long pause] Rechts eins. [long pause] Rechts zwei. [long pause] Rechts drei. [long pause] Rechts vier. [long pause] Rechts fünf. [long pause] Rechts sechs. [long pause] Links Kehre! [long pause] Rechts Kehre!"
+  },
+  {
+   "datei": "b2.mp3",
+   "ordner": "beifahrer",
+   "stimme": "Roger",
+   "ansagen": [
+    [
+     "achtung",
+     "Achtung!"
+    ],
+    [
+     "ueber_kuppe",
+     "Über Kuppe."
+    ],
+    [
+     "lang",
+     "Lang."
+    ],
+    [
+     "enger",
+     "Wird enger!"
+    ],
+    [
+     "oeffnet",
+     "Öffnet."
+    ],
+    [
+     "nicht_schneiden",
+     "Nicht schneiden!"
+    ],
+    [
+     "kuppe",
+     "Kuppe."
+    ],
+    [
+     "sprung",
+     "Sprung!"
+    ],
+    [
+     "sprung_gross",
+     "Großer Sprung!"
+    ],
+    [
+     "wasser",
+     "Achtung, Wasser!"
+    ],
+    [
+     "matsch",
+     "Matsch!"
+    ],
+    [
+     "ziel",
+     "Ziel! Voll durch!"
+    ],
+    [
+     "und",
+     "Und."
+    ]
+   ],
+   "text": "Achtung! [long pause] Über Kuppe. [long pause] Lang. [long pause] Wird enger! [long pause] Öffnet. [long pause] Nicht schneiden! [long pause] Kuppe. [long pause] Sprung! [long pause] Großer Sprung! [long pause] Achtung, Wasser! [long pause] Matsch! [long pause] Ziel! Voll durch! [long pause] Und."
+  },
+  {
+   "datei": "b3.mp3",
+   "ordner": "beifahrer",
+   "stimme": "Roger",
+   "ansagen": [
+    [
+     "w50",
+     "Fünfzig."
+    ],
+    [
+     "w100",
+     "Hundert."
+    ],
+    [
+     "w150",
+     "Hundertfünfzig."
+    ],
+    [
+     "w200",
+     "Zweihundert."
+    ],
+    [
+     "w250",
+     "Zweihundertfünfzig."
+    ],
+    [
+     "w300",
+     "Dreihundert."
+    ],
+    [
+     "w400",
+     "Vierhundert."
+    ],
+    [
+     "w500",
+     "Fünfhundert."
+    ],
+    [
+     "z5",
+     "Fünf!"
+    ],
+    [
+     "z4",
+     "Vier!"
+    ],
+    [
+     "z3",
+     "Drei!"
+    ],
+    [
+     "z2",
+     "Zwei!"
+    ],
+    [
+     "z1",
+     "Eins!"
+    ],
+    [
+     "los",
+     "Los!"
+    ],
+    [
+     "zwischenzeit_gut",
+     "Zwischenzeit: Gut! Weiter so!"
+    ],
+    [
+     "zwischenzeit_schlecht",
+     "Zwischenzeit: Wir verlieren Zeit!"
+    ],
+    [
+     "strafe",
+     "Fünf Sekunden Strafe!"
+    ],
+    [
+     "im_ziel",
+     "Im Ziel! Super gefahren!"
+    ]
+   ],
+   "text": "Fünfzig. [long pause] Hundert. [long pause] Hundertfünfzig. [long pause] Zweihundert. [long pause] Zweihundertfünfzig. [long pause] Dreihundert. [long pause] Vierhundert. [long pause] Fünfhundert. [long pause] Fünf! [long pause] Vier! [long pause] Drei! [long pause] Zwei! [long pause] Eins! [long pause] Los! [long pause] Zwischenzeit: Gut! Weiter so! [long pause] Zwischenzeit: Wir verlieren Zeit! [long pause] Fünf Sekunden Strafe! [long pause] Im Ziel! Super gefahren!"
+  },
+  {
+   "datei": "s1.mp3",
+   "ordner": "sprecher",
+   "stimme": "Daniel",
+   "ansagen": [
+    [
+     "los",
+     "Los!"
+    ],
+    [
+     "letzte_runde",
+     "Letzte Runde!"
+    ],
+    [
+     "bestzeit",
+     "Bestzeit!"
+    ],
+    [
+     "ziel",
+     "Im Ziel!"
+    ],
+    [
+     "sieg",
+     "Sieg! Du hast gewonnen!"
+    ],
+    [
+     "platz_2",
+     "Platz zwei!"
+    ],
+    [
+     "platz_3",
+     "Platz drei!"
+    ],
+    [
+     "platz_4",
+     "Platz vier!"
+    ],
+    [
+     "platz_5",
+     "Platz fünf!"
+    ],
+    [
+     "platz_6",
+     "Platz sechs!"
+    ],
+    [
+     "platz_7",
+     "Platz sieben!"
+    ],
+    [
+     "platz_8",
+     "Platz acht!"
+    ],
+    [
+     "platz_9",
+     "Platz neun!"
+    ],
+    [
+     "platz_10",
+     "Platz zehn!"
+    ]
+   ],
+   "text": "Los! [long pause] Letzte Runde! [long pause] Bestzeit! [long pause] Im Ziel! [long pause] Sieg! Du hast gewonnen! [long pause] Platz zwei! [long pause] Platz drei! [long pause] Platz vier! [long pause] Platz fünf! [long pause] Platz sechs! [long pause] Platz sieben! [long pause] Platz acht! [long pause] Platz neun! [long pause] Platz zehn!"
+  },
+  {
+   "datei": "s2.mp3",
+   "ordner": "sprecher",
+   "stimme": "Daniel",
+   "ansagen": [
+    [
+     "runde_ungueltig",
+     "Strecke verlassen! Die Runde zählt nicht."
+    ],
+    [
+     "tank_leer",
+     "Tank leer! Ab in die Box!"
+    ],
+    [
+     "aufgetankt",
+     "Aufgetankt, neue Reifen – und los!"
+    ],
+    [
+     "rausgeflogen",
+     "Zu schnell! Rausgeflogen!"
+    ],
+    [
+     "drift_verloren",
+     "Bande! Drift verloren!"
+    ],
+    [
+     "super_turbo",
+     "Super-Turbo!"
+    ],
+    [
+     "mega_turbo",
+     "Mega-Turbo!"
+    ]
+   ],
+   "text": "Strecke verlassen! Die Runde zählt nicht. [long pause] Tank leer! Ab in die Box! [long pause] Aufgetankt, neue Reifen – und los! [long pause] Zu schnell! Rausgeflogen! [long pause] Bande! Drift verloren! [long pause] Super-Turbo! [long pause] Mega-Turbo!",
+   "pause": 0.5
+  }
+ ]
+}

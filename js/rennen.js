@@ -107,7 +107,8 @@ export class Rennen {
     this.bestProS = null;                   // Zeit je Abschnitt der besten Runde (für die Plus/Minus-Anzeige)
   }
 
-  melden(text, art = 'info') { this.ereignisse.push({ text, art, t: this.uhr }); }
+  // stimme = Namen der Aufnahmen, die der Streckensprecher dazu sagt (sounds/stimme/sprecher/, siehe js/klang.js)
+  melden(text, art = 'info', stimme = null) { this.ereignisse.push({ text, art, t: this.uhr, stimme }); }
 
   // ein Bild weiter. eingabe = { lenk −1…1 (plus = links), gas 0…1, brems 0…1 }
   update(dt, eingabe) {
@@ -116,7 +117,7 @@ export class Rennen {
     const T = this.T;
     if (this.phase === 'ampel') {
       this.ampel = Math.min(5, Math.floor(this.uhr));
-      if (this.uhr >= this.ampelAus) { this.phase = 'los'; this.ampel = 0; this.zeit = 0; this.melden('Los!', 'start'); }
+      if (this.uhr >= this.ampelAus) { this.phase = 'los'; this.ampel = 0; this.zeit = 0; this.melden('Los!', 'start', ['los']); }
     } else if (this.phase !== 'pause') this.zeit += dt;
 
     const steht = this.phase === 'ampel';
@@ -156,7 +157,7 @@ export class Rennen {
       if (this.drift && c.ich && this.phase === 'los') this.driftZaehlen(c, dt);
       if (this.turbo && c.ich && this.phase === 'los') {
         const was = turboSchritt(a, c.tb || (c.tb = { ladung: 0, stufe: 0, ruhe: 0, zahl: 0 }), this.felder, T, dt);
-        if (was === 'zuenden') this.melden(['', 'Turbo!', 'Super-Turbo!', 'Mega-Turbo!'][a.turboStufe], 'turbo');
+        if (was === 'zuenden') this.melden(['', 'Turbo!', 'Super-Turbo!', 'Mega-Turbo!'][a.turboStufe], 'turbo', [null, null, ['super_turbo'], ['mega_turbo']][a.turboStufe]);
         else if (was === 'feld') this.melden('Turbo-Feld!', 'turbo');
       }
       // Computerfahrer, die festhängen (an der Mauer, im Kies), setzt ein Streckenposten zurück auf die Strecke
@@ -189,7 +190,7 @@ export class Rennen {
     const kmhM = au * 3.6 / this.sc;                                                 // Tempo im Maßstab (km/h)
     const aufMatte = Math.abs(a.d) < this.T.hb[Math.max(0, a.idx)] + 0.02;
     if (a.stoss > 0.15 && D.an) {
-      this.melden('Bande! Drift verloren', 'warn');
+      this.melden('Bande! Drift verloren', 'warn', ['drift_verloren']);
       D.laufend = 0; D.an = false; D.faktor = 1; D.ruhe = 0; D.kette = 0;
       return;
     }
@@ -217,8 +218,8 @@ export class Rennen {
     verbrauch(c, dt, this.T.laenge);
     const erg = boxDienst(c, this.T, dt);
     if (c.ich) {
-      if (erg === 'fertig') this.melden('Aufgetankt, neue Reifen – los!', 'beste');
-      if (c.sprit === 0 && !c.leerGemeldet) { c.leerGemeldet = true; this.melden('Tank leer! Ab in die Box', 'warn'); }
+      if (erg === 'fertig') this.melden('Aufgetankt, neue Reifen – los!', 'beste', ['aufgetankt']);
+      if (c.sprit === 0 && !c.leerGemeldet) { c.leerGemeldet = true; this.melden('Tank leer! Ab in die Box', 'warn', ['tank_leer']); }
       if (c.sprit > 0.5) c.leerGemeldet = false;
     } else if (c.ziel === null && (c.sprit < 0.22 || c.reifen < 0.25) && c.runde <= this.runden) c.boxWill = true;
     if (c.fahrer) c.fahrer.mal = Math.sqrt(reifenHalt(c));
@@ -239,7 +240,7 @@ export class Rennen {
         if (c.ziel !== null) a.gas = Math.min(a.gas, 0.4);
       }
       if (steht) { a.u = 0; a.drehzahl = 2000 + a.gas * 9000; continue; }
-      if (slotSchritt(c, T, dt, this.autos) === 'raus' && c.ich) this.melden('Zu schnell – rausgeflogen!', 'warn');
+      if (slotSchritt(c, T, dt, this.autos) === 'raus' && c.ich) this.melden('Zu schnell – rausgeflogen!', 'warn', ['rausgeflogen']);
     }
     const st = slotStoesse(this.autos, T);
     if (st > 0.3) this.beruehrt = Math.max(this.beruehrt || 0, st * 4);
@@ -285,7 +286,7 @@ export class Rennen {
       // (Drift-Matte: Wer quer rutscht, kommt weiter hinaus – erst ab der Mitte des Rand-Streifens zählt es)
       // Beim Formel-Rennwagen ist das abgeschaltet (Kristians Wunsch): Dort zählt jede Runde, auch mit einem Ausflug ins Gras.
       if (this.art !== 'f1' && !this.slot && !T.strasse && c.ich && this.modus === 'zeit' && c.runde > 0 && Math.abs(c.a.d) > T.hb[c.a.idx] + (this.drift ? 0.07 : 1.6 * this.sc + (T.kerbL[c.a.idx] || T.kerbR[c.a.idx] ? 1.2 * this.sc : 0))) {
-        if (c.gueltig) this.melden('Strecke verlassen – Runde zählt nicht', 'warn');
+        if (c.gueltig) this.melden('Strecke verlassen – Runde zählt nicht', 'warn', ['runde_ungueltig']);
         c.gueltig = false;
       }
       if (c.ich && this.modus === 'zeit' && c.runde > 0 && this.phase === 'los') this.geistAufnehmen(c);
@@ -297,7 +298,7 @@ export class Rennen {
           const neu = c.gueltig && (c.beste === null || t < c.beste);
           if (neu) c.beste = t;
           if (c.ich) {
-            this.melden((neu ? 'Bestzeit! ' : c.gueltig ? 'Runde ' : 'Ungültig: ') + zeitText(t), neu ? 'beste' : 'runde');
+            this.melden((neu ? 'Bestzeit! ' : c.gueltig ? 'Runde ' : 'Ungültig: ') + zeitText(t), neu ? 'beste' : 'runde', neu && c.zeiten.length > 1 ? ['bestzeit'] : null);
             if (neu && this.modus === 'zeit') this.neuerGeist(c, t);
           }
         }
@@ -307,9 +308,9 @@ export class Rennen {
         if (c.ich && this.modus === 'zeit') this.geist = { punkte: [], takt: 0, proS: [] };
         if (this.modus === 'rennen' && c.runde > this.runden && c.ziel === null) {
           c.ziel = this.zeit;
-          if (c.ich) this.melden('Ziel! Platz ' + (this.autos.filter(o => o.ziel !== null).length), 'ziel');
+          if (c.ich) { const platz = this.autos.filter(o => o.ziel !== null).length; this.melden('Ziel! Platz ' + platz, 'ziel', platz === 1 ? ['sieg'] : ['ziel', 'platz_' + platz]); }
           else if (!this.autos.some(o => o !== c && o.ziel !== null && o.ziel < c.ziel)) this.melden(c.name + ' gewinnt!', 'info');
-        } else if (c.ich && this.modus === 'rennen' && c.runde === this.runden && c.ziel === null) this.melden('Letzte Runde!', 'runde');
+        } else if (c.ich && this.modus === 'rennen' && c.runde === this.runden && c.ziel === null) this.melden('Letzte Runde!', 'runde', ['letzte_runde']);
       }
       c.prevS = s;
     }
