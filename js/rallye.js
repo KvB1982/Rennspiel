@@ -155,7 +155,7 @@ export function ansagenBauen(T, plan) {
     if (a.weiter && a.weiter > 300 && a.weiter < 400) a.weiter = 300;
     if (a.weiter && a.weiter > 400 && a.weiter < 500) a.weiter = 400;
   }
-  for (const a of liste) { a.text = ansageText(a); a.sprache = ansageSprache(a); }
+  for (const a of liste) { a.text = ansageText(a); a.sprache = ansageSprache(a); a.teile = ansageTeile(a); }
   return liste;
 }
 
@@ -189,6 +189,30 @@ function ansageSprache(a) {
   return w.join(' ');
 }
 
+// Dieselbe Ansage als Liste von Aufnahmen (sounds/stimme/beifahrer/<name>.mp3). Alle Namen, die hier vorkommen können,
+// stehen in BEIFAHRER_WORTE – tools/stimmen.mjs prüft, dass es jede Aufnahme gibt.
+export const BEIFAHRER_WORTE = [
+  ...['links', 'rechts'].flatMap(s => [1, 2, 3, 4, 5, 6, 'kehre'].map(g => s + '_' + g)),
+  'achtung', 'ueber_kuppe', 'lang', 'enger', 'oeffnet', 'nicht_schneiden', 'kuppe', 'sprung', 'sprung_gross', 'wasser', 'matsch', 'ziel', 'und',
+  ...Object.keys(WEITE).map(w => 'w' + w),
+  'z5', 'z4', 'z3', 'z2', 'z1', 'los', 'zwischenzeit_gut', 'zwischenzeit_schlecht', 'strafe', 'im_ziel',
+];
+function ansageTeile(a) {
+  const z = a.zusatz, w = [];
+  if (a.achtung) w.push('achtung');
+  if (a.art === 'kurve') {
+    if (z.includes('ueberKuppe')) w.push('ueber_kuppe');
+    w.push(a.seite + '_' + (z.includes('kehre') ? 'kehre' : a.grad));
+    if (z.includes('lang')) w.push('lang');
+    if (z.includes('enger')) w.push('enger');
+    if (z.includes('oeffnet')) w.push('oeffnet');
+    if (z.includes('nichtSchneiden')) w.push('nicht_schneiden');
+  } else w.push({ kuppe: 'kuppe', sprung: a.gross ? 'sprung_gross' : 'sprung', wasser: 'wasser', matsch: 'matsch', ziel: 'ziel' }[a.art]);
+  if (a.weiter === 'und') w.push('und');
+  else if (a.weiter && WEITE[a.weiter]) w.push('w' + a.weiter);
+  return w;
+}
+
 // Ansagen, die zusammen gesprochen werden ("Links 4 und rechts 3"): Gruppen bis zum nächsten Abstand
 export function ansageGruppen(liste) {
   const gruppen = []; let akt = null;
@@ -198,7 +222,7 @@ export function ansageGruppen(liste) {
     // höchstens drei Ansagen am Stück, sonst wird es zu viel zum Merken (der Rest kommt gleich danach)
     if (a.weiter !== 'und' || akt.teile.length >= 3) akt = null;
   }
-  for (const g of gruppen) g.sprache = g.teile.map(a => a.sprache).join(', ');
+  for (const g of gruppen) { g.sprache = g.teile.map(a => a.sprache).join(', '); g.worte = g.teile.flatMap(a => a.teile || []); }
   return gruppen;
 }
 
@@ -273,7 +297,7 @@ export class Etappe {
     aufStrecke(a, T, a.s, 0);
     a.y = T.y[a.idx];
     this.zeit += STRAFE; this.steckt = 0; this.wegListe = [];
-    this.melden(`Zurück auf den Weg (+${STRAFE} s)`, 'warn');
+    this.melden(`Zurück auf den Weg (+${STRAFE} s)`, 'warn', ['strafe']);
   }
 
   // Ist das Auto gegen einen Felsen gefahren? Dann zurückschieben und stark abbremsen
@@ -296,7 +320,8 @@ export class Etappe {
     }
   }
 
-  melden(text, art = 'info') { this.ereignisse.push({ text, art, t: this.uhr }); }
+  // stimme = Namen der Aufnahmen, die der Beifahrer dazu sagt (sounds/stimme/beifahrer/)
+  melden(text, art = 'info', stimme = null) { this.ereignisse.push({ text, art, t: this.uhr, stimme }); }
 
   update(dt, eingabe) {
     dt = Math.min(dt, 0.05);
@@ -306,10 +331,10 @@ export class Etappe {
       const vorher = Math.ceil(this.countdown);
       this.countdown -= dt;
       this.ampel = Math.max(0, Math.ceil(this.countdown));
-      if (Math.ceil(this.countdown) !== vorher && this.countdown > 0) this.melden(String(Math.ceil(this.countdown)), 'zaehlen');
+      if (Math.ceil(this.countdown) !== vorher && this.countdown > 0) this.melden(String(Math.ceil(this.countdown)), 'zaehlen', ['z' + Math.ceil(this.countdown)]);
       a.gas = eingabe.gas; a.brems = 0; a.lenkWunsch = eingabe.lenk;
       a.u = a.v = a.r = 0; a.drehzahl = 2500 + a.gas * 5200;
-      if (this.countdown <= 0) { this.phase = 'los'; this.zeit = 0; this.melden('Los!', 'start'); }
+      if (this.countdown <= 0) { this.phase = 'los'; this.zeit = 0; this.melden('Los!', 'start', ['los']); }
       this.vorlesen(a);
       return;
     }
@@ -349,13 +374,13 @@ export class Etappe {
           this.zw[k] = this.zeit;
           const best = Math.min(...this.rivalen.map(R => R.zw[k]));
           const ab = this.zeit - best;
-          this.melden(`Zwischenzeit ${k + 1}: ${zeitText(this.zeit)}  (${ab <= 0 ? '−' : '+'}${Math.abs(ab).toFixed(1)})`, ab <= 0 ? 'beste' : 'runde');
+          this.melden(`Zwischenzeit ${k + 1}: ${zeitText(this.zeit)}  (${ab <= 0 ? '−' : '+'}${Math.abs(ab).toFixed(1)})`, ab <= 0 ? 'beste' : 'runde', [ab <= 0 ? 'zwischenzeit_gut' : 'zwischenzeit_schlecht']);
         }
       });
       if (this.weg >= this.zielS) {
         c.ziel = this.zeit; c.letzte = this.zeit; this.phase = 'ziel'; this.zielUhr = this.uhr;
         this.plaetze();
-        this.melden(`Ziel! ${zeitText(this.zeit)} – Platz ${c.platz}`, 'ziel');
+        this.melden(`Ziel! ${zeitText(this.zeit)} – Platz ${c.platz}`, 'ziel', ['im_ziel']);
         if (!this.geistAlt || this.zeit < this.geistAlt.zeit) {
           this.geistAlt = { zeit: this.zeit, punkte: this.geist.punkte, proS: this.geist.proS };
           if (this.wennBestzeit) this.wennBestzeit(this.geistAlt);

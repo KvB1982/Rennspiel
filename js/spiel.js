@@ -13,10 +13,10 @@ import { ARTEN } from './verkehr.js';
 import { Kamera, SICHTEN } from './kamera.js';
 import { Eingabe } from './eingabe.js';
 import { LenkradEmpfang } from './verbindung.js';
-import { Klang } from './klang.js';
+import { Klang, SPRECHER_WORTE } from './klang.js';
 import { SUPERCARS, LACKE, supercar } from './supercars.js';
 import { inApp, istApfelGeraet, teilPlugin } from './native.js';
-import { zeitText as rallyeZeit } from './rallye.js';
+import { zeitText as rallyeZeit, BEIFAHRER_WORTE } from './rallye.js';
 import { baueRennen, TEMPO } from './rennbau.js';
 import { Rekorder, raster, SCHRITT, SCHRITTE_MAX } from './rekorder.js';
 import { Stand, PROFILE_MAX } from './stand.js';
@@ -28,7 +28,8 @@ const $ = id => document.getElementById(id);
 // ---------------------------------------------------------------- Einstellungen (werden im Browser gemerkt)
 const STANDARD = {
   fahrzeug: 'f1', modus: 'rennen', strecke: 'kueste', strecke_modell: 'wohnzimmer', strecke_slot: 'slot_oval', strecke_drift: 'drift_matte', strecke_super: 'metropole', strecke_rallye: 'wp_seen', tempo: 'mittel',
-  rallyeauto: 'sturmfalke', lack_rallye: 0, beifahrer: 'beides', kamera_rallye: 'hinten', kopfneigen: 'wenig',
+  rallyeauto: 'sturmfalke', lack_rallye: 0, beifahrer: 'beides', ansagen: 'an',   // ansagen: Der Streckensprecher sagt „Letzte Runde!“, „Bestzeit!“ …
+  kamera_rallye: 'hinten', kopfneigen: 'wenig',
   supercar: 'falkner', lack: 0, verkehr: 'normal', runden_super: 1, gegner_super: 5,
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
   kamera_klein: 'hinten',   // kleine Autos: hinter dem Auto, im Cockpit oder neben der Bahn stehen ('stand')
@@ -248,6 +249,7 @@ export function starteSpiel() {
       z.lastChild.appendChild(b);
     });
     ein.appendChild(z);
+    zeile('Ansagen (Stimme)', 'ansagen', [['an', 'an'], ['aus', 'aus']], !rallye);
     const ton = document.createElement('div'); ton.className = 'zeile';
     ton.innerHTML = `<span>Ton</span><div class="wahl"><button class="${klang.an ? 'an' : ''}">an</button><button class="${klang.an ? '' : 'an'}">aus</button></div>`;
     ton.querySelectorAll('button').forEach((b, k) => b.addEventListener('click', () => { klang.schalten(k === 0); menueBauen(); }));
@@ -340,6 +342,10 @@ export function starteSpiel() {
       const id = ganz ? RALLYE_FOLGE[app.rallyeStand.nr] : E[streckenFeld()];
       T = holeStrecke(id);
       if (sprecher) sprecher.stopp();
+      // Ton für diese Fahrt: der Motor des eigenen Autos und die Stimme (Rallye: Beifahrer, sonst Streckensprecher)
+      klang.schweigen();
+      klang.motorLaden(sup ? E.supercar : rallye ? E.rallyeauto : E.fahrzeug);
+      if (rallye) klang.stimmeLaden('beifahrer', BEIFAHRER_WORTE); else klang.stimmeLaden('sprecher', SPRECHER_WORTE);
       rennen = baueRennen(E, T, ganz ? app.rallyeStand.nr + 1 : 0);   // Auto, Gegner, Hilfen (js/rennbau.js)
       kurven = rennen.L && !modell && !rallye ? kurvenFinden(T, rennen.LS, rennen.ich.a.p) : null;
       // Aufnahme der Fahrt beginnt: alles aufschreiben, was man zum Nachfahren wissen muss
@@ -421,7 +427,7 @@ export function starteSpiel() {
     wachAus();
     if (sprecher) sprecher.stopp();
     zeige('hud', false); zeige('pause', false); zeige('ergebnis', false); zeige('menue', true);
-    klang.ruhe();   // im Menü ist alles still
+    klang.ruhe(); klang.schweigen();   // im Menü ist alles still
     menueBauen();
   }
   function pauseAn() { if (!laeuft) return; pausiert = true; zeige('pause', true); if (sprecher) sprecher.stopp(); }
@@ -568,8 +574,9 @@ export function starteSpiel() {
     while (R.ereignisse.length) {
       const m = R.ereignisse.shift();
       melden(m.text, m.art, m.art === 'ziel' ? 4 : m.art === 'turbo' ? 1 : 2);
-      if (m.art === 'start') klang.piep(1100, 0.4, 0.3);
-      if (m.art === 'beste') klang.piep(880, 0.25, 0.2);
+      if (m.stimme && E.ansagen !== 'aus') klang.sagen('sprecher', m.stimme);
+      if (m.art === 'start' || m.art === 'beste') klang.signal(m.art);
+      if (m.art === 'ziel') klang.signal('jubel');
       if (m.art === 'turbo') klang.turbo(R.ich.a.turboStufe || 1);
     }
     if (performance.now() > meldungBis) $('hMeldung').className = '';
@@ -651,9 +658,9 @@ export function starteSpiel() {
     while (R.ereignisse.length) {
       const m = R.ereignisse.shift();
       melden(m.text, m.art, m.art === 'ziel' ? 4 : m.art === 'zaehlen' ? 0.8 : 2.4);
-      if (m.art === 'zaehlen') klang.piep(660, 0.15, 0.25);
-      if (m.art === 'start') klang.piep(1100, 0.5, 0.3);
-      if (m.art === 'beste') klang.piep(880, 0.25, 0.2);
+      if (m.stimme && E.beifahrer === 'beides') klang.sagen('beifahrer', m.stimme, m.art === 'zaehlen' ? 1.1 : 1);
+      if (m.art === 'zaehlen' || m.art === 'start' || m.art === 'beste') klang.signal(m.art);
+      if (m.art === 'ziel') klang.signal('jubel');
     }
     if (performance.now() > meldungBis) $('hMeldung').className = '';
     // Karte
@@ -779,10 +786,10 @@ export function starteSpiel() {
       if (dienst && !app.warDienst) klang.box(klein);
       app.warDienst = dienst;
       // Ampel piept
-      if (R.phase === 'ampel' && R.ampel !== app.letzteAmpel) { if (R.ampel > 0) klang.piep(440, 0.15, 0.2); app.letzteAmpel = R.ampel; }
+      if (R.phase === 'ampel' && R.ampel !== app.letzteAmpel) { if (R.ampel > 0) klang.signal('ampel'); app.letzteAmpel = R.ampel; }
       if (R.phase === 'fertig' && !fertigGezeigt) { fertigGezeigt = true; const dieses = R; setTimeout(() => { if (laeuft && rennen === dieses) ergebnisZeigen(); }, 1200); }   // wer inzwischen im Menü ist oder neu gestartet hat, bekommt kein Ergebnis mehr darübergelegt
       // Rallye: Der Beifahrer liest die nächste Ansage vor
-      if (R.rallye && R.ansageNeu) { const g = R.ansageNeu; R.ansageNeu = null; if (E.beifahrer === 'beides') sprecher.sagen(g.sprache, g.s - R.weg); }
+      if (R.rallye && R.ansageNeu) { const g = R.ansageNeu; R.ansageNeu = null; if (E.beifahrer === 'beides' && !klang.sagen('beifahrer', g.worte, g.s - R.weg < 90 ? 1.12 : 1)) sprecher.sagen(g.sprache, g.s - R.weg); }   // zuerst die Aufnahmen; fehlt eine, liest die Stimme des Geräts
       }
     }
     kamera.update(dt, R.ich.a, { modell: !!T.def.modell, standorte: buehne.welt.standorte, massstab: T.sc, kopfMal: KOPF_STUFEN[E.kopfneigen] ?? 1 });

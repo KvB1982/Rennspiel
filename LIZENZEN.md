@@ -1,25 +1,21 @@
 # Quellen und Lizenzen
 
-## Geräusche
+## Geräusche und Stimmen
 
-Motor, Elektromotor, Reifenquietschen, Aufprall und Schlagschrauber sind Aufnahmen von [Freesound](https://freesound.org)
-unter **CC0** (Creative Commons Zero: gemeinfrei, frei nutzbar, auch ohne Namensnennung). Wir nennen die Urheber trotzdem gern.
-Für das Spiel wurden sie gekürzt, auf Mono umgerechnet, in der Lautstärke angeglichen und die Motor- und Quietsch-Stücke
-zu Schleifen geschnitten (Ende weich in den Anfang überblendet). Sie liegen im Ordner `sounds/`.
+Seit dem 27.11.2026 sind alle Geräusche und Stimmen im Ordner `sounds/` **selbst erzeugt** mit [3D AI Studio](https://www.3daistudio.com)
+(`generate_sound_effect` und `generate_speech`), also keine Aufnahmen von anderen Leuten mehr. Die früheren CC0-Aufnahmen von Freesound sind entfernt.
 
-| Datei | Wofür | Aufnahme | Urheber | Lizenz |
-| --- | --- | --- | --- | --- |
-| `f1_leerlauf.wav` | Rennwagen, niedrige Drehzahl (ganze Aufnahme, tiefes Brummen weggefiltert, schneller abgespielt) | [SFX_Car_Engine_Outside_RPMLow.wav](https://freesound.org/s/401556/) | GiocoSound | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
-| `f1_hoch.wav` | Rennwagen, hohe Drehzahl (ganze Aufnahme, tiefes Brummen weggefiltert, schneller abgespielt) | [SFX_Car_Engine_Outside_RPMHigh.wav](https://freesound.org/s/401551/) | GiocoSound | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
-| `elektromotor.wav` | Modellauto und Slotcar (Sekunde 15,5–17,2) | [ElectricMotor.wav](https://freesound.org/s/824119/) | derjuli | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
-| `reifen_quietschen.wav` | rutschende Reifen (Sekunde 27,7–29,1) | [screeching tyres / tires](https://freesound.org/s/614627/) | johnnydekk | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
-| `aufprall_gross.wav` | harter Einschlag des Rennwagens | [Car Crash](https://freesound.org/s/237375/) | squareal | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
-| `aufprall_klein.wav` | leichter Stoß des Rennwagens | [metal_collision.wav](https://freesound.org/s/386798/) | RichieMcMullen | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
-| `aufprall_plastik.wav` | kleine Autos stoßen an oder fliegen raus | [Plastic Toy Car Crash / Impact](https://freesound.org/s/566117/) | SpeedyVelcro | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
-| `schlagschrauber.wav` | Boxenstopp | [Air Impact Wrench](https://freesound.org/s/349398/) | sevenbsb | [CC0](http://creativecommons.org/publicdomain/zero/1.0/) |
+| Ordner oder Datei | Wofür | Wie erzeugt |
+| --- | --- | --- |
+| `sounds/motor/<auto>_tief.wav`, `_hoch.wav` | Motor je Auto bei niedriger und hoher Drehzahl (Rennwagen, sieben Supercars, drei Rallyeautos), `elektro.wav` (ferngesteuertes Auto, Drift-Rallye), `slot.wav` (Slotcar) | Geräusch-Erzeuger, mit `tools/klang_bau/schleife.py` zu Schleifen geschnitten |
+| `sounds/reifen_quietschen.wav`, `wind.wav`, `gras.wav`, `schotter.wav`, `wasser.wav` | Schleifen für Reifen, Fahrtwind und Untergrund | wie oben |
+| `sounds/aufprall_*.mp3`, `landung.mp3`, `schlagschrauber.mp3`, `turbo.mp3`, `ampel.mp3`, `start.mp3`, `bestzeit.mp3`, `jubel.mp3` | einzelne Geräusche | Geräusch-Erzeuger, mit `tools/klang_bau/einzeln.py` zugeschnitten |
+| `sounds/stimme/beifahrer/*.mp3` | Beifahrer in der Rallye (45 Ansagen, Stimme „Roger“, Deutsch) | Sprach-Erzeuger, mit `tools/klang_bau/stimmen.py` an den Pausen zerschnitten |
+| `sounds/stimme/sprecher/*.mp3` | Streckensprecher (21 Ansagen, Stimme „Daniel“, Deutsch) | wie oben |
 
-Wind, Rumpeln auf Gras und Kies, die Piep-Töne der Startampel und alle Rückfall-Töne (solange die Aufnahmen laden oder wenn sie fehlen)
-erzeugt das Spiel selbst (`js/klang.js`).
+Die Stimmen sind eingebaute Stimmen des Erzeugers, keine echte Person wird nachgemacht. Die Motoren sind nach Beschreibung erzeugt
+(zum Beispiel „Zwölfzylinder-Saugmotor, hohe Drehzahl“), keine Aufnahme eines echten Autos.
+Solange die Aufnahmen laden oder wenn sie fehlen, erzeugt das Spiel die Töne selbst (`js/klang.js`).
 
 ## 3D-Modelle
 
