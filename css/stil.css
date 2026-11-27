@@ -102,7 +102,6 @@ body.verbunden #hlStatus { color: var(--gruen); }
 #hlInfo { flex: 1; text-align: center; font-weight: bold; }
 .hlKnoepfe { display: flex; gap: 8px; }
 .hlKnoepfe button { background: #232a35; border: 1px solid #344052; border-radius: 12px; padding: 0 12px; min-height: 46px; min-width: 46px; font-size: 14px; white-space: nowrap; touch-action: none; position: relative; }
-.hlKnoepfe button::after { content: ''; position: absolute; inset: -6px -4px -12px; }   /* unsichtbarer Rand: Man trifft den Knopf auch, wenn man knapp daneben tippt */
 #hlStatus { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 760px) { .hlKnoepfe { gap: 6px; } .hlKnoepfe button { padding: 0 8px; font-size: 13px; } }
 .hlKnoepfe button.gedrueckt { background: #3d6ea8; border-color: #8fc0ff; }

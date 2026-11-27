@@ -468,11 +468,21 @@ export function starteSpiel() {
     else if (a === 'weiter') { app.rallyeStand.nr++; starten(); }
     else if (a === 'menue') zumMenue();
   });
-  // Die zwei Knöpfe während der Fahrt gehen schon beim Berühren los: Liegt beim Neigen ein Daumen auf Gas oder Bremse,
+  // Die zwei Knöpfe während der Fahrt achten selbst auf den Finger: Liegt beim Neigen ein Daumen auf Gas oder Bremse,
   // kommt auf iPhone und iPad sonst oft gar kein „Klick“ an.
+  // Seit 27.11.2026 abends zählt nur ein kurzer Tipp (aufsetzen und innerhalb einer halben Sekunde auf dem Knopf loslassen),
+  // nicht mehr die bloße Berührung – sonst löst eine Hand am Rand des Geräts die Knöpfe aus Versehen aus.
   const tipp = (b, tun) => {
-    let eben = 0;
-    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); eben = performance.now(); tun(); });
+    let f = null, eben = 0;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); f = { id: e.pointerId, t: performance.now(), x: e.clientX, y: e.clientY }; });
+    const hoch = e => {
+      if (!f || e.pointerId !== f.id) return;
+      const r = b.getBoundingClientRect(), drin = e.clientX >= r.left - 6 && e.clientX <= r.right + 6 && e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6;
+      const ok = e.type === 'pointerup' && drin && performance.now() - f.t <= 500 && Math.hypot(e.clientX - f.x, e.clientY - f.y) <= 24;
+      f = null; eben = performance.now();
+      if (ok) tun();
+    };
+    window.addEventListener('pointerup', hoch); window.addEventListener('pointercancel', hoch);
     b.addEventListener('click', () => { if (performance.now() - eben > 700) tun(); });
   };
   tipp($('hPause'), () => pausiert ? pauseAus() : pauseAn());

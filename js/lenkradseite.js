@@ -48,6 +48,9 @@ export function lenkradStarten(code, lokal, nah = false) {
 
   const sender = new LenkradSender(code, lokal, nah);
   const neig = new Neigung();
+  // Einmalig (27.11.2026): Empfindlichkeit zurück auf die mittlere Stufe (70°). Einen Tag lang ging der Knopf 🎚 schon bei
+  // bloßer Berührung los – gut möglich, dass sie dabei aus Versehen verstellt wurde. Danach gilt wieder, was man selbst wählt.
+  try { if (!localStorage.getItem('rennspiel.empf.zurueck1')) { neig.stufe = 3; localStorage.setItem('rennspiel.empf', 3); localStorage.setItem('rennspiel.empf.zurueck1', '1'); } } catch (e) {}
   const zustand = { gas: 0, brems: 0 };
   const statusText = {
     suchen: nah ? 'Suche ein iPad mit dem Rennspiel …' : 'Suche das Spiel …', nichtGefunden: 'Spiel mit Code ' + (code || '').toUpperCase() + ' nicht gefunden – ist es offen?',
@@ -104,13 +107,24 @@ export function lenkradStarten(code, lokal, nah = false) {
   document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
   document.addEventListener('gesturestart', e => e.preventDefault());
 
-  // Knöpfe oben: Sie gehen schon los, wenn der Finger sie berührt (nicht erst beim Loslassen).
-  // Grund: Ein „Klick“ kommt auf dem iPhone oft gar nicht an, wenn schon ein Daumen auf Gas oder Bremse liegt
-  // oder der Finger beim Tippen ein kleines Stück rutscht – und beim Lenken wackelt das Handy ja immer.
+  // Knöpfe oben: Ein Knopf zählt, wenn ein Finger ihn kurz antippt – also auf dem Knopf aufsetzt UND dort innerhalb einer
+  // halben Sekunde wieder loslässt. Das Spiel schaut dabei selbst auf den Finger und wartet nicht auf einen „Klick“ vom iPhone:
+  // Der kommt oft nicht an, wenn schon ein Daumen auf Gas oder Bremse liegt.
+  // Wichtig (27.11.2026): Eine bloße Berührung reicht NICHT. Sonst stellt ein Finger, der beim Halten oben am Rand liegt oder
+  // dort entlangstreift, aus Versehen die Mitte oder die Empfindlichkeit (🎚) um – und dann ist die Lenkung plötzlich ganz anders.
+  const TIPP_LANG = 500, TIPP_WEIT = 24;   // höchstens so lange (ms) und so weit gerutscht (Bildpunkte)
   const tipp = (b, tun) => {
-    let eben = 0;
-    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); eben = performance.now(); b.classList.add('gedrueckt'); setTimeout(() => b.classList.remove('gedrueckt'), 180); tun(); });
-    b.addEventListener('click', () => { if (performance.now() - eben > 700) tun(); });   // Tastatur oder Geräte ohne Finger
+    let f = null, eben = 0;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); f = { id: e.pointerId, t: performance.now(), x: e.clientX, y: e.clientY }; b.classList.add('gedrueckt'); });
+    const hoch = e => {
+      if (!f || e.pointerId !== f.id) return;
+      const r = b.getBoundingClientRect(), drin = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      const ok = e.type === 'pointerup' && drin && performance.now() - f.t <= TIPP_LANG && Math.hypot(e.clientX - f.x, e.clientY - f.y) <= TIPP_WEIT;
+      f = null; eben = performance.now(); b.classList.remove('gedrueckt');
+      if (ok) tun();
+    };
+    window.addEventListener('pointerup', hoch); window.addEventListener('pointercancel', hoch);
+    b.addEventListener('click', () => { if (performance.now() - eben > 700) tun(); });   // nur für die Tastatur: Nach einem Finger zählt der Klick nicht noch einmal
   };
   document.querySelectorAll('[data-k]').forEach(b => tipp(b, () => { sender.senden({ t: 'k', k: b.dataset.k }); if (inApp) ruetteln(0.2); else if (navigator.vibrate) navigator.vibrate(15); }));
   tipp($('hlMitte'), () => { neig.kalibrieren(); });

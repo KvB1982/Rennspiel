@@ -519,7 +519,10 @@ export function schritt(a, T, dt) {
     // Das Auto neigt sich mit der Straße: bergab zeigt die Nase nach unten, bergauf nach oben (nur fürs Bild und die Kamera).
     // Fährt man falsch herum, ist bergauf und bergab vertauscht.
     const lang = Math.sin(a.h) * f2.tx + Math.cos(a.h) * f2.tz;
-    a.nick = (a.nick || 0) + ((T.steig ? T.steig[f2.i] : 0) * lang - (a.nick || 0)) * Math.min(1, dt * 8);
+    // Der Formel-Rennwagen macht das NICHT mit (seit 27.11.2026 abends): Kristian fand den Formel-Stand vom 25.11.2026 gut,
+    // dort blieben Auto und Blick waagerecht – so ist es für ihn wieder.
+    if (a.art === 'f1') a.nick = 0;
+    else a.nick = (a.nick || 0) + ((T.steig ? T.steig[f2.i] : 0) * lang - (a.nick || 0)) * Math.min(1, dt * 8);
   }
 
   // DRIFT ZUM SELBER-STEUERN (Rallye, nur mit Arcade-Hilfe): Die Reifen halten das Auto sicher auf dem Weg – aber im Bild
