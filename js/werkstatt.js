@@ -67,10 +67,51 @@ const FORMEL_ECHT = [
   { pfad: 'zugGriff', mal: true, mehr: true, von: 0.5, bis: 1.5, schritt: 0.01, name: 'Halt beim Beschleunigen', text: 'Mehr = die Räder drehen beim Gasgeben später durch.' },
 ];
 
-// Welche Regler gibt es für welches Fahrzeug und Fahrgefühl? (Rallye kommt dazu, sobald ihre Abstimmung fertig ist.)
+// Regler für die Rallyeautos in Arcade und „echter“ (auch hier ist „echter“ dieselbe Hilfe mit anderen Start-Werten).
+// Die ersten Regler sind dieselben wie bei den Supercars, dazu kommt alles, was es nur in der Rallye gibt.
+const nimm = (...pfade) => pfade.map(pf => ({ ...ARCADE.find(r => r.pfad === pf), mehr: false }));
+const RALLYE = [
+  ...nimm('haft', 'hinten', 'lenkMax', 'arcade.lenk', 'bremsGriff', 'schub', 'arcade.frei'),
+  { pfad: 'arcade.freiHand', grad: true, von: 0.1, bis: 1.2, schritt: 0.01, name: 'Erlaubter Drift mit Handbremse', text: 'So weit darf das Auto mit gezogener Handbremse quer rutschen.' },
+  { pfad: 'arcade.drift.winkel', grad: true, von: 0, bis: 0.9, schritt: 0.01, name: 'Drift im Bild', text: 'So weit stellt sich das Auto in harten Kurven quer (nur fürs Auge, die Reifen halten weiter). 0 = aus.' },
+  { pfad: 'arcade.rand', von: 0, bis: 6, schritt: 0.1, name: 'Führung am Wegrand', text: 'Die unsichtbare Hand, die das Auto vom Rand wegdreht. 0 = aus.' },
+  { pfad: 'arcade.spur', von: 0, bis: 4, schritt: 0.1, name: 'Spur-Helfer', text: 'Dreht das Auto langsam in Richtung des Wegs. 0 = aus.' },
+  ...nimm('arcade.ein', 'arcade.fang', 'arcade.kurve'),
+  { pfad: 'arcade.halt', mehr: true, von: 0, bis: 15, schritt: 0.1, name: 'Zurückholen aus dem Drift', text: 'Wie kräftig der Computer das Auto zurückholt, wenn es weiter rutscht als erlaubt.' },
+  { pfad: 'arcade.belag', mehr: true, von: 0, bis: 1, schritt: 0.05, name: 'Hilfe auf losem Boden', text: 'So viel vom fehlenden Halt auf Schotter und Wasser gleicht der Computer aus. 0 = der Boden rutscht voll.' },
+  { pfad: 'arcade.kreis', mehr: true, von: 3, bis: 12, schritt: 0.1, name: 'Engster Kreis (Meter)', text: 'Kleiner = das Auto dreht beim Fahren enger.' },
+  { pfad: 'arcade.unter.ab', mehr: true, von: 0.1, bis: 1, schritt: 0.01, name: 'Bremst von selbst ab so viel Lenkrad', text: 'Zu schnell und das Lenkrad weiter eingeschlagen als das: Das Auto nimmt Gas weg und bremst mit. 1 = praktisch aus.' },
+  { pfad: 'arcade.drift.hand', grad: true, mehr: true, von: 0, bis: 1.3, schritt: 0.01, name: 'Drift im Bild mit Handbremse', text: 'So weit stellt sich das Auto mit Handbremse quer (nur fürs Auge).' },
+  { pfad: 'arcade.fall', mehr: true, von: 1, bis: 3, schritt: 0.05, name: 'Sprünge: Fallen', text: 'Mehr = das Auto fällt schneller, Sprünge sind kürzer.' },
+  ...ARCADE.filter(r => ['arcade.griff', 'arcade.folgen', 'arcade.zug', 'lenkTempo', 'esp.beta', 'zugGriff'].includes(r.pfad)),
+];
+
+// Regler für das neue, schlichte Fahrmodell der Rallye (Fahrgefühl „Neu“): echtes Rutschen, keine ziehenden Hilfen
+const RALLYE_NEU = [
+  { pfad: 'schlicht.haft', von: 0.8, bis: 1.8, schritt: 0.01, name: 'Reifenhaftung', text: 'Mehr = schneller durch die Kurve, das Auto rutscht später.' },
+  { pfad: 'schlicht.belag', von: 0, bis: 1, schritt: 0.05, name: 'Loser Boden rutscht', text: 'Mehr = Schotter und Wasser haben spürbar weniger Halt als Asphalt. 0 = überall gleich.' },
+  { pfad: 'schlicht.direkt', von: 1, bis: 8, schritt: 0.1, name: 'Lenk-Direktheit', text: 'Mehr = schon wenig Lenkrad bringt die engste Kurve, die die Reifen können.' },
+  { pfad: 'schlicht.kreis', von: 4, bis: 12, schritt: 0.1, name: 'Engster Kreis (Meter)', text: 'Kleiner = das Auto dreht bei wenig Tempo enger.' },
+  { pfad: 'schlicht.querAb', von: 0.2, bis: 0.95, schritt: 0.01, name: 'Drift beginnt ab so viel Lenkrad', text: 'Erst wer weiter einlenkt als das und Gas gibt, bringt das Heck herum. Kleiner = driftet früher.' },
+  { pfad: 'schlicht.dreh', von: 1, bis: 3, schritt: 0.05, name: 'Wie weit das Heck kommt', text: 'Mehr = größerer Drift-Winkel. 1 = kein Drift.' },
+  { pfad: 'schlicht.gas', von: 0, bis: 1.5, schritt: 0.05, name: 'Gas drückt das Heck herum', text: 'Mehr = mit Vollgas wird der Drift noch weiter.' },
+  { pfad: 'schlicht.stabil', von: 0, bis: 4, schritt: 0.1, name: 'Geradestellen', text: 'Mehr = das Auto stellt sich schneller von selbst wieder gerade.' },
+  { pfad: 'schlicht.brems', von: 0.8, bis: 3, schritt: 0.05, name: 'Bremskraft', text: 'Mehr = kürzerer Bremsweg.' },
+  { pfad: 'schlicht.zug', von: 1, bis: 3, schritt: 0.05, name: 'Antritt', text: 'Mehr = das Auto beschleunigt stärker (so viel halten die Reifen beim Gasgeben aus).' },
+  { pfad: 'schlicht.zugQuer', von: 0, bis: 1, schritt: 0.05, name: 'Zugkraft im Drift', text: 'So viel Motorkraft bleibt, wenn das Auto quer rutscht. Mehr = der Drift kostet weniger Tempo.' },
+  { pfad: 'schlicht.kurve', von: 0.8, bis: 1.3, schritt: 0.01, name: 'Bremshilfe: Tempo in der Kurve', text: 'Nur mit Bremshilfe: Mehr = sie lässt dich schneller in die Kurve.' },
+  { pfad: 'schlicht.driftAuf', mehr: true, von: 1, bis: 10, schritt: 0.1, name: 'Drift baut sich auf', text: 'Mehr = das Heck kommt schneller.' },
+  { pfad: 'schlicht.driftAb', mehr: true, von: 2, bis: 15, schritt: 0.1, name: 'Drift hört auf', text: 'Mehr = das Heck kommt schneller zurück, wenn du gegenlenkst oder vom Gas gehst.' },
+  { pfad: 'schlicht.handDreh', mehr: true, von: 1, bis: 3, schritt: 0.05, name: 'Handbremse: Eindrehen', text: 'Mehr = die Handbremse wirft das Heck weiter herum.' },
+  { pfad: 'schlicht.handBrems', mehr: true, von: 0, bis: 1, schritt: 0.05, name: 'Handbremse: Bremsen', text: 'So stark bremst die Handbremse dabei.' },
+  { pfad: 'schub', mal: true, mehr: true, sonst: 1, von: 0.5, bis: 1.5, schritt: 0.01, name: 'Motorkraft', text: 'Mehr = mehr Kraft bei hohem Tempo.' },
+];
+
+// Welche Regler gibt es für welches Fahrzeug und Fahrgefühl?
 export const REGLER = {
   f1: { arcade: ARCADE, echt: FORMEL_ECHT },
   super: { arcade: ARCADE, echt: ARCADE },
+  rallye: { arcade: RALLYE, echt: RALLYE, neu: RALLYE_NEU },
 };
 
 export const GEFUEHL_NAME = { arcade: 'Arcade', echt: 'echter', neu: 'Neu' };
