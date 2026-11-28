@@ -165,6 +165,8 @@ export class Buehne {
     this.welt = def.rallye ? baueWpWelt(T, s, { qualitaet: this.qualitaet, etappe }) : baueWelt(T, s, { qualitaet: this.qualitaet });
     this.etappe = etappe;
     this.spritzer = def.rallye ? new Spritzer(s, { staubFarbe: def.welt.wald === 'laub' ? 0x8f7a5c : def.welt.wald === 'berg' ? 0xb0aa9c : 0xcbb894, viel: this.qualitaet === 'hoch' ? 1 : this.qualitaet === 'mittel' ? 0.65 : 0.35 }) : null;
+    // Rallye: kein Gummi auf dem Weg – aber Ideallinie und rote Bremszonen gibt es auch hier (wenn im Menü an)
+    const rallyeL = def.rallye ? L : null;
     if (def.rallye) { L = null; s.fog.near = st.nebelNah ?? 150; }
     if (T.strasse || def.weit) {
       // Straßen-Strecken (und die ganz lange Rennstrecke) sind riesig: weiter sehen, die Berge am Horizont nur leicht im Dunst
@@ -175,6 +177,10 @@ export class Buehne {
     this.verkehrBild = verkehr ? new VerkehrBild(s, verkehr, { abend: istDunkel(def), kamera: this.kamera }) : null;
     if (L) gummiAuftragen(this.welt, T, L);
     if (L && linie && !modell) linieZeigen(this.welt, T, L);
+    // (Der Schotterweg ist in der Mitte etwas höher als am Rand, deshalb folgt die Linie dieser Wölbung. Auf losem Boden
+    // sieht man sie schlechter als auf Asphalt, darum ist sie hier kräftiger. Bremszonen unter 12 m fallen weg: Der Tempo-Plan
+    // der Rallye hat an Bodenwellen viele winzige Bremsstücke.)
+    if (rallyeL && linie) linieZeigen(this.welt, T, rallyeL, { hoch: (l, i) => -((l / T.hb[i]) ** 2) * 0.07, kraeftig: true, kurz: Math.round(12 / (T.laenge / T.n)) });
     if (modell) {
       const g = this.welt.grenzen;
       this.decke.position.set(g.mx, 2.6, g.mz);
