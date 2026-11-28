@@ -16,6 +16,7 @@ import { STRECKEN } from '../js/strecken.js';
 import { baueStrecke } from '../js/strecke.js';
 import { aufStrecke } from '../js/physik.js';
 import { baueRennen } from '../js/rennbau.js';
+import { reglerFuer, schluessel, verstellt, anzeige, stellung, grundStellung } from '../js/werkstatt.js';
 import { auspacken } from '../js/rekorder.js';
 
 const args = process.argv.slice(2);
@@ -49,6 +50,16 @@ const quelle = Object.entries(quellen).sort((a, b) => b[1] - a[1]).map(([q, n]) 
 console.log(`\n=== Fahrt vom ${String(P.wann).replace('T', ' ').slice(0, 16)} (Weltzeit) ===`);
 console.log(`Strecke ${def.name} (${P.strecke}), Auto ${auto}, ${E.fahrzeug === 'rallye' ? 'Rallye' : E.modus === 'zeit' ? 'Zeitfahren' : 'Rennen mit ' + (E.fahrzeug === 'super' ? E.gegner_super : E.gegner) + ' Gegnern'}`);
 console.log(`Fahrgefühl ${E.arcade === 'neu' ? 'Neu' : E.arcade !== false ? 'Arcade' : 'echter'}, Bremshilfe ${E.bremshilfe ? 'an' : 'aus'}, Lenkhilfe ${E.lenkhilfe ? 'an' : 'aus'}, Traktion ${E.traktion ? 'an' : 'aus'}, Gas von allein ${E.autogas ? 'an' : 'aus'}`);
+// Werkstatt: selbst verstellte Regler dieser Fahrt (gelten nur für das eigene Auto, siehe js/werkstatt.js)
+{
+  const liste = reglerFuer(E), werte = E.werkstatt && E.werkstatt[schluessel(E)];
+  if (verstellt(E)) {
+    const p0 = neuesAuto(E.fahrzeug === 'super' ? E.supercar : E.fahrzeug === 'rallye' ? E.rallyeauto : E.fahrzeug).p;
+    const pG = E.arcade === false && p0.echtHilfe ? { ...p0, arcade: { ...p0.arcade, ...p0.echtHilfe } } : p0;
+    console.log('Werkstatt (eigene Werte): ' + liste.filter(r => typeof werte[r.pfad] === 'number').map(r => `${r.name} ${anzeige(pG, r, stellung(pG, r, werte))} (gebaut ${anzeige(pG, r, grundStellung(pG, r))})`).join(', ')
+      + (P.werkstattUnterwegs ? '\n  Achtung: Die Regler wurden während dieser Fahrt verstellt. Nachgefahren wird mit den Werten vom Ende, das passt nur ungefähr.' : ''));
+  } else console.log('Werkstatt: nichts verstellt');
+}
 console.log(`Steuerung: ${quelle}${F.neig ? ' (Neige-Stufe ' + E.neigStufe + ')' : ''} · Grafik ${E.grafik} · Kamera ${E.fahrzeug === 'rallye' ? E.kamera_rallye : T.def.modell ? E.kamera_klein : E.kamera}`);
 if (P.geraet) console.log(`Gerät: ${P.geraet.app ? 'App' : 'Browser'}, ${P.geraet.breite} × ${P.geraet.hoehe} Punkte (mal ${P.geraet.punkte}) · ${String(P.geraet.ua).slice(0, 90)}`);
 console.log(`Aufnahme: ${zeit(dauer)} lang, ${F.n} ${F.schritt ? "Rechenschritte von 1/120 s" : "Bilder"}${P.abgeschnitten ? ' (nach 20 Minuten abgeschnitten)' : ''}`);

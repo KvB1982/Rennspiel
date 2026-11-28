@@ -6,6 +6,7 @@ import { Rennen } from './rennen.js';
 import { Etappe } from './rallye.js';
 import { LACKE } from './supercars.js';
 import { linieFuer } from './ki.js';
+import { werkstattAnwenden } from './werkstatt.js';
 
 // Höchsttempo der kleinen Autos in Metern pro Sekunde. 1,8 m/s sehen beim Maßstab 1:30 aus wie knapp 200 km/h.
 // (Ferngesteuertes Auto: Das ist das Tempo auf der Geraden – in den Kurven bestimmt die Haftung, wie schnell es geht.)
@@ -37,5 +38,8 @@ export function baueRennen(E, T, rallyeNr = 0) {
     const a = rennen.ich.a;
     a.p = { ...a.p, arcade: { ...a.p.arcade, ...a.p.echtHilfe } }; a.arcade = true; a.sport = true;
   }
+  // Werkstatt: Hat man für dieses Fahrzeug und Fahrgefühl Regler verstellt (E.werkstatt), bekommt dein Auto diese Werte.
+  // Ohne verstellte Regler ändert das nichts (siehe js/werkstatt.js).
+  werkstattAnwenden(rennen, E, T);
   return rennen;
 }
