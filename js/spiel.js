@@ -450,12 +450,10 @@ export function starteSpiel() {
     box.textContent = '';
     for (const b of $('wkKnoepfe').querySelectorAll('[data-a=neu], [data-a=alles]')) b.hidden = !liste;
     if (!liste) {
-      $('wkHinweis').textContent = E.fahrzeug === 'rallye'
-        ? 'Die Regler für die Rallye kommen, sobald ihre neue Abstimmung fertig ist. Für Formel-Rennwagen und Supercars gibt es sie schon.'
-        : 'Für dieses Fahrzeug gibt es noch keine Regler. Für Formel-Rennwagen und Supercars gibt es sie schon.';
+      $('wkHinweis').textContent = 'Für dieses Fahrzeug gibt es noch keine Regler. Für Formel-Rennwagen, Supercars und Rallyeautos gibt es sie schon.';
       return;
     }
-    $('wkHinweis').textContent = 'Jeder Regler wirkt sofort und nur auf dein Auto. Gelb = von dir verstellt, ↺ stellt zurück. Die roten Bremszonen auf der Straße passen erst nach „Neu starten“.';
+    $('wkHinweis').textContent = 'Jeder Regler wirkt sofort und nur auf dein Auto. Gelb = von dir verstellt, ↺ stellt zurück. ' + (E.fahrzeug === 'rallye' ? 'Bremszonen und Bremshilfe rechnen in der Rallye weiter mit dem gebauten Auto.' : 'Die roten Bremszonen auf der Straße passen erst nach „Neu starten“.');
     const p = rennen.ich.a.pGrund || rennen.ich.a.p;
     const werte = () => E.werkstatt[schluessel(E)] || {};                                  // nur lesen
     const zumSchreiben = () => E.werkstatt[schluessel(E)] || (E.werkstatt[schluessel(E)] = {});
