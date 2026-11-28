@@ -196,6 +196,8 @@ export function schritt(a, T, dt) {
   if (T.pfuetzen && T.pfuetzen.length && ad < hb + 1 && inPfuetze(T, f.s, f.d)) a.grund = BELAG.wasser;
   // In der Luft (nach einer Kuppe) haben die Reifen keinen Halt: kein Lenken, kein Gas, keine Bremse
   let gr = a.luft ? IN_DER_LUFT : GRUND[a.grund] || GRUND[BELAG.asphalt];
+  // Rallyeautos (nebenFrei): Neben dem Weg fährt das Auto ganz normal weiter – der Boden dort zählt wie der Weg selbst.
+  if (p.nebenFrei && !a.luft && ad >= hb && a.grund !== BELAG.wasser) gr = GRUND[T.belag ? T.belag[f.i] : BELAG.asphalt] || GRUND[BELAG.asphalt];
   // „echter“: Auf Gras und Kies rutscht das Auto nicht ganz so schlimm weg, damit man nach einem Ausrutscher wieder zurückfindet
   if (!a.arcade && p.echt && p.echt.neben && gr.haft < p.echt.neben) gr = { haft: p.echt.neben, zieh: gr.zieh };
 
@@ -674,7 +676,9 @@ function schlichtSchritt(a, gr, dt, nebenZug) {
       // Wer noch weiter einlenkt, dreht die Nase weiter hinein, als das Auto fahren kann: Das Heck kommt, das Auto driftet
       // (dreh, mit Gas noch mehr). Mit Handbremse fliegt das Heck sofort herum.
       const grenz = halt / Math.max(au, 2), kante = 1 / S.direkt;
-      const lin = Math.min(1, Math.abs(w) * S.direkt), ueber = Math.max(0, Math.abs(w) - kante) / (1 - kante);
+      // Das Heck kommt nur, wenn man stark einlenkt (mehr als querAb) UND Gas gibt. Ohne Gas lenkt das Auto ganz normal.
+      const ab = S.querAb ?? kante;
+      const lin = Math.min(1, Math.abs(w) * S.direkt), ueber = Math.max(0, Math.abs(w) - ab) / (1 - ab) * (S.querAb ? Math.max(0, a.gas) : 1);
       // Das Heck braucht einen Moment, bis es kommt (driftAuf), und fängt sich schneller wieder (driftAb): Ein kurzer Ruck am
       // Lenkrad stellt das Auto deshalb nicht gleich quer – wer das Lenkrad hält, driftet.
       a.heck = (a.heck || 0) + (ueber - (a.heck || 0)) * Math.min(1, h * (ueber > (a.heck || 0) ? S.driftAuf : S.driftAb));

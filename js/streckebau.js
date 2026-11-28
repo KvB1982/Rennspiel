@@ -370,17 +370,19 @@ function baueBox(T, gruppe) {
 
 // Ideallinie und Bremszonen auf die Fahrbahn malen (Fahrhilfe für den Rennwagen):
 // ganz zart hellblau die beste Linie, kräftig rot die Stücke, auf denen man bremsen muss.
-export function linieZeigen(welt, T, L) {
+export function linieZeigen(welt, T, L, { hoch = null, kraeftig = false, kurz = 3 } = {}) {
   const n = T.n, ds = T.laenge / n;
   // gebremst wird dort, wo der Tempo-Plan deutlich langsamer wird (mehr als 5 m/s² Verzögerung)
   const bremst = i => { const v0 = L.tempo[i], v1 = L.tempo[(i + 1) % n]; return (v0 * v0 - v1 * v1) / (2 * ds) > 5; };
-  const zart = new THREE.MeshBasicMaterial({ color: 0x9fdcff, transparent: true, opacity: 0.16, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
-  const rot = new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -5 });
+  const zart = new THREE.MeshBasicMaterial({ color: 0x9fdcff, transparent: true, opacity: kraeftig ? 0.32 : 0.16, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
+  const rot = new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: kraeftig ? 0.6 : 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -5 });
+  // hoch(l, i) = so viel höher oder tiefer liegt die Fahrbahn an dieser Stelle (Rallye: der Weg ist gewölbt)
+  const h = (i, l, dazu) => (hoch ? hoch(l, i) : 0) + dazu;
   const g = new THREE.Group();
-  g.add(mesh(band(T, 0, n, 1, (i, j) => L.off[i] + (j - 0.5) * 0.7, () => 0.02), zart, false, false));
+  g.add(mesh(band(T, 0, n, 1, (i, j) => L.off[i] + (j - 0.5) * 0.7, (i, j, l) => h(i, l, 0.02)), zart, false, false));
   for (const [von, bis] of abschnitte(n, bremst)) {
-    if (bis - von < 3) continue;
-    g.add(mesh(band(T, von, bis, 1, (i, j) => L.off[i] + (j - 0.5) * 1.1, () => 0.03), rot, false, false));
+    if (bis - von < kurz) continue;   // ganz kurze Stücke weglassen (sonst flimmern lauter rote Krümel)
+    g.add(mesh(band(T, von, bis, 1, (i, j) => L.off[i] + (j - 0.5) * 1.1, (i, j, l) => h(i, l, 0.03)), rot, false, false));
   }
   welt.gruppe.add(g);
   welt.linie = g;
