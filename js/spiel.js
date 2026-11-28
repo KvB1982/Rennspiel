@@ -21,6 +21,7 @@ import { baueRennen, TEMPO } from './rennbau.js';
 import { Rekorder, raster, SCHRITT, SCHRITTE_MAX } from './rekorder.js';
 import { Stand, PROFILE_MAX } from './stand.js';
 import { RALLYEAUTOS, rallyeauto } from './rallyeautos.js';
+import { reglerFuer, schluessel, gefuehlVon, verstellt, stellung, grundStellung, wertBei, anzeige, werkstattAnwenden, GEFUEHL_NAME, FAHRZEUG_NAME } from './werkstatt.js';
 import { ladeRallyeautos } from './supercarbau.js';
 
 const $ = id => document.getElementById(id);
@@ -34,6 +35,7 @@ const STANDARD = {
   gegner: 7, staerke: 'mittel', runden: 3, farbe: 0, kamera: 'hinten',
   kamera_klein: 'hinten',   // kleine Autos: hinter dem Auto, im Cockpit oder neben der Bahn stehen ('stand')
   bremshilfe: true, lenkhilfe: false, traktion: true, arcade: true, autogas: false, grafik: 'hoch', linie: true, boxen: true,
+  werkstatt: {},      // selbst eingestellte Fahrphysik je Fahrzeug und Fahrgefühl (Pause → Werkstatt, siehe js/werkstatt.js)
   messwerte: false,   // kleine Anzeige für Tüftler: Bilder pro Sekunde, Dreiecke, Lenkung, Gas, Bremse
   hud: false,      // Gang und Kurven-Gang groß in der Bildmitte (wie in der Scheibe eines echten Autos) statt unten rechts
   neigStufe: 3,    // wie weit man das Gerät dafür neigen muss (2 = weit … 5 = ganz wenig; Grad stehen in VOLL in neigung.js)
@@ -57,6 +59,7 @@ function einstLaden() {
   Object.assign(E, stand.einst());
   if (E.kopfneigen === true) E.kopfneigen = 'wenig'; else if (E.kopfneigen === false) E.kopfneigen = 'aus';   // früher gab es nur an und aus
   if (!(E.kopfneigen in KOPF_STUFEN)) E.kopfneigen = 'wenig';
+  E.werkstatt = JSON.parse(JSON.stringify(E.werkstatt || {}));   // eigene Kopie (sonst schreiben alle Profile in dieselbe Liste)
   if (E.kamera_rallye === 'haube') E.kamera_rallye = 'cockpit';   // die Motorhauben-Kamera ist jetzt ein richtiges Cockpit
 }
 einstLaden();
@@ -426,12 +429,91 @@ export function starteSpiel() {
     laeuft = false; pausiert = false; app.rallyeStand = null;
     wachAus();
     if (sprecher) sprecher.stopp();
-    zeige('hud', false); zeige('pause', false); zeige('ergebnis', false); zeige('menue', true);
+    zeige('hud', false); zeige('pause', false); zeige('werkstatt', false); zeige('ergebnis', false); zeige('menue', true);
     klang.ruhe(); klang.schweigen();   // im Menü ist alles still
     menueBauen();
   }
-  function pauseAn() { if (!laeuft) return; pausiert = true; zeige('pause', true); if (sprecher) sprecher.stopp(); }
-  function pauseAus() { pausiert = false; zeige('pause', false); letzteZeit = performance.now(); }
+  function pauseAn() {
+    if (!laeuft) return; pausiert = true; zeige('pause', true); if (sprecher) sprecher.stopp();
+    $('pWerkstatt').textContent = verstellt(E) ? '🔧 Werkstatt (eigene Werte)' : '🔧 Werkstatt';
+  }
+  function pauseAus() { pausiert = false; zeige('pause', false); zeige('werkstatt', false); letzteZeit = performance.now(); }
+
+  // ---------------------------------------------------------------- Werkstatt: Fahrphysik mit Reglern einstellen
+  // Welche Regler es gibt, steht in js/werkstatt.js. Hier wird nur das Fenster gebaut.
+  // Jeder Regler wirkt sofort auf dein Auto; gemerkt wird je Profil, Fahrzeug und Fahrgefühl (E.werkstatt).
+  let wkMehr = false;   // sind die Regler für Tüftler aufgeklappt?
+  function werkstattZeigen() {
+    zeige('pause', false); zeige('werkstatt', true);
+    const liste = reglerFuer(E), box = $('wkListe');
+    $('wkTitel').textContent = '🔧 Werkstatt: ' + (FAHRZEUG_NAME[E.fahrzeug] || 'kleines Auto') + ', ' + GEFUEHL_NAME[gefuehlVon(E)];
+    box.textContent = '';
+    for (const b of $('wkKnoepfe').querySelectorAll('[data-a=neu], [data-a=alles]')) b.hidden = !liste;
+    if (!liste) {
+      $('wkHinweis').textContent = E.fahrzeug === 'rallye'
+        ? 'Die Regler für die Rallye kommen, sobald ihre neue Abstimmung fertig ist. Für Formel-Rennwagen und Supercars gibt es sie schon.'
+        : 'Für dieses Fahrzeug gibt es noch keine Regler. Für Formel-Rennwagen und Supercars gibt es sie schon.';
+      return;
+    }
+    $('wkHinweis').textContent = 'Jeder Regler wirkt sofort und nur auf dein Auto. Gelb = von dir verstellt, ↺ stellt zurück. Die roten Bremszonen auf der Straße passen erst nach „Neu starten“.';
+    const p = rennen.ich.a.pGrund || rennen.ich.a.p;
+    const werte = () => E.werkstatt[schluessel(E)] || {};                                  // nur lesen
+    const zumSchreiben = () => E.werkstatt[schluessel(E)] || (E.werkstatt[schluessel(E)] = {});
+    let mehrDa = false;
+    for (const r of liste) {
+      if (grundStellung(p, r) === undefined) continue;   // dieses Auto hat die Zahl nicht
+      if (r.mehr && !mehrDa) {
+        mehrDa = true;
+        const m = document.createElement('button'); m.id = 'wkMehr'; m.textContent = wkMehr ? 'Weniger Regler ▴' : 'Mehr Regler ▾';
+        m.addEventListener('click', () => { wkMehr = !wkMehr; werkstattZeigen(); });
+        box.append(m);
+      }
+      if (r.mehr && !wkMehr) continue;
+      const z = document.createElement('div'); z.className = 'wkZeile';
+      const name = document.createElement('b'); name.textContent = r.name;
+      const zahl = document.createElement('output');
+      const zurueck = document.createElement('button'); zurueck.textContent = '↺'; zurueck.title = 'Zurück auf den Wert, mit dem das Auto gebaut ist';
+      const regler = document.createElement('input'); regler.type = 'range'; regler.min = r.von; regler.max = r.bis; regler.step = r.schritt;
+      regler.setAttribute('aria-label', r.name);
+      const text = document.createElement('small'); text.textContent = r.text;
+      const malen = () => {
+        const s = stellung(p, r, werte()), g = grundStellung(p, r), anders = typeof werte()[r.pfad] === 'number';
+        regler.value = s;
+        // Faktor-Regler zeigen zusätzlich die Zahl, die damit im Auto steht
+        zahl.textContent = anzeige(p, r, s) + (r.mal ? ' (' + wertBei(p, r, s).toFixed(2).replace('.', ',') + ')' : '');
+        z.classList.toggle('anders', anders);
+        text.textContent = r.text + (anders ? ' Gebaut: ' + anzeige(p, r, g) + '.' : '');
+      };
+      const setzen = fertig => {
+        const s = Number(regler.value), g = grundStellung(p, r);
+        if (Math.abs(s - g) < r.schritt / 2) delete zumSchreiben()[r.pfad]; else zumSchreiben()[r.pfad] = s;
+        werkstattWirkt(fertig); malen();
+      };
+      regler.addEventListener('input', () => setzen(false));    // beim Schieben: sofort aufs Auto
+      regler.addEventListener('change', () => setzen(true));    // beim Loslassen: merken
+      zurueck.addEventListener('click', () => { delete zumSchreiben()[r.pfad]; werkstattWirkt(true); malen(); });
+      z.append(name, zahl, zurueck, regler, text); box.append(z); malen();
+    }
+  }
+  // Die Regler-Werte aufs Auto legen. fertig = der Finger hat losgelassen: merken und alles neu rechnen, was vom Auto abhängt.
+  function werkstattWirkt(fertig) {
+    const k = schluessel(E);
+    if (E.werkstatt[k] && !Object.keys(E.werkstatt[k]).length) delete E.werkstatt[k];
+    werkstattAnwenden(rennen, E, T);
+    if (!fertig) return;
+    merken();
+    if (kurven) kurven = kurvenFinden(T, rennen.LS, rennen.ich.a.p);   // Gang für die nächste Kurve passt zum neuen Tempo-Plan
+    // In die Aufnahme dieser Fahrt gehören die Werte, die am Ende gelten. Wurde unterwegs verstellt, steht das dabei
+    // (dann lässt sich die Fahrt nicht mehr haargenau nachfahren).
+    if (rek.kopf && rek.kopf.E) { rek.kopf.E.werkstatt = JSON.parse(JSON.stringify(E.werkstatt)); if (rek.n) { rek.kopf.werkstattUnterwegs = true; rek.ereignis('werkstatt'); } }
+  }
+  $('pause').querySelector('[data-a=werkstatt]').addEventListener('click', werkstattZeigen);
+  $('wkKnoepfe').addEventListener('click', e => {
+    const a = e.target.dataset.a;
+    if (a === 'fertig') { zeige('werkstatt', false); pauseAn(); }
+    else if (a === 'neu') { zeige('werkstatt', false); starten(); }
+    else if (a === 'alles') { delete E.werkstatt[schluessel(E)]; werkstattWirkt(true); werkstattZeigen(); }
+  });
   function kameraWeiter() {
     if (!kamera) return;
     // Kleine Autos: hinter dem Auto → im Cockpit → neben der Bahn (dort nacheinander alle Stellen zum Stehen) → wieder von vorn

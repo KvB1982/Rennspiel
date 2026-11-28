@@ -110,10 +110,23 @@
       <button data-a="neu">Neu starten</button>
       <button data-a="kamera">Kamera wechseln</button>
       <button data-a="mitte">Lenkrad: Mitte neu setzen</button>
+      <button data-a="werkstatt" id="pWerkstatt" title="Fahrphysik deines Autos mit Reglern einstellen">🔧 Werkstatt</button>
       <button data-a="sichern" title="Aufnahme dieser Fahrt als Datei sichern (zum Nachmessen)">💾 Fahrt sichern</button>
       <button data-a="menue">Zurück zum Menü</button>
     </div>
   </div>
+
+  <!-- Werkstatt: Fahrphysik mit Reglern einstellen (Inhalt baut spiel.js, Regler stehen in js/werkstatt.js) -->
+  <div id="werkstatt" class="fenster" hidden><div>
+    <h2 id="wkTitel">🔧 Werkstatt</h2>
+    <p class="klein" id="wkHinweis"></p>
+    <div id="wkListe"></div>
+    <div id="wkKnoepfe">
+      <button data-a="fertig">Fertig</button>
+      <button data-a="neu">Neu starten und testen</button>
+      <button data-a="alles">Alles zurücksetzen</button>
+    </div>
+  </div></div>
 
   <!-- Ergebnis -->
   <div id="ergebnis" class="fenster" hidden><div><h2 id="eTitel"></h2><table id="eTabelle"></table>
