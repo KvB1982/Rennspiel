@@ -41,17 +41,17 @@ const BASIS = {
     unter: { ab: 0.25, tempo: 12, brems: 0.8, bremsH: 0.5, gasWeg: 1 },
     drift: { winkel: 0.5, hand: 0.95, ab: 0.4, lang: 4.5, abTempo: 4, lose: 1.0, feder: 60, ruhe: 10, eng: 0.3, engAb: 0.7 } },
   // Das neue, schlichte Fahrmodell (Menü „Fahrgefühl: Neu“, siehe schlichtSchritt in physik.js): echtes Rutschen, keine ziehenden Hilfen.
-  // Neben dem Weg bremst der Boden (zieh), aber der Motor geht nicht aus und es gibt keine Pause danach.
+  // Das Auto lenkt ganz normal. Nur wer in der Kurve stark einlenkt und dabei Gas gibt, driftet.
   schlicht: { haft: 1.3, belag: 0.3, direkt: 4, kreis: 6.5, langsam: 2, dreh: 1.75, gas: 0.5, driftAuf: 3, driftAb: 8, stabil: 1.5, folgen: 60, steif: 14, zug: 2.0, zugQuer: 0.25, brems: 1.7, handDreh: 1.8, handStabil: 0.5, handBrems: 0.35, kurve: 1.0, wand: 0.6,
-    neben: { zieh: 3.5, zug: 0.15, ab: 9, rand: 0.5, pause: 0, pauseZug: 1 } },
+    // "querAb": Erst ab so viel Lenkrad-Ausschlag (0,6 = gut die Hälfte) UND mit Gas kommt das Heck. Ohne Gas driftet das Auto nicht.
+    querAb: 0.6 },
   // Drift zum Selber-Steuern (siehe physik.js): "winkel" = so weit stellt sich das Auto in einer harten Kurve quer (rad),
   // "hand" = mit Handbremse, "ab" = ab so viel Kurvenkraft beginnt es (Anteil der Grenze), "abTempo" = erst ab diesem Tempo (m/s),
   // "lose" = wie viel mehr auf losem Boden, "feder"/"ruhe" = wie schnell das Heck kommt und wie schnell es sich beruhigt.
   // "eng"/"engAb" = in Haarnadelkurven (das Auto dreht sich schneller als engAb rad/s) kommt das Heck noch einmal so viel weiter herum.
-  // neben: Neben dem Weg bremst der Boden kräftig ("zieh" mal Erdanziehung) und der Motor zieht nur noch "zug" – bis hinunter auf "ab" m/s.
-  // "rand" = so viele Meter neben dem Weg sind noch frei (der Rand zählt nicht gleich als Wald).
-  // "pause"/"pauseZug": Zurück auf dem Weg kommt die Motorkraft erst nach und nach wieder (so lange, so wenig am Anfang).
-  neben: { zieh: 3, zug: 0, ab: 12, rand: 0.5, pause: 3, pauseZug: 0.15 },
+  // Neben dem Weg (Kristians Wunsch vom 28.11.2026): Dort fährt das Auto ganz normal weiter, als wäre es noch auf dem Weg.
+  // Der Boden bremst nicht und rutscht nicht mehr als der Weg. (Früher gab es hier "neben": Der Wald bremste stark.)
+  nebenFrei: true,
   // Fahrgefühl „echter“ bei der Rallye: dieselbe Hilfe wie Arcade, aber mit diesen Werten darüber gelegt. Die unsichtbare Hand am Wegrand
   // schiebt nur noch halb so stark (rand) und hält das Auto nicht mehr in der Spur (spur), der lose Boden rutscht mehr (belag, griff),
   // und das Auto darf weiter quer rutschen (frei).

@@ -217,7 +217,7 @@ export function starteSpiel() {
     zeile('Kopf neigt sich in die Kurve', 'kopfneigen', [['aus', 'aus'], ['wenig', 'wenig'], ['stark', 'stark']], !slot);
     zeile('Höchsttempo', 'tempo', [['langsam', 'langsam'], ['mittel', 'mittel'], ['schnell', 'schnell']], modell);
     zeile('Tanken und Reifen', 'boxen', [[true, 'an'], [false, 'aus']], modell && rennenAn && !drift);
-    zeile('Ideallinie und Bremszonen', 'linie', [[true, 'an'], [false, 'aus']], !modell && !rallye);
+    zeile('Ideallinie und Bremszonen', 'linie', [[true, 'an'], [false, 'aus']], !modell);
     // HUD: Gang, Tempo und der Gang für die nächste Kurve stehen mitten im Bild
     zeile('Gang-Anzeige', 'hud', [[false, 'unten rechts'], [true, 'HUD in der Mitte']], !modell);
     zeile('Bremshilfe', 'bremshilfe', [[true, 'an'], [false, 'aus']], !slot);
